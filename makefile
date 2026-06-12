@@ -27,7 +27,7 @@ endif
 
 libxputty: check-and-reinit-submodules
 ifeq (,$(filter $(NOGOAL),$(MAKECMDGOALS)))
-ifeq (,$(wildcard ./libxputty/xputty/resources/smoothir.png))
+ifeq (,$(wildcard ./libxputty/xputty/resources/toneshifteq.png))
 	@cp ./EQ12/Resources/*.png ./libxputty/xputty/resources/
 endif
 	@exec $(MAKE) --no-print-directory -j 1 -C $@ $(MAKECMDGOALS)
@@ -46,7 +46,7 @@ ifeq (,$(filter $(PASS),$(MAKECMDGOALS)))
 endif
 
 clean:
-	@rm -f ./libxputty/xputty/resources/smoothir.png
+	@rm -f ./libxputty/xputty/resources/toneshifteq.png
 	@rm -f ./libxputty/xputty/resources/filters.png
 
 features:

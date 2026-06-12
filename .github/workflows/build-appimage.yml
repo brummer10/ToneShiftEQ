@@ -35,15 +35,15 @@ jobs:
       run: |
         mkdir -p AppDir/usr/bin
         cp bin/* AppDir/usr/bin/
-        cat > AppDir/smoothir.desktop <<EOF
+        cat > AppDir/toneshifteq.desktop <<EOF
         [Desktop Entry]
-        Name=smoothir
-        Exec=smoothir
-        Icon=smoothir
+        Name=toneshifteq
+        Exec=toneshifteq
+        Icon=toneshifteq
         Type=Application
         Categories=AudioVideo;
         EOF
-        cp SmoothIR/Resources/smoothir.svg AppDir/smoothir.svg
+        cp EQ12/Resources/toneshifteq.png AppDir/toneshifteq.png
 
     - name: Download linuxdeploy
       run: |
@@ -56,8 +56,8 @@ jobs:
       run: |
         ./linuxdeploy-x86_64.AppImage \
           --appdir AppDir \
-          --desktop-file AppDir/smoothir.desktop \
-          --icon-file AppDir/smoothir.svg \
+          --desktop-file AppDir/toneshifteq.desktop \
+          --icon-file AppDir/toneshifteq.png \
           --output appimage
 
     - name: Create release filename (tag)
@@ -94,8 +94,8 @@ jobs:
     - name: Upload AppImage artifact
       uses: actions/upload-artifact@v4
       with:
-        name: smoothir-x86_64.AppImage
-        path: smoothir-*.AppImage
+        name: toneshifteq-x86_64.AppImage
+        path: toneshifteq-*.AppImage
 
     - name: Upload release archive (tag)
       if: startsWith(github.ref, 'refs/tags/')
