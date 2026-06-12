@@ -116,7 +116,7 @@ public:
                     const std::vector<double>& bufferR, const uint32_t sampleRate) {
         const bool stereo = !bufferR.empty();
 
-        const uint32_t frames = stereo ? std::min(bufferL.size(), bufferR.size()) : bufferL.size();
+        const uint32_t frames = stereo ? std::min<uint32_t>(bufferL.size(), bufferR.size()) : bufferL.size();
 
         if (frames == 0) {
             std::cerr << "Error: empty buffer\n";

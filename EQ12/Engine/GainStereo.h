@@ -15,6 +15,8 @@
 class GainStereo {
 public:
     float gain = 0.0f;
+    float* meterLout = &meterL;
+    float* meterRout = &meterR;
 
     GainStereo() {}
     ~GainStereo() {}
@@ -69,6 +71,8 @@ public:
 
         meterL = 20.0f * log10(std::max<double>(0.0000003, powerL));
         meterR = 20.0f * log10(std::max<double>( 0.0000003, powerR));
+        *meterLout = meterL;
+        *meterRout = meterR;
     }
 
 private:
@@ -90,7 +94,7 @@ private:
 
         fRec3[ch][1] = fRec3[ch][0];
         fRec0[ch][1] = fRec0[ch][0];
-        fRec2[ch][1] = fRec2[ch][0];
+        fRec2[ch][1] = fRec2[ch][0] * 0.99999999;
         iRec1[ch][1] = iRec1[ch][0];
     }
 

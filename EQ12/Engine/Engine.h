@@ -19,6 +19,8 @@
 #include <thread>
 #include <unistd.h>
 
+#include "Band.h"
+#include "Parameter.h"
 #include "AudioFile.h"
 #include "ParallelThread.h"
 
@@ -26,6 +28,7 @@
 class Engine
 {
 public:
+    Params                       param;
     ParallelThread               xrworker;
     AudioFile                    af;
     IRProcessor*                 ip = nullptr;
@@ -36,16 +39,9 @@ public:
     size_t                       irLength = 4096;          
     std::string                  revfile;
     std::string                  srcfile;
-    std::vector<double>*         srcL;
-    std::vector<double>*         srcR;
-    std::vector<double>*         dstL;
-    std::vector<double>*         dstR;
     std::atomic<bool>            execute {false};
     std::atomic<bool>            workToDo {false};
-    std::atomic<bool>            loadRevFile {false};
-    std::atomic<bool>            loadSrcFile {false};
     std::atomic<bool>            processIR {false};
-    std::atomic<bool>            rebuild {false};
     std::atomic<bool>            waitForIR {false};
     std::atomic<bool>            dataReady {false};
     std::atomic<bool>            convLoadIR {false};
@@ -63,6 +59,8 @@ private:
     float*                       abuffer = nullptr;
     uint32_t                     frames = 0;
 
+    void registerParameters();
+
     inline void processBuffer();
     inline void feedAnanlyzer(uint32_t nframes, float* output, float* output1);
 };
@@ -74,6 +72,8 @@ inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana
         conv = conv_;
         ana = ana_;
         vu = vu_;
+        registerParameters();
+        
         abuffer = new float[8192];
         memset(abuffer, 0, 8192 * sizeof(float));
 
@@ -89,12 +89,42 @@ inline Engine::~Engine(){
 
 };
 
+void Engine::registerParameters() {
+    //                  name           group    min, max, def, step     value                               isStepped  type
+    param.registerParam("Enable",     "Global",  0,   1,   0,    1,     (void*)&conv->bypass,        true,  IS_INT);
+
+    for (int i = 0; i < 12; ++i) {
+        std::string n = "Band " + std::to_string(i + 1);
+        param.registerParam(n + " enable", "EQ", 0, 1, 1, 1, (void*)&ip->bands[i].enabled, true, IS_INT);
+        param.registerParam(n + " type", "EQ", 0, 2, defs[i].type, 1, (void*)&ip->bands[i].type, true, IS_INT);
+        param.registerParam(n + " mute", "EQ", 0, 1, 0, 1, (void*)&ip->bands[i].mute, true, IS_INT);
+        param.registerParam(n + " freq", "EQ", defs[i].freqMin, defs[i].freqMax, defs[i].freqDef, 0.01, (void*)&ip->bands[i].freq, false, IS_DOUBLE);
+        param.registerParam(n + " gain", "EQ", -48.0, 24.0, 0.0, 0.01, (void*)&ip->bands[i].gain, false, IS_DOUBLE);
+        param.registerParam(n + " Q", "EQ", defs[i].qMin, 10.0, defs[i].qDef, 0.01, (void*)&ip->bands[i].Q, false, IS_DOUBLE);
+    }
+    //                  name           group    min, max, def, step     value                               isStepped  type
+    param.registerParam("Solo Band",      "EQ",  0,  11,   0,    1,     (void*)&ip->solo_band,       true,  IS_INT);
+    param.registerParam("Solo enabled",   "EQ",  0,   1,   0,    1,     (void*)&ip->solo_enabled,    true,  IS_INT);
+
+    param.registerParam("Lowcut enable",  "EQ",  0,   1,   0,    1,     (void*)&ip->lowcut_enabled,  true,  IS_INT);
+    param.registerParam("Lowcut freq",    "EQ", 19, 2200, 19, 0.01,     (void*)&ip->lowcut,         false,  IS_DOUBLE);
+    param.registerParam("Highcut enable", "EQ",  0,   1,   0,    1,     (void*)&ip->highcut_enabled, true,  IS_INT);
+    param.registerParam("Highcut freq",   "EQ", 110,22000,22000,0.01,   (void*)&ip->highcut,        false,  IS_DOUBLE);
+
+    param.registerParam("Smooth",         "IR",  0,   1,  0.3, 0.01,    (void*)&ip->smooth_amount,  false,  IS_DOUBLE);
+    param.registerParam("Dynamics",       "IR", -1,   1,  0.0, 0.01,    (void*)&ip->dynamics_amount,false,  IS_DOUBLE);
+    param.registerParam("Tone Bias",      "IR", -1,   1,  0.0, 0.01,    (void*)&ip->tilt_amount,    false,  IS_DOUBLE);
+   
+    param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
+};
+
+
 inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     s_rate = rate;
 
     ana->init(4096, (float)rate);
     vu->init(rate);
-
+    ip->computeIR(rate);
     execute.store(false, std::memory_order_release);
 
     xrworker.setThreadName("Worker");
@@ -109,27 +139,8 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
 void Engine::do_work_mono() {
     execute.store(true, std::memory_order_release);
 
-    if (loadRevFile.load(std::memory_order_acquire)) {
-        if (!revfile.empty()) af.getAudioFile(revfile, s_rate);
-        loadRevFile.store(false, std::memory_order_release);
-        (*dstL).assign(af.samplesL.begin(), af.samplesL.end());
-        (*dstR).assign(af.samplesR.begin(), af.samplesR.end());
-        processIR.store(true, std::memory_order_release);
-        rebuild.store(true, std::memory_order_release);
-    }
-
-    if (loadSrcFile.load(std::memory_order_acquire)) {
-        if (!srcfile.empty()) af.getAudioFile(srcfile, s_rate);
-        loadSrcFile.store(false, std::memory_order_release);
-        (*srcL).assign(af.samplesL.begin(), af.samplesL.end());
-        (*srcR).assign(af.samplesR.begin(), af.samplesR.end());
-        processIR.store(true, std::memory_order_release);
-        rebuild.store(true, std::memory_order_release);
-    }
-
     if (processIR.load(std::memory_order_acquire)) {
-        ip->computeIR((*dstL),(*dstR), (*srcL),(*srcR), s_rate, irLength, 
-                                rebuild.load(std::memory_order_acquire));
+        ip->computeIR(s_rate);
         processIR.store(false, std::memory_order_release);
         waitForIR.store(true, std::memory_order_release);
     }

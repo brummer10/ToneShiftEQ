@@ -26,7 +26,7 @@ public:
 
     ~JackClient() {}
 
-    bool start(const char* name = "smoothir") {
+    bool start(const char* name = "toneshifteq") {
         client = jack_client_open(name, JackNoStartServer, nullptr);
 
         if (!client) {

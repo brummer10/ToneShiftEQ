@@ -62,24 +62,25 @@ else
 endif
 
 	# set bundle name
-	NAME = smootheq
-	PLUGNAME = smootheq
+	NAME = toneshifteq
+	PLUGNAME = toneshifteq
 	VER = 0.1
 
 ifeq (,$(filter clap,$(MAKECMDGOALS)))
-	NAME = smoothir
+ifeq (,$(filter lv2,$(MAKECMDGOALS)))
 	BACKEND = jack
+endif
 endif
 
 	PREFIX ?= /usr
 	# check if user is root
 	user = $(shell whoami)
 	ifeq ($(user),root)
-	INSTALL_DIR ?= $(PREFIX)/lib/lv2
+	LV2_INSTALL_DIR ?= $(PREFIX)/lib/lv2
 	EXE_INSTALL_DIR ?= $(PREFIX)/bin
 	CLAP_INSTAL_DIR ?= $(PREFIX)/lib/clap
 	else 
-	INSTALL_DIR ?= ~/.lv2
+	LV2_INSTALL_DIR ?= ~/.lv2
 	EXE_INSTALL_DIR ?= ~/bin
 	CLAP_INSTAL_DIR ?= ~/.clap
 	endif
@@ -94,10 +95,16 @@ endif
 	HEADER_DIR := $(LIB_DIR)include/
 	UI_LIB:= $(LIB_DIR)libxputty.$(STATIC_LIB_EXT)
 
+	BUNDLE := ToneShiftEQ.lv2
+	LV2_DIR := ./lv2/
+	LV2_INCLUDE := -I./lv2/
+
+	LV2_PLUGIN := $(LV2_DIR)ToneShiftEQ
+	LV2_GUI := $(LV2_DIR)ToneShiftEQ_ui
 
 	CLAP_DIR := ./clap/
 	CLAP_INCLUDE := -I./clap/clap/ -I./clap/
-	CLAP_SOURCES := $(CLAP_DIR)SmoothIRClap.cpp
+	CLAP_SOURCES := $(CLAP_DIR)ToneShiftEQClap.cpp
 
 	# set compile flags
 	GUI_LDFLAGS += -I$(HEADER_DIR) -Wl,-Bstatic -L. $(UI_LIB) \
@@ -123,7 +130,7 @@ endif
 	# invoke build files
 	OBJECTS = main.cpp
 
-	DEPS = $(NAME).d
+	DEPS = $(NAME).d $(NAME)_ui.d
 
 .PHONY : all 
 
@@ -138,6 +145,20 @@ all : check $(NAME)
 clap: $(NAME).clap
 	$(QUIET)mkdir -p ../bin/
 	$(QUIET)cp ./$(NAME).clap ../bin/
+	@$(B_ECHO) "=================== DONE =======================$(reset)"
+
+lv2: $(NAME).$(LIB_EXT) $(NAME)_ui.$(LIB_EXT)
+	@$(B_ECHO) "Create $(BUNDLE) $(reset)"
+	$(QUIET)mkdir -p ../bin/$(BUNDLE)
+	$(QUIET)cp $(LV2_DIR)*.ttl ../bin/$(BUNDLE)
+	$(QUIET)$(TTLUPDATE)
+	$(QUIET)$(TTLUPDATEGUI)
+	$(QUIET)cp ./*.$(LIB_EXT) ../bin/$(BUNDLE)
+	@if [ -f ../bin/$(BUNDLE)/$(NAME).$(LIB_EXT) ]; then \
+		$(B_ECHO) "build finish, . . . $(reset)"; \
+	else \
+		$(R_ECHO) "Sorry, build fail$(reset)"; \
+	fi
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
 
 debug : all
@@ -156,7 +177,7 @@ info:
 
 
 clean :
-	$(QUIET)rm -f *.o *.d *.a *.lib *.clap
+	$(QUIET)rm -f *.o *.d *.a *.lib *.clap *.$(LIB_EXT)
 	$(QUIET)rm -f $(NAME) $(NAME).exe 
 	$(QUIET)rm -rf ../bin
 
@@ -183,9 +204,19 @@ ifneq ("$(wildcard ../bin/$(PLUGNAME).clap)","")
 else
 	@$(B_ECHO) "$(NAME).clap Clap skipped$(reset)"
 endif
+ifneq ("$(wildcard ../bin/$(BUNDLE))","")
+	@$(B_ECHO) "Install $(NAME).lv2 to $(DESTDIR)$(LV2_INSTALL_DIR)/$(reset)"
+	$(QUIET)mkdir -p $(DESTDIR)$(LV2_INSTALL_DIR)/$(BUNDLE)
+	$(QUIET)cp -r ../bin/$(BUNDLE)/* $(DESTDIR)$(LV2_INSTALL_DIR)/$(BUNDLE)
+	@$(B_ECHO) ". ., done$(reset)"
+else
+	@$(B_ECHO) "$(BUNDLE) skipped$(reset)"
+endif
 
 uninstall :
 	$(QUIET)rm -rf $(DESTDIR)$(EXE_INSTALL_DIR)/$(NAME)
+	$(QUIET)rm -rf $(DESTDIR)$(LV2_INSTALL_DIR)/$(BUNDLE)
+	$(QUIET)rm -rf $(DESTDIR)$(CLAP_INSTAL_DIR)/$(PLUGNAME).clap
 
 $(NAME) : $(OBJECTS)
 	$(CXX) -MMD $(CXXFLAGS) $(OBJECTS) -o $(NAME)$(EXE) $(LDFLAGS)
@@ -193,11 +224,25 @@ ifneq ($(MAKECMDGOALS),debug)
 	$(STRIP) -s -x -X -R .note.ABI-tag $(NAME)$(EXE)
 endif
 
-$(NAME).clap: $(CLAP_SOURCES) $(CLAP_DIR)SmoothIR.cc
+$(NAME).clap: $(CLAP_SOURCES) $(CLAP_DIR)ToneShiftEQ.cc
 	@$(B_ECHO) "Compiling $(NAME).clap $(reset)"
-	$(CXX) -shared $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS)
+	$(CXX) -shared -MMD $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).clap
+endif
+
+$(NAME)_ui.$(LIB_EXT): $(LV2_GUI).cpp $(GUIIMPL_SOURCE) $(UI_LIB)
+	@$(B_ECHO) "Compiling $(NAME)_ui.$(LIB_EXT) $(reset)"
+	$(QUIET)$(CXX) -shared -MMD $(CXXFLAGS) -I./ $(LV2_INCLUDE) $(LV2_GUI).cpp -L. $(UI_LIB) -o $@ $(LDFLAGS) $(GUI_LDFLAGS)
+ifeq (,$(filter yes,$(DEBUG)))
+	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME)_ui.$(LIB_EXT)
+endif
+
+$(NAME).$(LIB_EXT): $(LV2_PLUGIN).cpp
+	@$(B_ECHO) "Compiling $(NAME).$(LIB_EXT) $(reset)"
+	$(QUIET)$(CXX) -shared -MMD $(CXXFLAGS) $(LV2_INCLUDE) $(LV2_PLUGIN).cpp -o $(NAME).$(LIB_EXT) $(LDFLAGS)
+ifeq (,$(filter yes,$(DEBUG)))
+	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).$(LIB_EXT)
 endif
 
 doc:

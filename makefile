@@ -7,7 +7,7 @@ SWITCHGOAL := all modapp standalone lv2 jack clap vst2
 
 PASS := features 
 
-SUBDIR := SmoothIR
+SUBDIR := EQ12
 
 .PHONY: $(SUBDIR) libxputty  recurse
 
@@ -28,13 +28,13 @@ endif
 libxputty: check-and-reinit-submodules
 ifeq (,$(filter $(NOGOAL),$(MAKECMDGOALS)))
 ifeq (,$(wildcard ./libxputty/xputty/resources/smoothir.png))
-	@cp ./SmoothIR/Resources/*.png ./libxputty/xputty/resources/
+	@cp ./EQ12/Resources/*.png ./libxputty/xputty/resources/
 endif
 	@exec $(MAKE) --no-print-directory -j 1 -C $@ $(MAKECMDGOALS)
 endif
 ifneq (,$(filter $(SWITCHGOAL),$(MAKECMDGOALS)))
 ifeq (,$(wildcard ./libxputty/xputty/resources/smoothir.png))
-	@cp ./SmoothIR/Resources/*.png ./libxputty/xputty/resources/
+	@cp ./EQ12/Resources/*.png ./libxputty/xputty/resources/
 endif
 	@exec $(MAKE) --no-print-directory -j 1 -C $@ all
 endif

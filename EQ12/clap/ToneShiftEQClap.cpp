@@ -1,5 +1,5 @@
 /*
- * SmoothIR.cpp
+ * ToneShiftEQ.cpp
  *
  * SPDX-License-Identifier:  BSD-3-Clause
  *
@@ -13,10 +13,10 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct smoothir_plugin_t smoothir_plugin_t;
+typedef struct toneshifteq_plugin_t toneshifteq_plugin_t;
 
-#define WINDOW_WIDTH  875
-#define WINDOW_HEIGHT 520
+#define WINDOW_WIDTH  880
+#define WINDOW_HEIGHT 430
 
 #if defined(_WIN32)
 #define GUIAPI CLAP_WINDOW_API_WIN32
@@ -26,16 +26,16 @@ typedef struct smoothir_plugin_t smoothir_plugin_t;
 
 
 /****************************************************************
- ** smoothir_plugin_t -> the plugin struct
+ ** toneshifteq_plugin_t -> the plugin struct
  */
 
-#include "SmoothIR.cc"
+#include "ToneShiftEQ.cc"
 
 // Plugin data structure
-struct smoothir_plugin_t {
+struct toneshifteq_plugin_t {
     clap_plugin_t plugin;
     const clap_host_t *host;
-    SmoothIR *r;
+    ToneShiftEQ *r;
     std::string state;
     bool isInited;
     bool guiIsCreated;
@@ -49,12 +49,12 @@ struct smoothir_plugin_t {
  */
 
 static uint32_t params_count(const clap_plugin_t* plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     return (uint32_t)plug->r->param->getParamCount();
 }
 
 static bool params_get_info(const clap_plugin_t* plugin, uint32_t param_index, clap_param_info_t* param_info) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if ((int)param_index >= plug->r->param->getParamCount()) return false;
     const auto& def = plug->r->param->getParameter(param_index);
     memset(param_info, 0, sizeof(*param_info));
@@ -72,36 +72,35 @@ static bool params_get_info(const clap_plugin_t* plugin, uint32_t param_index, c
 }
 
 static bool params_get_value(const clap_plugin_t* plugin, clap_id param_id, double* value) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (param_id < 0 || (int)param_id >= plug->r->param->getParamCount()) return false;
     *value = plug->r->param->getParam(param_id);
     return true;
 }
 
 static bool params_value_to_text(const clap_plugin_t* plugin, clap_id param_id, double value, char* out, uint32_t size) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (param_id < 0 || (int)param_id >= plug->r->param->getParamCount()) return false;
     snprintf(out, size, "%.2f", value);
     return true;
 }
 
 static bool params_text_to_value(const clap_plugin_t* plugin, clap_id param_id, const char* text, double* out_value) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (param_id < 0 || (int)param_id >= plug->r->param->getParamCount()) return false;
     *out_value = atof(text);
     return true;
 }
 
 static void sync_params_to_plug(const clap_plugin_t *plugin, const clap_event_header_t *hdr) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (hdr->space_id == CLAP_CORE_EVENT_SPACE_ID) {
         switch (hdr->type) {
             case CLAP_EVENT_PARAM_VALUE: {
                 const clap_event_param_value_t *ev = (const clap_event_param_value_t *)hdr;
                 plug->r->param->setParam(ev->param_id, ev->value);
-                if (ev->param_id > 0 && ev->param_id < 46) {
+                if (ev->param_id > 0 && ev->param_id < 82) {
                     plug->r->engine.processIR.store(true, std::memory_order_release);
-                    plug->r->engine.rebuild.store(false, std::memory_order_release);
                     plug->r->engine.workToDo.store(true, std::memory_order_release);
                 }
                 break;
@@ -111,7 +110,7 @@ static void sync_params_to_plug(const clap_plugin_t *plugin, const clap_event_he
 }
 
 static void sync_params_to_host(const clap_plugin_t *plugin, const clap_output_events_t *out) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     for (int i = 0; i < plug->r->param->getParamCount(); i++) {
         if (plug->r->param->isParamDirty(i)) {
             clap_event_param_value_t event = {};
@@ -136,7 +135,7 @@ static void sync_params_to_host(const clap_plugin_t *plugin, const clap_output_e
 static void params_flush(const clap_plugin_t *plugin,
                         const clap_input_events_t *in,
                         const clap_output_events_t *out) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     for (uint32_t i = 0; i < in->size(in); ++i) {
         const clap_event_header_t *ev = in->get(in, i);
         if (ev->type == CLAP_EVENT_PARAM_VALUE) {
@@ -148,7 +147,7 @@ static void params_flush(const clap_plugin_t *plugin,
     }
 }
 
-const clap_plugin_params_t smoothir_params = {
+const clap_plugin_params_t toneshifteq_params = {
     .count         = params_count,
     .get_info      = params_get_info,
     .get_value     = params_get_value,
@@ -190,12 +189,12 @@ static const clap_plugin_audio_ports_t audio_ports = {
  ** Latency reporting
  */
 
-static uint32_t smoothir_latency_get(const clap_plugin_t *plugin) {
-    return 0;
+static uint32_t toneshifteq_latency_get(const clap_plugin_t *plugin) {
+    return 384; // PART_SIZE + FFT_SIZE
 }
 
 static const clap_plugin_latency_t latency_extension = {
-    .get = smoothir_latency_get,
+    .get = toneshifteq_latency_get,
 };
 
 /****************************************************************
@@ -203,15 +202,15 @@ static const clap_plugin_latency_t latency_extension = {
  */
 
 // State Management
-static bool smoothir_state_save(const clap_plugin_t *plugin, const clap_ostream_t *stream) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_state_save(const clap_plugin_t *plugin, const clap_ostream_t *stream) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->saveState(&plug->state);
     stream->write(stream, plug->state.c_str(), strlen(plug->state.c_str()));
     return true;
 }
 
-static bool smoothir_state_load(const clap_plugin_t *plugin, const clap_istream_t *stream) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_state_load(const clap_plugin_t *plugin, const clap_istream_t *stream) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     char _state[2048];
     char *curr = _state;
     int thisread = stream->read(stream, curr, 2048);
@@ -222,62 +221,62 @@ static bool smoothir_state_load(const clap_plugin_t *plugin, const clap_istream_
 }
 
 static const clap_plugin_state_t state_extension = {
-    .save = smoothir_state_save,
-    .load = smoothir_state_load,
+    .save = toneshifteq_state_save,
+    .load = toneshifteq_state_load,
 };
 
 /****************************************************************
  ** GUI handling
  */
 
-static bool smoothir_gui_is_api_supported(const clap_plugin *plugin, const char *api, bool is_floating) {
+static bool toneshifteq_gui_is_api_supported(const clap_plugin *plugin, const char *api, bool is_floating) {
     return strcmp(api, GUIAPI) == 0;
 }
 
-static bool smoothir_gui_get_preferred_api(const clap_plugin_t *plugin, const char **api, bool *isFloating) {
+static bool toneshifteq_gui_get_preferred_api(const clap_plugin_t *plugin, const char **api, bool *isFloating) {
     *api = GUIAPI;
     *isFloating = false;
     return true;
 }
 
-static bool smoothir_gui_set_scale(const clap_plugin_t *plugin, double scale) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_set_scale(const clap_plugin_t *plugin, double scale) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->getMain()->hdpi = scale;
     return true;
 }
 
-static bool smoothir_gui_get_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_get_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     *width = plug->r->sw.top->width;
     *height = plug->r->sw.top->height;
     return true;
 }
 
-static bool smoothir_gui_can_resize(const clap_plugin_t *plugin) {
+static bool toneshifteq_gui_can_resize(const clap_plugin_t *plugin) {
     return true;
 }
 
-static bool smoothir_gui_get_resize_hints(const clap_plugin_t *plugin, clap_gui_resize_hints_t *hints) {
+static bool toneshifteq_gui_get_resize_hints(const clap_plugin_t *plugin, clap_gui_resize_hints_t *hints) {
     return false;
 }
 
-static bool smoothir_gui_adjust_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_adjust_size(const clap_plugin_t *plugin, uint32_t *width, uint32_t *height) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->width = *width;
     plug->height = *height;
     return true;   
 }
 
-static bool smoothir_gui_set_transient(const clap_plugin_t *plugin, const clap_window_t *window) {
+static bool toneshifteq_gui_set_transient(const clap_plugin_t *plugin, const clap_window_t *window) {
     return false;
 }
 
-static void smoothir_gui_suggest_title(const clap_plugin_t *plugin, const char *title) {
-    title = "SmoothIR";
+static void toneshifteq_gui_suggest_title(const clap_plugin_t *plugin, const char *title) {
+    title = "ToneShiftEQ";
 }
 
-static bool smoothir_gui_create(const clap_plugin *plugin, const char *api, bool is_floating) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_create(const clap_plugin *plugin, const char *api, bool is_floating) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (strcmp(api, GUIAPI) == 0) {
         if (!plug->guiIsCreated) {
             plug->r->startGui();
@@ -288,29 +287,29 @@ static bool smoothir_gui_create(const clap_plugin *plugin, const char *api, bool
     return false;
 }
 
-static void smoothir_gui_destroy(const clap_plugin *plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static void toneshifteq_gui_destroy(const clap_plugin *plugin) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (plug->guiIsCreated) {
         plug->r->quitGui();
     }
     plug->guiIsCreated = false;
 }
 
-static bool smoothir_gui_show(const clap_plugin *plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_show(const clap_plugin *plugin) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->showGui();
     return true;
 }
 
-static bool smoothir_gui_hide(const clap_plugin *plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_hide(const clap_plugin *plugin) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->hideGui();
     return true;
 }
 
 // embed the GUI
-static bool smoothir_gui_set_parent(const clap_plugin_t *plugin, const clap_window_t *window) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_set_parent(const clap_plugin_t *plugin, const clap_window_t *window) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if (!plug->guiIsCreated) {
         #if defined(_WIN32)
         plug->r->startGui((Window)window->win32);
@@ -327,35 +326,35 @@ static bool smoothir_gui_set_parent(const clap_plugin_t *plugin, const clap_wind
     return true;
 }
 
-static bool smoothir_gui_set_size(const clap_plugin_t *plugin, uint32_t width, uint32_t height) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_gui_set_size(const clap_plugin_t *plugin, uint32_t width, uint32_t height) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     os_resize_window(plug->r->getMain()->dpy, plug->r->sw.top, width, height);
     return true;
 }
 
 
 // Main thread callback (we run our own main thread)
-static void smoothir_on_main_thread(const clap_plugin_t *plugin) {
-   // smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static void toneshifteq_on_main_thread(const clap_plugin_t *plugin) {
+   // toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
    // plug->r->runGui();
 }
 
 static const clap_plugin_gui_t extensionGUI = {
-    .is_api_supported = smoothir_gui_is_api_supported,
-    .get_preferred_api = smoothir_gui_get_preferred_api,
-    .create = smoothir_gui_create,
-    .destroy = smoothir_gui_destroy,
-    .set_scale = smoothir_gui_set_scale,
-    .get_size = smoothir_gui_get_size,
-    .can_resize = smoothir_gui_can_resize,
-    .get_resize_hints = smoothir_gui_get_resize_hints,
-    .adjust_size = smoothir_gui_adjust_size,
-    .set_size = smoothir_gui_set_size,
-    .set_parent = smoothir_gui_set_parent,
-    .set_transient = smoothir_gui_set_transient,
-    .suggest_title = smoothir_gui_suggest_title,
-    .show = smoothir_gui_show,
-    .hide = smoothir_gui_hide,
+    .is_api_supported = toneshifteq_gui_is_api_supported,
+    .get_preferred_api = toneshifteq_gui_get_preferred_api,
+    .create = toneshifteq_gui_create,
+    .destroy = toneshifteq_gui_destroy,
+    .set_scale = toneshifteq_gui_set_scale,
+    .get_size = toneshifteq_gui_get_size,
+    .can_resize = toneshifteq_gui_can_resize,
+    .get_resize_hints = toneshifteq_gui_get_resize_hints,
+    .adjust_size = toneshifteq_gui_adjust_size,
+    .set_size = toneshifteq_gui_set_size,
+    .set_parent = toneshifteq_gui_set_parent,
+    .set_transient = toneshifteq_gui_set_transient,
+    .suggest_title = toneshifteq_gui_suggest_title,
+    .show = toneshifteq_gui_show,
+    .hide = toneshifteq_gui_hide,
 };
 
 /****************************************************************
@@ -363,23 +362,23 @@ static const clap_plugin_gui_t extensionGUI = {
  */
 
 // Initialize the plugin
-static bool smoothir_init(const clap_plugin_t *plugin) {
-    //smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static bool toneshifteq_init(const clap_plugin_t *plugin) {
+    //toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     //plug->r->initEngine(48000, 25, 1);
     return true;
 }
 
 // Destroy the plugin
-static void smoothir_destroy(const clap_plugin_t *plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
-    smoothir_gui_destroy(plugin);
+static void toneshifteq_destroy(const clap_plugin_t *plugin) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
+    toneshifteq_gui_destroy(plugin);
     delete plug->r;
     delete plug;
 }
 
 // Audio processing
-static clap_process_status smoothir_process(const clap_plugin_t *plugin, const clap_process_t *process) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static clap_process_status toneshifteq_process(const clap_plugin_t *plugin, const clap_process_t *process) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     // Ensure there is one input and two outputs
     if (process->audio_inputs[0].channel_count < 2 || process->audio_outputs[0].channel_count < 2) {
         return false; // Invalid format
@@ -428,11 +427,11 @@ static clap_process_status smoothir_process(const clap_plugin_t *plugin, const c
 }
 
 // Finally get the sample rate and init the engine
-static bool smoothir_activate(const struct clap_plugin *plugin,
+static bool toneshifteq_activate(const struct clap_plugin *plugin,
                              double                    sample_rate,
                              uint32_t                  min_frames_count,
                              uint32_t                  max_frames_count) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->initEngine(sample_rate, 25, 1);
     plug->isInited = true;
     if(!plug->state.empty()) plug->r->readState(plug->state);
@@ -440,62 +439,62 @@ static bool smoothir_activate(const struct clap_plugin *plugin,
 }
 
 // clear the state string when we get deactivated
-static void smoothir_deactivate(const struct clap_plugin *plugin) {
-    smoothir_plugin_t *plug = (smoothir_plugin_t *)plugin->plugin_data;
+static void toneshifteq_deactivate(const struct clap_plugin *plugin) {
+    toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     if(!plug->state.empty()) plug->state.clear();
 }
 
-static bool smoothir_start_processing(const struct clap_plugin *plugin) { return true; }
+static bool toneshifteq_start_processing(const struct clap_plugin *plugin) { return true; }
 
-static void smoothir_stop_processing(const struct clap_plugin *plugin) {}
+static void toneshifteq_stop_processing(const struct clap_plugin *plugin) {}
 
-static void smoothir_reset(const struct clap_plugin *plugin) {}
+static void toneshifteq_reset(const struct clap_plugin *plugin) {}
 
 // CLAP plugin descriptor
-static const clap_plugin_descriptor_t smoothir_descriptor = {
+static const clap_plugin_descriptor_t toneshifteq_descriptor = {
     .clap_version = CLAP_VERSION_INIT,
-    .id = "com.brummer10.SmoothEQ",
-    .name = "SmoothEQ",
+    .id = "com.brummer10.ToneShiftEQ",
+    .name = "ToneShift-EQ12",
     .vendor = "brummer10",
-    .url = "https://github.com/brummer10/SmoothIR",
-    .manual_url = "https://github.com/brummer10/SmoothIR",
-    .support_url = "https://github.com/brummer10/SmoothIR",
+    .url = "https://github.com/brummer10/ToneShiftEQ",
+    .manual_url = "https://github.com/brummer10/ToneShiftEQ",
+    .support_url = "https://github.com/brummer10/ToneShiftEQ",
     .version = "0.3.0",
-    .description = "CLAP plugin wrapper for SmoothIR",
+    .description = "12 band liner phase EQ",
     .features = (const char *[]){ CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, NULL },
 };
 
 // Extensions
-static const void *smoothir_get_extension(const clap_plugin_t *plugin, const char *id) {
+static const void *toneshifteq_get_extension(const clap_plugin_t *plugin, const char *id) {
     if (!strcmp(id, CLAP_EXT_AUDIO_PORTS)) return &audio_ports;
     if (!strcmp(id, CLAP_EXT_LATENCY)) return &latency_extension;
     if (!strcmp(id, CLAP_EXT_GUI)) return &extensionGUI;
-    if (!strcmp(id, CLAP_EXT_PARAMS)) return &smoothir_params;
+    if (!strcmp(id, CLAP_EXT_PARAMS)) return &toneshifteq_params;
     if (!strcmp(id, CLAP_EXT_STATE)) return &state_extension;
     return NULL;
 }
 
 // Create the plugin
-static const clap_plugin_t *smoothir_create(const clap_host_t *host) {
-    smoothir_plugin_t *plug = new smoothir_plugin_t{};
+static const clap_plugin_t *toneshifteq_create(const clap_host_t *host) {
+    toneshifteq_plugin_t *plug = new toneshifteq_plugin_t{};
     if (!plug) return NULL;
-    plug->r = new SmoothIR();
+    plug->r = new ToneShiftEQ();
     plug->guiIsCreated = false;
     plug->isInited = false;
     plug->width = WINDOW_WIDTH;
     plug->height = WINDOW_HEIGHT;
-    plug->plugin.desc = &smoothir_descriptor;
+    plug->plugin.desc = &toneshifteq_descriptor;
     plug->plugin.plugin_data = plug;
-    plug->plugin.init = smoothir_init;
-    plug->plugin.destroy = smoothir_destroy;
-    plug->plugin.activate = smoothir_activate;
-    plug->plugin.deactivate = smoothir_deactivate;
-    plug->plugin.start_processing = smoothir_start_processing;
-    plug->plugin.stop_processing = smoothir_stop_processing;
-    plug->plugin.reset = smoothir_reset;
-    plug->plugin.process = smoothir_process;
-    plug->plugin.get_extension = smoothir_get_extension;
-    plug->plugin.on_main_thread = smoothir_on_main_thread;
+    plug->plugin.init = toneshifteq_init;
+    plug->plugin.destroy = toneshifteq_destroy;
+    plug->plugin.activate = toneshifteq_activate;
+    plug->plugin.deactivate = toneshifteq_deactivate;
+    plug->plugin.start_processing = toneshifteq_start_processing;
+    plug->plugin.stop_processing = toneshifteq_stop_processing;
+    plug->plugin.reset = toneshifteq_reset;
+    plug->plugin.process = toneshifteq_process;
+    plug->plugin.get_extension = toneshifteq_get_extension;
+    plug->plugin.on_main_thread = toneshifteq_on_main_thread;
     plug->host = host;
     return &plug->plugin;
 }
@@ -508,9 +507,9 @@ static uint32_t plugin_factory_get_plugin_count(const struct clap_plugin_factory
    return 1;
 }
 
-static const clap_plugin_descriptor_t *plugin_factory_get_smoothir_descriptor
+static const clap_plugin_descriptor_t *plugin_factory_get_toneshifteq_descriptor
                     (const struct clap_plugin_factory *factory, uint32_t index) {
-   return  &smoothir_descriptor; //s_plugins[index].desc;
+   return  &toneshifteq_descriptor; //s_plugins[index].desc;
 }
 
 static const clap_plugin_t *plugin_factory_create_neuralrack
@@ -520,12 +519,12 @@ static const clap_plugin_t *plugin_factory_create_neuralrack
    if (!clap_version_is_compatible(host->clap_version)) {
       return NULL;
    }
-   return smoothir_create(host);
+   return toneshifteq_create(host);
 }
 
 static const clap_plugin_factory_t plugin_factory = {
     .get_plugin_count = plugin_factory_get_plugin_count,
-    .get_plugin_descriptor = plugin_factory_get_smoothir_descriptor,
+    .get_plugin_descriptor = plugin_factory_get_toneshifteq_descriptor,
     .create_plugin = plugin_factory_create_neuralrack,
 };
 

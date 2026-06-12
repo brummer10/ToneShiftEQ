@@ -73,7 +73,8 @@ void draw_label(void *w_, void* user_data) {
     cairo_text_extents(w->crb, label, &extents_f);
     double twf = extents_f.width/2.0;
     cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
-    cairo_show_text(w->crb, label);
+    cairo_text_path (w->crb, label);
+    cairo_fill (w->crb);
     widget_reset_scale(w);
 }    
 
@@ -147,7 +148,8 @@ void draw_i_button(void *w_, void* user_data) {
     cairo_text_extents(w->crb, w->label, &extents_f);
     double twf = extents_f.width/2.0;
     cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
-    cairo_show_text(w->crb, w->label);
+    cairo_text_path (w->crb, w->label);
+    cairo_fill (w->crb);
     widget_reset_scale(w);
     
 }
@@ -244,6 +246,7 @@ Widget_t *add_xsave_file_button(Widget_t *parent, int x, int y, int width, int h
     Widget_t *fbutton = add_toggle_button(parent, label, x, y, width, height);
     fbutton->private_struct = filebutton;
     fbutton->flags |= HAS_MEM;
+    fbutton->flags |= NO_PROPAGATE;
     fbutton->scale.gravity = ASPECT;
     fbutton->func.expose_callback = draw_i_button;
     fbutton->func.mem_free_callback = fxbutton_mem_free;
@@ -255,6 +258,7 @@ Widget_t *add_xsave_file_button(Widget_t *parent, int x, int y, int width, int h
 Widget_t *add_my_button(Widget_t *parent, int x, int y, int width, int height, const char *label) {
     Widget_t *fbutton = add_button(parent, label, x, y, width, height);
     fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE;
     fbutton->func.expose_callback = draw_i_button;
     return fbutton;
 }
@@ -262,6 +266,7 @@ Widget_t *add_my_button(Widget_t *parent, int x, int y, int width, int height, c
 Widget_t *add_my_toggle_button(Widget_t *parent, int x, int y, int width, int height, const char *label) {
     Widget_t *fbutton = add_toggle_button(parent, label, x, y, width, height);
     fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE;
     fbutton->func.expose_callback = draw_i_button;
     return fbutton;
 }
@@ -299,7 +304,8 @@ static void draw_my_combobox(void *w_, void* user_data) {
     cairo_text_extents(w->crb, label, &extents_f);
     double twf = extents_f.width/2.0;
     cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
-    cairo_show_text(w->crb, label);
+    cairo_text_path (w->crb, label);
+    cairo_fill (w->crb);
     widget_reset_scale(w);
 
 }

@@ -16,33 +16,29 @@
 #include <atomic>
 #include <utility>
 
-#include "Parameter.h"
-#include "AudioFile.h"
 #include "xwidgets.h"
 #include "widgets.cc"
+#include "AudioFile.h"
 #include "EQController.h"
+#include "IConnector.h"
 
 class SpectrumViewer {
 public:
     using Vec = std::vector<float>;
-    Params param;
-    std::vector<double> dstL;
-    std::vector<double> dstR;
-    std::vector<double> srcL;
-    std::vector<double> srcR;
-    std::string ref_file;
-    std::string src_file;
     bool run = false;
+    int active_panel = 0;
     Widget_t* top = nullptr;
     Widget_t* bp = nullptr;
-    Widget_t* frame[6];
-    Widget_t* ftype[6];
-    Widget_t* fenable[6];
-    Widget_t* freq[6];
-    Widget_t* fq[6];
-    Widget_t* fgain[6];
-    Widget_t* solo[6];
-    Widget_t* mute[6];
+    Widget_t* frame[12];
+    Widget_t* ftype[12];
+    Widget_t* fenable[12];
+    Widget_t* freq[12];
+    Widget_t* fq[12];
+    Widget_t* fgain[12];
+    Widget_t* solo[12];
+    Widget_t* mute[12];
+    Widget_t* prev[12];
+    Widget_t* next[12];
 
     Widget_t* lowcut = nullptr;
     Widget_t* lcenable = nullptr;
@@ -53,150 +49,214 @@ public:
     Widget_t* dynamics = nullptr;
     Widget_t* tilt = nullptr;
     Widget_t* vug = nullptr;
+    Widget_t* vumeterL = nullptr;
+    Widget_t* vumeterR = nullptr;
     std::atomic<bool> havePreset {false};
 
-    SpectrumViewer(Engine *engine_) {
-        engine = engine_;
-        registerParameters();
-        engine->srcL = &srcL;
-        engine->srcR = &srcR;
-        engine->dstL = &dstL;
-        engine->dstR = &dstR;
+    SpectrumViewer(IConnector *conn_) {
+        conn = conn_;
     }
 
     ~SpectrumViewer() {
-        if(image_layer) cairo_surface_destroy(image_layer);
         if(eq_layer) cairo_surface_destroy(eq_layer);
     }
 
-    void setRef(const std::vector<double>& refL, const std::vector<double>& refR, std::string ref_file_) {
-        dstL.assign(refL.begin(), refL.end());
-        dstR.assign(refR.begin(), refR.end());
-        ref_file = ref_file_;
-    }
-
-    void setSource(const std::vector<double>& sourceL, const std::vector<double>& sourceR, std::string src_file_) {
-        srcL.assign(sourceL.begin(), sourceL.end());
-        srcR.assign(sourceR.begin(), sourceR.end());
-        src_file = src_file_;
-    }
-
-    void setData(const std::vector<double>& ref,
-                 const std::vector<double>& source,
-                 const std::vector<double>& diff,
-                 const std::vector<double>& ir) {
-        ref_.assign(ref.begin(), ref.end());
-        source_.assign(source.begin(), source.end());
-        diff_.assign(diff.begin(), diff.end());
+    void setData(const std::vector<float>& ir) {
         ir_.assign(ir.begin(), ir.end());
     }
 
-    void init(int width = 875, int height = 520) {
+    void setSpec(const float* data, int bin) {
+        mag_.clear();
+        for (int i = 0; i<bin; i++) {
+            mag_.push_back(data[i]);
+            expose_widget(spec);
+        }
+    }
+
+    void setFilter(const float* data, int bin) {
+        ir_.clear();
+        for (int i = 0; i<bin; i++) {
+            ir_.push_back(data[i]);
+        }
+        rebuild_eq_layer = true;
+        expose_widget(spec);
+    }
+
+    void init(int width = 880, int height = 430) {
         main_init(&main);
         top = create_window(&main, os_get_root_window(&main, IS_WINDOW), 0, 0, width, height);
-        widget_set_title(top, "Smoothed IR");
+        widget_set_title(top, "ToneShift-EQ12");
         widget_set_icon_from_png(top,LDVAR(smoothir_png));
         //top->flags = NO_PROPAGATE;
         top->func.expose_callback = draw_window;
     }
 
-    void create(int width = 875, int height = 520) {
+    void create(int width = 880, int height = 430) {
         spec_width  = 0;
         spec_height = 0;
 
-        spec = create_widget(&main, top,0, 0, width-75, height-190);
+        spec = create_widget(&main, top,0, 0, width-80, height);
         XSelectInput(spec->app->dpy, spec->widget,StructureNotifyMask|ExposureMask|KeyPressMask 
                     |EnterWindowMask|LeaveWindowMask|ButtonReleaseMask|KeyReleaseMask
                     |ButtonPressMask|Button1MotionMask|PointerMotionMask);
 
         spec->parent_struct = this;
+        spec->flags |= NO_PROPAGATE;
         spec->func.expose_callback = draw_callback;
         spec->func.motion_callback = mouse_in_spec;
         spec->func.leave_callback = mouse_leave_spec;
         spec->func.button_release_callback = mouse_move_spec;
         spec->func.button_press_callback = mouse_set_spec;
 
-        Widget_t* gframe = add_my_frame(top,"", width-73, 0, 71, height-192);
-        vumeterL = add_my_vmeter(gframe, "Meter", false, 28, 5, 10, height-200);
-        vumeterR = add_my_vmeter(gframe, "Meter", true, 38, 5, 10, height-200);
-        vug = add_my_vslider(gframe, "Gain", 5, 5, 20, height-200);
+        Widget_t* gframe = add_my_frame(top,"", width-79, 0, 78, height-82);
+        vumeterL = add_my_vmeter(gframe, "Meter", false, 35, 5, 10, height-88);
+        vumeterR = add_my_vmeter(gframe, "Meter", true, 45, 5, 10, height-88);
+        vug = add_my_vslider(gframe, "Gain", 8, 6, 20, height-90);
         vug->parent_struct = this;
         set_adjustment(vug->adj,0.0, 0.0, -46.0, 12.0, 0.1, CL_CONTINUOS);
         vug->func.value_changed_callback = set_gain;
 
-        Widget_t* lframe = add_my_frame(top,"", width-75, 331, 73, 100);
-        curFreq = add_my_label(lframe, "",5,10,60,20);
-        curGain = add_my_label(lframe, "",5,30,60,20);
+        Widget_t* lframe = add_my_frame(top,"", width-79, 350, 78, 80);
+        curFreq = add_my_label(lframe, "",5,0,60,20);
+        curGain = add_my_label(lframe, "",5,20,60,20);
+
+        bp = add_my_toggle_button(lframe, 5, 40, 60, 20, "Bypass");
+        bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        bp->parent_struct = this;
+        bp->func.value_changed_callback = bp_response;
+
+        #ifndef CLAPPLUG
+        Widget_t* quit = add_my_button(lframe, 5, 60, 60, 20, "Quit");
+        quit->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        quit->parent_struct = this;
+        quit->func.value_changed_callback = quit_response;
+        #endif
+
+        Widget_t* laframe = add_my_z_frame(spec,"", 1, 331, width-80, 100);
 
         int x = 1;
-        for (int i = 0; i<6; i++) {
-            frame[i] = add_my_frame(top,"", x, 331, 133, 100);
+        for (int i = 0; i<12; i++) {
+            frame[i] = add_my_panel(laframe,"", 285, 0, 250, 99);
+            double r,g,bcol;
+            get_band_color(i, r, g, bcol);
+            set_widget_color(frame[i], (Color_state)0, (Color_mod)1, r, g, bcol, 1.0);
+           
 
-            solo[i] = add_my_toggle_button(frame[i], 5, 5, 20, 20, "S");
+            prev[i] = add_my_button(frame[i], 10, 78, 20, 20, "<");
+            prev[i]->data = i;
+            prev[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+            prev[i]->parent_struct = this;
+            prev[i]->func.value_changed_callback = prev_response;
+
+            solo[i] = add_my_toggle_button(frame[i], 40, 78, 20, 20, "S");
             solo[i]->data = i;
             solo[i]->flags |= IS_RADIO;
             solo[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             solo[i]->parent_struct = this;
             solo[i]->func.value_changed_callback = solo_response;
 
-            mute[i] = add_my_toggle_button(frame[i], 25, 5, 20, 20, "M");
+            mute[i] = add_my_toggle_button(frame[i], 60, 78, 20, 20, "M");
             mute[i]->data = i;
             mute[i]->flags |= IS_RADIO;
             mute[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             mute[i]->parent_struct = this;
             mute[i]->func.value_changed_callback = mute_response;
 
-            ftype[i] = add_type_combobox(frame[i], "Type", 50, 5, 55, 20);
+            ftype[i] = add_type_combobox(frame[i], "Type", 95, 78, 60, 18);
             ftype[i]->data = i;
             ftype[i]->parent_struct = this;
             combobox_add_entry(ftype[i],"Low Shelf");
             combobox_add_entry(ftype[i],"Peak");
             combobox_add_entry(ftype[i],"High Shelf");
-            if (i>0 && i<5) {
+            if (i>0 && i<11) {
                 combobox_set_active_entry(ftype[i], 1);
-            } else if (i>=5) {
+            } else if (i>=11) {
                 combobox_set_active_entry(ftype[i], 2);
             } else {
                 combobox_set_active_entry(ftype[i], 0);
             }
             ftype[i]->func.value_changed_callback = set_ftype;
 
-            fenable[i] = add_my_enable_button(frame[i], 108, 5, 20, 20, "");
+            fenable[i] = add_my_enable_button(frame[i], 178, 78, 20, 20, "");
             fenable[i]->data = i;
             fenable[i]->parent_struct = this;
             fenable[i]->func.value_changed_callback = set_fenable;
-            adj_set_value(fenable[i]->adj, engine->ip->bands[i].enabled);
-            double r,g,bcol;
+            adj_set_value(fenable[i]->adj, conn->getParameterValue(i * 6 + 1));
+            
             get_band_color(i, r, g, bcol);
 
             set_widget_color(fenable[i], (Color_state)0, (Color_mod)0, r, g, bcol, 1.0);
 
-            freq[i] = add_my_knob(frame[i], "FREQ", "Hz", 6,37,42, 60);
+            next[i] = add_my_button(frame[i], 220, 78, 20, 20, ">");
+            next[i]->data = i;
+            next[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+            next[i]->parent_struct = this;
+            next[i]->func.value_changed_callback = next_response;
+
+            freq[i] = add_eq_knob(frame[i], "FREQ", "Hz", 37,10,52, 68);
+            set_widget_color(freq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             freq[i]->data = i;
             freq[i]->parent_struct = this;
             freq[i]->func.value_changed_callback = set_freq;
             freq[i]->func.button_release_callback = set;
-            if (i == 0) set_adjustment(freq[i]->adj, 80.0, 80.0, 20.0, 120.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 1) set_adjustment(freq[i]->adj, 150.0, 150.0, 80.0, 300.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 2) set_adjustment(freq[i]->adj, 500.0, 500.0, 250.0, 1000.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 3) set_adjustment(freq[i]->adj, 1500.0, 1500.0, 800.0, 3000.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 4) set_adjustment(freq[i]->adj, 4500.0, 4500.0, 2000.0, 8000.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 5) set_adjustment(freq[i]->adj, 10000.0, 10000.0, 6000.0, 20000.0, 0.01, CL_LOGARITHMIC);
-            
+            if (i == 0)
+                set_adjustment(freq[i]->adj, 40.0,    40.0,    20.0,    60.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 1)
+                set_adjustment(freq[i]->adj, 70.0,    70.0,    40.0,   100.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 2)
+                set_adjustment(freq[i]->adj, 120.0,  120.0,    70.0,   180.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 3)
+                set_adjustment(freq[i]->adj, 210.0,  210.0,   120.0,   300.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 4)
+                set_adjustment(freq[i]->adj, 370.0,  370.0,   200.0,   550.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 5)
+                set_adjustment(freq[i]->adj, 650.0,  650.0,   350.0,   900.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 6)
+                set_adjustment(freq[i]->adj, 1150.0, 1150.0,  650.0,  1600.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 7)
+                set_adjustment(freq[i]->adj, 2000.0, 2000.0, 1100.0,  2800.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 8)
+                set_adjustment(freq[i]->adj, 3500.0, 3500.0, 1800.0,  5000.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 9)
+                set_adjustment(freq[i]->adj, 6100.0, 6100.0, 3500.0,  9000.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 10)
+                set_adjustment(freq[i]->adj, 10700.0,10700.0,6000.0, 15000.0,    0.01, CL_LOGARITHMIC);
+            else if (i == 11)
+                set_adjustment(freq[i]->adj, 18000.0,18000.0,10000.0,20000.0,    0.01, CL_LOGARITHMIC);            
 
-            fq[i] = add_my_knob(frame[i], "Q", "", 48,37,42, 60);
+            fq[i] = add_eq_knob(frame[i], "Q", "", 161,10, 52, 68);
+            set_widget_color(fq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             fq[i]->data = i;
             fq[i]->parent_struct = this;
             fq[i]->func.value_changed_callback = set_fq;
             fq[i]->func.button_release_callback = set;
-            if (i == 0) set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 1) set_adjustment(fq[i]->adj, 1.0, 1.0, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 2) set_adjustment(fq[i]->adj, 1.0, 1.0, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 3) set_adjustment(fq[i]->adj, 1.2, 1.2, 0.7, 10.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 4) set_adjustment(fq[i]->adj, 1.4, 1.4, 0.8, 10.0, 0.01, CL_LOGARITHMIC);
-            else if (i == 5) set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
+            if (i == 0)          // Low Shelf
+                set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 1)     // 70 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 2)     // 120 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 3)     // 210 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 4)     // 370 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 5)     // 650 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 6)     // 1150 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 7)     // 2000 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 8)     // 3500 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 9)     // 6100 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 10)    // 10700 Hz
+                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+            else if (i == 11)    // High Shelf
+                set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
 
-            fgain[i] = add_my_knob(frame[i], "GAIN", "dB", 90,37,42, 60);
+            fgain[i] = add_eq_knob(frame[i], "GAIN", "dB", 90,0,70, 78);
+            set_widget_color(fgain[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             fgain[i]->data = i;
             fgain[i]->parent_struct = this;
             set_adjustment(fgain[i]->adj, 0.0, 0.0, -48.0, 24.0, 0.1, CL_CONTINUOS);
@@ -205,61 +265,37 @@ public:
             x += 133;
         }
 
-        Widget_t* ref = add_my_file_button(top, 10, 435, 90, 20, "Reference:", " ", ".wav|.WAV");
-        ref->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        ref->parent_struct = this;
-        ref->func.user_callback = ref_load_response;
-        ref_label = add_my_label(top, "",100,437,265,20);
-        ref_label->label = ref_file.data();
-
-        Widget_t* remove_ref = add_my_button(top, 370, 435, 20, 20, "X");
-        remove_ref->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        remove_ref->parent_struct = this;
-        remove_ref->func.value_changed_callback = remove_ref_response;
-
-        Widget_t* src = add_my_file_button(top, 10, 465, 90, 20, "Source:", " ", ".wav|.WAV");
-        src->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        src->parent_struct = this;
-        src->func.user_callback = src_load_response;
-        src_label = add_my_label(top, "",100,467,265,20);
-        src_label->label = src_file.data();
-
-        Widget_t* remove_src = add_my_button(top, 370, 465, 20, 20, "X");
-        remove_src->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        remove_src->parent_struct = this;
-        remove_src->func.value_changed_callback = remove_src_response;
-
-        Widget_t* save = add_xsave_file_button(top, 10, 495, 90, 20, "Save IR", " ", ".wav|.WAV");
-        save->flags = USE_TRANSPARENCY | FAST_REDRAW;
-        save->parent_struct = this;
-        save->func.user_callback = save_response;
-
-        lowcut = add_my_knob(top, "LowCut", "Hz", 450,436,60, 80);
-        float min_lc = get_min_lowcut(sampleRate, irLength);
-        set_adjustment(lowcut->adj, 100.0, 100.0, min_lc, 2200.0, 0.01, CL_LOGARITHMIC);
+        lowcut = add_my_knob(laframe, "LowCut", "Hz", 20,26,60, 70);
+        set_adjustment(lowcut->adj, 19.0, 19.0, 19.0, 2200.0, 0.01, CL_LOGARITHMIC);
         lowcut->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(lowcut, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
         lowcut->parent_struct = this;
         lowcut->func.value_changed_callback = set_lowcut;
         lowcut->func.button_release_callback = set;
 
-        lcenable = add_my_enable_button(lowcut, 19, 15, 20, 20, "");
-        lcenable->parent_struct = this;
-        lcenable->func.value_changed_callback = set_lowcut_enable;
+        //lcenable = add_my_enable_button(lowcut, 19, 10, 20, 20, "");
+        //lcenable->parent_struct = this;
+        //lcenable->func.value_changed_callback = set_lowcut_enable;
 
-        highcut = add_my_knob(top, "HighCut", "Hz", 520,436,60, 80);
-        set_adjustment(highcut->adj, 4000.0, 4000.0, 110.0, 22000.0, 0.01, CL_LOGARITHMIC);
+        highcut = add_my_knob(laframe, "HighCut", "Hz", 120,26,60, 70);
+        set_adjustment(highcut->adj, 22000.0, 22000.0, 110.0, 22000.0, 0.01, CL_LOGARITHMIC);
         highcut->flags = USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(highcut, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
         highcut->parent_struct = this;
         highcut->func.value_changed_callback = set_highcut;
         highcut->func.button_release_callback = set;
 
-        hcenable = add_my_enable_button(highcut, 19, 15, 20, 20, "");
-        hcenable->parent_struct = this;
-        hcenable->func.value_changed_callback = set_highcut_enable;
+        #ifndef CLAPPLUG
+        Widget_t* save = add_xsave_file_button(laframe, 190, 65, 90, 20, "Save IR", " ", ".wav|.WAV");
+        save->parent_struct = this;
+        save->func.user_callback = save_response;
+        #endif
 
-        smooth = add_my_knob(top, "Smooth", "", 590,436,60, 80);
+        //hcenable = add_my_enable_button(highcut, 19, 10, 20, 20, "");
+        //hcenable->parent_struct = this;
+        //hcenable->func.value_changed_callback = set_highcut_enable;
+
+        smooth = add_my_knob(laframe, "Smooth", "", 590,26,60, 70);
         set_adjustment(smooth->adj, 0.3, 0.3, 0.0, 1.0, 0.01, CL_CONTINUOS);
         smooth->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(smooth, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -267,7 +303,7 @@ public:
         smooth->func.value_changed_callback = set_smooth;
         smooth->func.button_release_callback = set;
 
-        dynamics = add_my_knob(top, "Dynamics", "", 660,436,60, 80);
+        dynamics = add_my_knob(laframe, "Dynamics", "", 660,26,60, 70);
         set_adjustment(dynamics->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
         dynamics->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(dynamics, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -275,40 +311,18 @@ public:
         dynamics->func.value_changed_callback = set_dynamics;
         dynamics->func.button_release_callback = set;
 
-        tilt = add_my_knob(top, "Tone Bias", "", 730,436,60, 80);
+        tilt = add_my_knob(laframe, "Tone Bias", "", 730,26,60, 70);
         set_adjustment(tilt->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
         tilt->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(tilt, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
         tilt->parent_struct = this;
         tilt->func.value_changed_callback = set_tilt;
         tilt->func.button_release_callback = set;
-
-        Widget_t* irsize = add_my_combobox(top, "Ir size", 805, 435, 60, 20);
-        irsize->parent_struct = this;
-        combobox_add_entry(irsize,"1024");
-        combobox_add_entry(irsize,"2048");
-        combobox_add_entry(irsize,"4096");
-        combobox_add_entry(irsize,"8192");
-        combobox_add_entry(irsize,"16384");
-        combobox_set_active_entry(irsize, 2);
-        irsize->func.value_changed_callback = set_irsize;
-        add_tooltip(irsize->childlist->childs[0], "Ir length");
-
-        bp = add_my_toggle_button(top, 805, 465, 60, 20, "Bypass");
-        bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        bp->parent_struct = this;
-        bp->func.value_changed_callback = bp_response;
-
-        #ifndef CLAPPLUG
-        Widget_t* quit = add_my_button(top, 805, 495, 60, 20, "Quit");
-        quit->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        quit->parent_struct = this;
-        quit->func.value_changed_callback = quit_response;
-        #endif
     }
 
     void show() {
         widget_show_all(top);
+        raise_control_panel(active_panel);
     }
 
     void setSampleRate(const double sr) {
@@ -329,26 +343,23 @@ public:
     }
 
     void check_spec() {
-        adj_set_value(vumeterL->adj, power2db(vumeterL, engine->vu->getMeterL()));
-        adj_set_value(vumeterR->adj, power2db(vumeterR, engine->vu->getMeterR()));
-        if (engine->ana->hasNewData()) {
-            bin = engine->ana->getBins();
+        adj_set_value(vumeterL->adj, power2db(vumeterL, conn->getMeterL()));
+        adj_set_value(vumeterR->adj, power2db(vumeterR, conn->getMeterR()));
+        if (conn->checkNewData()) {
+            bin = conn->getBins();
             mag_.clear();
-            const float* m = engine->ana->getMagnitudes();
+            const float* m = conn->getMagnitudes();
             for (int i = 0; i<bin; i++) {
                 mag_.push_back(m[i]);
             }
-            engine->ana->clearFlag();
+            conn->clearAna();
             expose_widget(spec);
         }
     }
 
     void check_irmatch() {
-        if (engine->dataReady.load(std::memory_order_acquire)) {
-            engine->dataReady.store(false, std::memory_order_release);
-            setData(engine->ip->getRefMag(), engine->ip->getSrcMag(), 
-                            engine->ip->getDiffMag(), engine->ip->getIRMag());
-            rebuild_layer = rebuild;
+        if (conn->haveData()) {
+            setData(conn->getIR());
             rebuild_eq_layer = true;
             expose_widget(spec);
         }
@@ -366,21 +377,15 @@ private:
     Widget_t* ref_label = nullptr;
     Widget_t* src_label = nullptr;
     Widget_t* spec = nullptr;
-    Widget_t* vumeterL = nullptr;
-    Widget_t* vumeterR = nullptr;
     Widget_t* curFreq = nullptr;
     Widget_t* curGain = nullptr;
-    Engine *engine = nullptr;
+    IConnector* conn = nullptr;
     AudioFile af;
-    Vec ref_;
-    Vec source_;
-    Vec diff_;
-    Vec ir_;
-    Vec mag_;
-    std::string ir_file;
+    Vec ir_; // filter
+    Vec mag_; // spectrum
+
     char cfreq[64];
     char cgain[64];
-    size_t irLength = 2048;
     double sampleRate = 48000.0;
     bool band_match = false;
     int match_state = -1;
@@ -390,90 +395,28 @@ private:
     int bin = 0;
     int spec_width  = 0;
     int spec_height = 0;
-    cairo_surface_t *image_layer = nullptr;
-    bool rebuild_layer = true;
     cairo_surface_t *eq_layer = nullptr;
     bool rebuild_eq_layer = true;
-    bool rebuild = true;
     std::atomic<bool> set_leak {false};
 
     const float f_min = 20.0f;
     const float f_max = 20000.0f;
-    const float db_min = -96.0f;
+    const float db_min = -72.0f;
     const float db_max = 24.0f;
 
-    void registerParameters() {
-        //                  name           group    min, max, def, step     value                               isStepped  type
-        param.registerParam("Enable",     "Global",  0,   1,   0,    1,     (void*)&engine->conv->bypass,        true,  IS_INT);
-
-        param.registerParam("Band 1 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[0].enabled,true,  IS_INT);
-        param.registerParam("Band 1 type",    "EQ",  0,   2,   0,    1,     (void*)&engine->ip->bands[0].type,   true,  IS_INT);
-        param.registerParam("Band 1 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[0].mute,   true,  IS_INT);
-        param.registerParam("Band 1 freq",    "EQ", 20, 120,  80, 0.01,     (void*)&engine->ip->bands[0].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 1 gain",    "EQ", -48, 24,   0, 0.01,     (void*)&engine->ip->bands[0].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 1 Q",       "EQ", 0.4, 10, 0.7, 0.01,     (void*)&engine->ip->bands[0].Q,     false,  IS_DOUBLE);
-
-        param.registerParam("Band 2 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[1].enabled,true,  IS_INT);
-        param.registerParam("Band 2 type",    "EQ",  0,   2,   1,    1,     (void*)&engine->ip->bands[1].type,   true,  IS_INT);
-        param.registerParam("Band 2 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[1].mute,   true,  IS_INT);
-        param.registerParam("Band 2 freq",    "EQ", 80, 300, 150, 0.01,     (void*)&engine->ip->bands[1].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 2 gain",    "EQ", -48, 24, 0.0, 0.01,     (void*)&engine->ip->bands[1].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 2 Q",       "EQ", 0.5, 10, 1.0, 0.01,     (void*)&engine->ip->bands[1].Q,     false,  IS_DOUBLE);
-
-        param.registerParam("Band 3 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[2].enabled,true,  IS_INT);
-        param.registerParam("Band 3 type",    "EQ",  0,   2,   1,    1,     (void*)&engine->ip->bands[2].type,   true,  IS_INT);
-        param.registerParam("Band 3 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[2].mute,   true,  IS_INT);
-        param.registerParam("Band 3 freq",    "EQ",250,1000, 500, 0.01,     (void*)&engine->ip->bands[2].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 3 gain",    "EQ", -48, 24, 0.0, 0.01,     (void*)&engine->ip->bands[2].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 3 Q",       "EQ", 0.5, 10, 1.0, 0.01,     (void*)&engine->ip->bands[2].Q,     false,  IS_DOUBLE);
-
-        param.registerParam("Band 4 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[3].enabled,true,  IS_INT);
-        param.registerParam("Band 4 type",    "EQ",  0,   2,   1,    1,     (void*)&engine->ip->bands[3].type,   true,  IS_INT);
-        param.registerParam("Band 4 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[3].mute,   true,  IS_INT);
-        param.registerParam("Band 4 freq",    "EQ",800,3000,1500, 0.01,     (void*)&engine->ip->bands[3].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 4 gain",    "EQ", -48, 24, 0.0, 0.01,     (void*)&engine->ip->bands[3].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 4 Q",       "EQ", 0.7, 10, 1.2, 0.01,     (void*)&engine->ip->bands[3].Q,     false,  IS_DOUBLE);
-
-        param.registerParam("Band 5 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[4].enabled,true,  IS_INT);
-        param.registerParam("Band 5 type",    "EQ",  0,   2,   1,    1,     (void*)&engine->ip->bands[4].type,   true,  IS_INT);
-        param.registerParam("Band 5 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[4].mute,   true,  IS_INT);
-        param.registerParam("Band 5 freq",    "EQ",2000,8000,4500,0.01,     (void*)&engine->ip->bands[4].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 5 gain",    "EQ", -48, 24, 0.0, 0.01,     (void*)&engine->ip->bands[4].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 5 Q",       "EQ", 0.8, 10, 1.4, 0.01,     (void*)&engine->ip->bands[4].Q,     false,  IS_DOUBLE);
- 
-        param.registerParam("Band 6 enable",  "EQ",  0,   1,   1,    1,     (void*)&engine->ip->bands[5].enabled,true,  IS_INT);
-        param.registerParam("Band 6 type",    "EQ",  0,   2,   2,    1,     (void*)&engine->ip->bands[5].type,   true,  IS_INT);
-        param.registerParam("Band 6 mute",    "EQ",  0,   1,   0,    1,     (void*)&engine->ip->bands[5].mute,   true,  IS_INT);
-        param.registerParam("Band 6 freq",    "EQ",6000,20000,10000,0.01,   (void*)&engine->ip->bands[5].freq,  false,  IS_DOUBLE);
-        param.registerParam("Band 6 gain",    "EQ", -48, 24, 0.0, 0.01,     (void*)&engine->ip->bands[5].gain,  false,  IS_DOUBLE);
-        param.registerParam("Band 6 Q",       "EQ", 0.4, 10, 0.7, 0.01,     (void*)&engine->ip->bands[5].Q,     false,  IS_DOUBLE);
-        //                  name           group    min, max, def, step     value                               isStepped  type
-        param.registerParam("Solo Band",      "EQ",  0,   5,   0,    1,     (void*)&engine->ip->solo_band,       true,  IS_INT);
-        param.registerParam("Solo enabled",   "EQ",  0,   1,   0,    1,     (void*)&engine->ip->solo_enabled,    true,  IS_INT);
-
-        param.registerParam("Lowcut enable",  "EQ",  0,   1,   0,    1,     (void*)&engine->ip->lowcut_enabled,  true,  IS_INT);
-        param.registerParam("Lowcut freq",    "EQ", 35, 2200, 100,0.01,     (void*)&engine->ip->lowcut,         false,  IS_DOUBLE);
-        param.registerParam("Highcut enable", "EQ",  0,   1,   0,    1,     (void*)&engine->ip->highcut_enabled, true,  IS_INT);
-        param.registerParam("Highcut freq",   "EQ", 110,22000,4000,0.01,    (void*)&engine->ip->highcut,        false,  IS_DOUBLE);
-
-        param.registerParam("Smooth",         "IR",  0,   1,  0.3, 0.01,    (void*)&engine->ip->smooth_amount,  false,  IS_DOUBLE);
-        param.registerParam("Dynamics",       "IR", -1,   1,  0.0, 0.01,    (void*)&engine->ip->dynamics_amount,false,  IS_DOUBLE);
-        param.registerParam("Tone Bias",      "IR", -1,   1,  0.0, 0.01,    (void*)&engine->ip->tilt_amount,    false,  IS_DOUBLE);
-       
-        param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&engine->vu->gain,           false,  IS_FLOAT);
+    static void save_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if(user_data !=NULL) {
+            std::string ir_file = *(const char**)user_data;
+            std::pair<std::vector<double>, std::vector<double> > ir = self->conn->get_ir();        
+            self->af.saveAudioFile(ir_file, ir.first, ir.second, self->sampleRate);
+        }
     }
 
     // send value changes from GUI to the engine/host
     void sendValueChanged(int index, float value) {
-        param.setParam(index, value);
-        param.setParamDirty(index, true);
-        param.controllerChanged.store(true, std::memory_order_release);
-        if (index > 0 && index < 46) {
-            engine->processIR.store(true, std::memory_order_release);
-            engine->rebuild.store(false, std::memory_order_release);
-            engine->workToDo.store(true, std::memory_order_release);
-            rebuild = false;
-        }
+        conn->sendValueChanged(index, value);
     }
 
     // Callbacks
@@ -489,7 +432,7 @@ private:
     static void set_gain(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(46, adj_get_value(w->adj));
+        self->sendValueChanged(82, adj_get_value(w->adj));
     }
 
     static void bp_response(void *w_, void* user_data) {
@@ -499,13 +442,14 @@ private:
     }
 
     void set_radio(Widget_t* w, bool set) {
-         for (int i = 0; i<6; i++) {
+         for (int i = 0; i<12; i++) {
             Widget_t *wid = solo[i];
             if (wid != w) {
                 xevfunc store = wid->func.value_changed_callback;
                 wid->func.value_changed_callback = null_callback;
                 adj_set_value(wid->adj, 0.0);
-                engine->ip->setSoloBand(wid->data, (int)adj_get_value(wid->adj));
+                conn->sendValueChanged(73,wid->data);
+                conn->sendValueChanged(74,(int)adj_get_value(wid->adj));
                 wid->func.value_changed_callback = store;
             }
         }
@@ -518,19 +462,44 @@ private:
                     xevfunc store = wid->func.value_changed_callback;
                     wid->func.value_changed_callback = null_callback;
                     if (wid != w) adj_set_value(wid->adj, 0.0);
-                    engine->ip->setMuteBand(wid->data, (int)adj_get_value(wid->adj));
+                    conn->sendValueChanged(wid->data * 6 + 3, (int)adj_get_value(wid->adj));
                     wid->func.value_changed_callback = store;
                 }
             }
         }
     }
 
+    void raise_control_panel(int a) {
+        for(int i = 0; i < 12; i++) {
+            widget_hide(frame[i]);
+            if (i == a) {
+                active_panel = a;
+                widget_show_all(frame[i]);
+                os_raise_widget(frame[i]);
+            }
+        }
+    }
+
+    static void prev_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        int r = std::max<int>(0, w->data - 1);
+        self->raise_control_panel(r);
+    }
+
+    static void next_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        int r = std::min<int>(12, w->data + 1);
+        self->raise_control_panel(r);
+    }
+
     static void solo_response(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->set_radio(w, true);
-        self->sendValueChanged(37, w->data);
-        self->sendValueChanged(38, adj_get_value(w->adj));
+        self->sendValueChanged(73, w->data);
+        self->sendValueChanged(74, adj_get_value(w->adj));
     }
 
     static void mute_response(void *w_, void* user_data) {
@@ -573,154 +542,55 @@ private:
     static void set_lowcut(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(40, adj_get_value(w->adj));
+        float v = adj_get_value(w->adj);
+        if (v > 20.0f) self->sendValueChanged(75, 1.0f);
+        else  self->sendValueChanged(75, 0.0f);
+        self->sendValueChanged(76, v);
     }
 
     static void set_lowcut_enable(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(39, adj_get_value(w->adj));
+        self->sendValueChanged(75, adj_get_value(w->adj));
     }
 
     static void set_highcut(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(42, adj_get_value(w->adj));
+        float v = adj_get_value(w->adj);
+        if (v < 20000) self->sendValueChanged(77, 1.0f);
+        else  self->sendValueChanged(77, 0.0f);
+        self->sendValueChanged(78, v);
     }
 
     static void set_highcut_enable(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(41, adj_get_value(w->adj));
+        self->sendValueChanged(77, adj_get_value(w->adj));
     }
 
     static void set_smooth(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(43, adj_get_value(w->adj));
+        self->sendValueChanged(79, adj_get_value(w->adj));
     }
 
     static void set_dynamics(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(44, adj_get_value(w->adj));
+        self->sendValueChanged(80, adj_get_value(w->adj));
     }
 
     static void set_tilt(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(45, adj_get_value(w->adj));
-    }
-
-    void comput_and_set() {
-        rebuild = true;
-        engine->processIR.store(true, std::memory_order_release);
-        engine->rebuild.store(true, std::memory_order_release);
-        engine->workToDo.store(true, std::memory_order_release);
-    }
-
-    static void set_irsize(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        int v = (int)adj_get_value(w->adj);
-        switch (v) {
-            case 0: self->irLength = 1024;
-            break;
-            case 1: self->irLength = 2048;
-            break;
-            case 2: self->irLength = 4096;
-            break;
-            case 3: self->irLength = 8192;
-            break;
-            case 4: self->irLength = 16384;
-            break;
-            default : self->irLength = 2048;
-            break;
-        }
-        // adjust minimum lowcut val
-        float min_lc = self->get_min_lowcut(self->sampleRate, self->irLength);
-        float lc = adj_get_value(self->lowcut->adj);
-        float val = std::max<float>(lc, min_lc);
-        set_adjustment(self->lowcut->adj, 100.0, val, min_lc, 2200.0, 0.01, CL_LOGARITHMIC);
-        self->engine->ip->setLowCut((double)adj_get_value(self->lowcut->adj));
-        expose_widget(self->lowcut);
-        // recompute spectrum with new size
-        self->comput_and_set();
+        self->sendValueChanged(81, adj_get_value(w->adj));
     }
 
     static void set(void *w_, void *event, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->set_leak.store(true, std::memory_order_release);
-    }
-
-    static void ref_load_response(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        if(user_data !=NULL) {
-            self->ref_file = *(const char**)user_data;
-            if ( self->af.getAudioFile(self->ref_file, self->sampleRate) ) {
-                self->dstL.clear();
-                self->dstR.clear();
-                self->dstL.assign(self->af.samplesL.begin(), self->af.samplesL.end());
-                self->dstR.assign(self->af.samplesR.begin(), self->af.samplesR.end());
-                self->comput_and_set();
-                self->ref_label->label = self->ref_file.data();
-                expose_widget(self->ref_label);
-            }
-        }
-    }
-
-    static void remove_ref_response(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
-            auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-            self->dstL.clear();
-            self->dstR.clear();
-            self->ref_label->label = " ";
-            expose_widget(self->ref_label);
-            self->comput_and_set();
-        }
-    }
-
-    static void src_load_response(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        if(user_data !=NULL) {
-            self->src_file = *(const char**)user_data;
-            if ( self->af.getAudioFile(self->src_file, self->sampleRate) ) {
-                self->srcL.clear();
-                self->srcR.clear();
-                self->srcL.assign(self->af.samplesL.begin(), self->af.samplesL.end());
-                self->srcR.assign(self->af.samplesR.begin(), self->af.samplesR.end());
-                self->comput_and_set();
-                self->src_label->label = self->src_file.data();
-                expose_widget(self->src_label);
-            }
-        }
-    }
-
-    static void remove_src_response(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
-            auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-            self->srcL.clear();
-            self->srcR.clear();
-            self->src_label->label = " ";
-            expose_widget(self->src_label);
-            self->comput_and_set();
-        }
-    }
-
-    static void save_response(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        if(user_data !=NULL) {
-            self->ir_file = *(const char**)user_data;
-            std::pair<std::vector<double>, std::vector<double> > ir = self->engine->ip->createIRStereo();        
-            self->af.saveAudioFile(self->ir_file, ir.first, ir.second, self->sampleRate);
-            std::cout << "save as: " << self->ir_file << std::endl;
-        }
     }
 
     static void mouse_set_spec(void *w_, void *xbutton_, void* user_data) {
@@ -739,7 +609,11 @@ private:
         Metrics_t m;
         os_get_window_metrics(spec, &m);
         const int width  = m.width;
-        const int height = m.height;
+        const int height = m.height-80;
+        if ((int)y > height) {
+            mouse_leave_spec(spec, nullptr);
+            return;
+        }
 
         float freq = x_to_freq(x, f_min, f_max, width);
         float g = y_to_db(y, db_min, db_max, height);
@@ -829,11 +703,6 @@ private:
     }
 
     // Helpers
-    float get_min_lowcut(float sr, size_t ir_len) {
-        float fmin = sr / (float)ir_len;
-        return std::max<float>(20.0f,fmin * 1.5f);
-    }
-
     static float clampf(float x, float lo, float hi) {
         return (x < lo) ? lo : (x > hi) ? hi : x;
     }
@@ -856,7 +725,8 @@ private:
 
     static void draw_text(cairo_t* cr, float x, float y, const char* txt) {
         cairo_move_to(cr, std::max<float>(5.0f, x), y);
-        cairo_show_text(cr, txt);
+        cairo_text_path (cr, txt);
+        cairo_fill (cr);
     }
 
     // Drawing
@@ -902,31 +772,20 @@ private:
     }
 
     static void get_band_color(int i, double &r, double &g, double &b) {
-        if (i == 0) {
-            r = 0.95;
-            g = 0.55;
-            b = 0.20;
-        } else if (i == 1) {
-            r = 0.95;
-            g = 0.80;
-            b = 0.25;
-        } else if (i == 2) {
-            r = 0.40;
-            g = 0.85;
-            b = 0.35;
-        } else if (i == 3) {
-            r = 0.25;
-            g = 0.80;
-            b = 0.75;
-        } else if (i == 4) {
-            r = 0.30;
-            g = 0.55;
-            b = 0.95;
-        } else {
-            r = 0.75;
-            g = 0.40;
-            b = 0.95;
-         }
+        switch(i) {
+        case 0:  r=0.95; g=0.45; b=0.20; break;
+        case 1:  r=0.95; g=0.60; b=0.20; break;
+        case 2:  r=0.95; g=0.80; b=0.25; break;
+        case 3:  r=0.75; g=0.90; b=0.25; break;
+        case 4:  r=0.40; g=0.85; b=0.35; break;
+        case 5:  r=0.25; g=0.85; b=0.55; break;
+        case 6:  r=0.25; g=0.80; b=0.75; break;
+        case 7:  r=0.25; g=0.70; b=0.95; break;
+        case 8:  r=0.30; g=0.55; b=0.95; break;
+        case 9:  r=0.45; g=0.45; b=0.95; break;
+        case 10: r=0.60; g=0.40; b=0.95; break;
+        default: r=0.80; g=0.35; b=0.95; break;
+        }
     }
 
     static double mapQ(double q_ui) {
@@ -956,26 +815,30 @@ private:
         return std::exp(log_f);
     }
 
-    static double eval_band_db(const Band& b, double f, double sr) {
+    static double eval_band_db(IConnector* conn, int i, double f, double sr) {
         if (f < 10.0) return 0.0;
-        double x = std::log2((f + 1e-9) / (b.freq + 1e-9));
-        double Q = mapQ(b.Q);
+        double freq = conn->getParameterValue(i * 6 + 4);
+        double gain = conn->getParameterValue(i * 6 + 5);
+        double q = conn->getParameterValue(i * 6 + 6);
+        int type = conn->getParameterValue(i * 6 + 2);
+        double x = std::log2((f + 1e-9) / (freq + 1e-9));
+        double Q = mapQ(q);
 
-        switch (b.type) {
-            case Band::Peak: {
-                double sigma = 1.0 / (1.5 * Q + 0.5);
-                double g = std::exp(-0.5 * (x * x) / (sigma * sigma));
-                return b.gain * g;
-            }
-            case Band::LowShelf: {
+        switch (type) {
+            case 0: { // Band::LowShelf
                 double slope = Q * 2.0;
                 double g = 0.5 * (1.0 - std::tanh(slope * x));
-                return b.gain * g;
+                return gain * g;
             }
-            case Band::HighShelf: {
+            case 1: { // Band::Peak
+                double sigma = 1.0 / (1.5 * Q + 0.5);
+                double g = std::exp(-0.5 * (x * x) / (sigma * sigma));
+                return gain * g;
+            }
+            case 2: { // Band::HighShelf
                 double slope = Q * 2.0;
                 double g = 0.5 * (1.0 + std::tanh(slope * x));
-                return b.gain * g;
+                return gain * g;
             }
         }
         return 0.0;
@@ -1020,10 +883,10 @@ private:
         Metrics_t m;
         os_get_window_metrics(spec, &m);
         const int width  = m.width;
-        const int height = m.height;
-        for (int i = 0; i < 6; ++i) {
-            float x = freq_to_x(engine->ip->bands[i].freq, f_min, f_max, width);
-            float y = db_to_y(engine->ip->bands[i].gain, db_min, db_max, height);
+        const int height = m.height-80;
+        for (int i = 0; i < 12; ++i) {
+            float x = freq_to_x(conn->getParameterValue(i * 6 + 4), f_min, f_max, width);
+            float y = db_to_y(conn->getParameterValue(i * 6 + 5), db_min, db_max, height);
 
             float dx = mx - x;
             float dy = my - y;
@@ -1032,12 +895,14 @@ private:
                 band_match = true;
                 match_band = i;
                 rebuild_eq_layer = true;
-                expose_widget(spec);
+                raise_control_panel(match_band);
+                os_expose_widget(spec);
                 return ;
             } else if (band_match) {
                 band_match = false;
                 rebuild_eq_layer = true;
-                expose_widget(spec);
+                mouse_leave_spec(spec, nullptr);
+                os_expose_widget(spec);
             }
         }
         band_match = false;
@@ -1047,9 +912,8 @@ private:
         const int STEPS = width;
         float y0 = db_to_y(0.0, db_min, db_max, height);
 
-        for (int i = 0; i < 6; ++i) {
-            auto& b = engine->ip->bands[i];
-            if (!b.enabled) continue;
+        for (int i = 0; i < 12; ++i) {
+            if (!(int)conn->getParameterValue(i * 6 + 1)) continue;
             bool isStarted = false;
             double startX = 0.0;
             double stopX = 0.0;
@@ -1060,7 +924,7 @@ private:
             cairo_new_path(cr);
             for (int x = 0; x < STEPS; ++x) {
                 double freq = x_to_freq(x, f_min, f_max, width);
-                double db = eval_band_db(b, freq, sampleRate);
+                double db = eval_band_db(conn, i, freq, sampleRate);
                 double y = db_to_y(db, db_min, db_max, height);
                 if (fabs(y - y0) < 0.5) continue;
 
@@ -1111,26 +975,19 @@ private:
     }
 
     void draw_band_points(cairo_t* cr, const int width, const int height) {
-        cairo_set_line_width(cr, 10.0);
-        for(int i = 0; i<6; i++) {
+        for(int i = 0; i<12; i++) {
             double r,g,bcol;
             get_band_color(i, r, g, bcol);
             cairo_set_source_rgba(cr, r, g, bcol, 1.0);
 
-            int on = engine->ip->bands[i].enabled;
-            float db = db_to_y(engine->ip->bands[i].gain, db_min, db_max, height);
-            float freq = freq_to_x(engine->ip->bands[i].freq, f_min, f_max, width);
+            int on = conn->getParameterValue(i * 6 + 1);
+            float db = db_to_y(conn->getParameterValue(i * 6 + 5), db_min, db_max, height);
+            float freq = freq_to_x(conn->getParameterValue(i * 6 + 4), f_min, f_max, width);
             if (on) {
+                cairo_set_line_width(cr, 10.0);
                 cairo_move_to(cr, freq, db);
                 cairo_line_to(cr, freq, db);
                 cairo_stroke(cr);
-            }
-        }
-        for(int i = 0; i<6; i++) {
-            int on = engine->ip->bands[i].enabled;
-            float db = db_to_y(engine->ip->bands[i].gain, db_min, db_max, height);
-            float freq = freq_to_x(engine->ip->bands[i].freq, f_min, f_max, width);
-            if (on) {
                 if (band_match && (match_band == i)) {
                     draw_band_ring(cr, freq, db, i, match_state);
                 }
@@ -1142,7 +999,7 @@ private:
         std::vector<double> freqs = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
         std::vector<double> minor_freqs = {30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800,
                                                     900, 3000, 4000, 6000, 7000, 8000, 9000};
-        std::vector<double> dbs = {-72, -48, -24, -18, -12, -6, 0, 6, 12, 18, 24};
+        std::vector<double> dbs = { -48, -24, -18, -12, -6, 0, 6, 12, 18, 24};
 
         if (w->image) cairo_surface_destroy(w->image);
         w->image = nullptr;
@@ -1222,14 +1079,18 @@ private:
         // frequency labels
         for (double f : freqs) {
             double x = freq_to_x(f, f_min, f_max, width);
+            double ax = 0;
             char buf[32];
             if (f >= 1000)
                 sprintf(buf, "%.0fk", f / 1000.0);
             else
                 sprintf(buf, "%.0f", f);
+            if (f >= 500 && f <=999) ax = 18;
+            if (f >= 501 && f <=1000) ax = 15;
             cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.7);
-            cairo_move_to(cr, x + 4, height - 6);
-            cairo_show_text(cr, buf);
+            cairo_move_to(cr, x + 4, (height - ax) - 6);
+            cairo_text_path (cr, buf);
+            cairo_fill (cr);
         }
 
         // dB labels
@@ -1239,35 +1100,10 @@ private:
             sprintf(buf, "%.0f", db);
             cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.7);
             cairo_move_to(cr, 5, y - 2);
-            cairo_show_text(cr, buf);
+            cairo_text_path (cr, buf);
+            cairo_fill (w->crb);
         }
         cairo_destroy(cr);
-    }
-
-    void create_layer(Widget_t *w, const int width, const int height, const float sample_rate) {
-        if(image_layer) cairo_surface_destroy(image_layer);
-        image_layer = nullptr;
-        image_layer = cairo_surface_create_similar (w->surface,
-                            CAIRO_CONTENT_COLOR_ALPHA, width, height);
-        if (!image_layer || cairo_surface_status(image_layer) != CAIRO_STATUS_SUCCESS) {
-            image_layer = nullptr;
-            return;
-        }
-        cairo_t *cr = cairo_create (image_layer);
-        if (cairo_status(cr) != CAIRO_STATUS_SUCCESS) {
-            cairo_destroy(cr);
-            return;
-        }
-        cairo_set_source_surface (cr, w->image, 0, 0);
-        cairo_rectangle(cr,0, 0, width, height);
-        cairo_fill(cr);
-        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
-        cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-        drawSpectrum(cr, ref_,   width, height, 1.5, sample_rate, 1.0, 0.333, 0.333,   "reference",   height-20);
-        drawSpectrum(cr, source_,width, height, 1.5, sample_rate, 0.314, 0.98, 0.482,  "source",      height-40);
-        drawSpectrum(cr, diff_,  width, height, 1.5, sample_rate, 1.0, 0.722, 0.424,   "diff",  height-60, true);
-        cairo_destroy(cr);
-        rebuild_layer = false;
     }
 
     void create_eq_layer(Widget_t *w, const int width, const int height, const float sample_rate) {
@@ -1286,14 +1122,14 @@ private:
             cairo_destroy(cr);
             return;
         }
-        cairo_set_source_surface (cr, image_layer, 0, 0);
+        cairo_set_source_surface (cr, w->image, 0, 0);
         cairo_rectangle(cr,0, 0, width, height);
         cairo_fill(cr);
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         draw_band_points(cr, width, height);
         draw_band_curves(cr, width, height);
-        drawSpectrum(cr, ir_,    width, height, 2.5, sample_rate, 0.545, 0.914, 0.992, "impulse",      height-80);
+        drawSpectrum(cr, ir_,    width, height, 2.5, sample_rate, 0.545, 0.914, 0.992, "",      height-80);
         cairo_destroy(cr);
         rebuild_eq_layer = false;
     }
@@ -1310,14 +1146,10 @@ private:
         const float sample_rate = sampleRate;
 
         const int width  = m.width;
-        const int height = m.height;
+        const int height = m.height-80;
         if (spec_height != height || spec_width != width) {
             create_background(w, width, height);
-            create_layer(w, width, height, sample_rate);
             create_eq_layer(w, width, height, sample_rate);
-        }
-        if (!image_layer || rebuild_layer) {
-            create_layer(w, width, height, sample_rate);
         }
         if (!eq_layer || rebuild_eq_layer) {
             create_eq_layer(w, width, height, sample_rate);
@@ -1328,14 +1160,13 @@ private:
             cairo_fill(w->crb);
         } else {
             create_background(w, width, height);
-            create_layer(w, width, height, sample_rate);
             create_eq_layer(w, width, height, sample_rate);
             return;
         }
         spec_height = height;
         spec_width = width;
 
-        drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "input", height-100, false, true);
+        drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 11);
@@ -1349,7 +1180,7 @@ private:
         if (mags.empty()) return;
 
         cairo_set_source_rgba(cr, r, g, b, t.spec_alpha);
-        draw_text(cr, width - 60, label_y, label);
+        //draw_text(cr, width - 60, label_y, label);
 
         cairo_set_line_width(cr, line_width);
         static const double dashes[] = {2.0};

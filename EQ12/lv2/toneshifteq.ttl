@@ -1,0 +1,1069 @@
+@prefix lv2:    <http://lv2plug.in/ns/lv2core#> .
+@prefix doap:   <http://usefulinc.com/ns/doap#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:   <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix units:  <http://lv2plug.in/ns/extensions/units#> .
+
+@prefix foaf:   <http://xmlns.com/foaf/0.1/> .
+@prefix guiext: <http://lv2plug.in/ns/extensions/ui#>.
+@prefix opts:   <http://lv2plug.in/ns/ext/options#> .
+@prefix time:   <http://lv2plug.in/ns/ext/time#>.
+@prefix units:  <http://lv2plug.in/ns/extensions/units#> .
+@prefix atom:   <http://lv2plug.in/ns/ext/atom#> .
+@prefix urid:   <http://lv2plug.in/ns/ext/urid#> .
+@prefix pprop:  <http://lv2plug.in/ns/ext/port-props#> .
+@prefix midi:   <http://lv2plug.in/ns/ext/midi#> .
+
+<urn:name#me>
+   a foaf:Person ;
+   foaf:name "brummer" .
+
+<urn:brummer:toneshifteq>
+    a lv2:Plugin ;
+    doap:name "ToneShift-EQ12" ;
+    doap:maintainer <urn:name#me> ;
+    lv2:requiredFeature urid:map ;
+    lv2:optionalFeature lv2:hardRTCapable ;
+    lv2:minorVersion 1 ;
+    lv2:microVersion 0 ;
+
+guiext:ui <urn:brummer:toneshifteq_ui> ;
+
+    lv2:port
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 0 ;
+        lv2:symbol "enable" ;
+        lv2:name "Enable" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 1 ;
+        lv2:symbol "band1_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 2 ;
+        lv2:symbol "band1_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 3 ;
+        lv2:symbol "band1_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 4 ;
+        lv2:symbol "band1_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 40 ;
+        lv2:minimum 20 ;
+        lv2:maximum 60 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 5 ;
+        lv2:symbol "band1_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 6 ;
+        lv2:symbol "band1_q" ;
+        lv2:name "Q" ;
+        lv2:default 0.7 ;
+        lv2:minimum 0.4 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 7 ;
+        lv2:symbol "band2_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 8 ;
+        lv2:symbol "band2_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 9 ;
+        lv2:symbol "band2_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 10 ;
+        lv2:symbol "band2_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 70 ;
+        lv2:minimum 40 ;
+        lv2:maximum 100 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 11 ;
+        lv2:symbol "band2_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 12 ;
+        lv2:symbol "band2_q" ;
+        lv2:name "Q" ;
+        lv2:default 1 ;
+        lv2:minimum 0.5 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 13 ;
+        lv2:symbol "band3_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 14 ;
+        lv2:symbol "band3_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 15 ;
+        lv2:symbol "band3_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 16 ;
+        lv2:symbol "band3_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 120 ;
+        lv2:minimum 70 ;
+        lv2:maximum 180 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 17 ;
+        lv2:symbol "band3_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 18 ;
+        lv2:symbol "band3_q" ;
+        lv2:name "Q" ;
+        lv2:default 1 ;
+        lv2:minimum 0.5 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 19 ;
+        lv2:symbol "band4_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 20 ;
+        lv2:symbol "band4_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 21 ;
+        lv2:symbol "band4_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 22 ;
+        lv2:symbol "band4_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 210 ;
+        lv2:minimum 120 ;
+        lv2:maximum 300 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 23 ;
+        lv2:symbol "band4_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 24 ;
+        lv2:symbol "band4_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.1 ;
+        lv2:minimum 0.5 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 25 ;
+        lv2:symbol "band5_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 26 ;
+        lv2:symbol "band5_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 27 ;
+        lv2:symbol "band5_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 28 ;
+        lv2:symbol "band5_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 370 ;
+        lv2:minimum 200 ;
+        lv2:maximum 550 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 29 ;
+        lv2:symbol "band5_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 30 ;
+        lv2:symbol "band5_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.2 ;
+        lv2:minimum 0.6 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 31 ;
+        lv2:symbol "band6_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 32 ;
+        lv2:symbol "band6_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 33 ;
+        lv2:symbol "band6_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 34 ;
+        lv2:symbol "band6_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 650 ;
+        lv2:minimum 350 ;
+        lv2:maximum 900 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 35 ;
+        lv2:symbol "band6_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 36 ;
+        lv2:symbol "band6_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.3 ;
+        lv2:minimum 0.6 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 37 ;
+        lv2:symbol "band7_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 38 ;
+        lv2:symbol "band7_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 39 ;
+        lv2:symbol "band7_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 40 ;
+        lv2:symbol "band7_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 1150 ;
+        lv2:minimum 650 ;
+        lv2:maximum 1600 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 41 ;
+        lv2:symbol "band7_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 42 ;
+        lv2:symbol "band7_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.4 ;
+        lv2:minimum 0.7 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 43 ;
+        lv2:symbol "band8_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 44 ;
+        lv2:symbol "band8_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 45 ;
+        lv2:symbol "band8_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 46 ;
+        lv2:symbol "band8_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 2000 ;
+        lv2:minimum 1100 ;
+        lv2:maximum 2800 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 47 ;
+        lv2:symbol "band8_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 48 ;
+        lv2:symbol "band8_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.5 ;
+        lv2:minimum 0.8 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 49 ;
+        lv2:symbol "band9_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 50 ;
+        lv2:symbol "band9_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 51 ;
+        lv2:symbol "band9_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 52 ;
+        lv2:symbol "band9_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 3500 ;
+        lv2:minimum 1800 ;
+        lv2:maximum 5000 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 53 ;
+        lv2:symbol "band9_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 54 ;
+        lv2:symbol "band9_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.6 ;
+        lv2:minimum 0.8 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 55 ;
+        lv2:symbol "band10_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 56 ;
+        lv2:symbol "band10_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 57 ;
+        lv2:symbol "band10_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 58 ;
+        lv2:symbol "band10_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 6100 ;
+        lv2:minimum 3500 ;
+        lv2:maximum 9000 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 59 ;
+        lv2:symbol "band10_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 60 ;
+        lv2:symbol "band10_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.5 ;
+        lv2:minimum 0.8 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 61 ;
+        lv2:symbol "band11_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 62 ;
+        lv2:symbol "band11_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 63 ;
+        lv2:symbol "band11_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 64 ;
+        lv2:symbol "band11_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 10700 ;
+        lv2:minimum 6000 ;
+        lv2:maximum 15000 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 65 ;
+        lv2:symbol "band11_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 66 ;
+        lv2:symbol "band11_q" ;
+        lv2:name "Q" ;
+        lv2:default 1.3 ;
+        lv2:minimum 0.7 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 67 ;
+        lv2:symbol "band12_enable" ;
+        lv2:name "Band Enable" ;
+        lv2:default 1 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 68 ;
+        lv2:symbol "band12_type" ;
+        lv2:name "Band Type" ;
+        lv2:default 2 ;
+        lv2:minimum 0 ;
+        lv2:maximum 2 ;
+        lv2:portProperty lv2:integer , lv2:enumeration ;
+        lv2:scalePoint [ rdfs:label "Low Shelf" ; rdf:value 0 ] ;
+        lv2:scalePoint [ rdfs:label "Peak" ; rdf:value 1 ] ;
+        lv2:scalePoint [ rdfs:label "High Shelf" ; rdf:value 2 ] ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 69 ;
+        lv2:symbol "band12_mute" ;
+        lv2:name "Band Mute" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 70 ;
+        lv2:symbol "band12_freq" ;
+        lv2:name "Frequency" ;
+        lv2:default 18000 ;
+        lv2:minimum 10000 ;
+        lv2:maximum 20000 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 71 ;
+        lv2:symbol "band12_gain" ;
+        lv2:name "Gain" ;
+        lv2:default 0 ;
+        lv2:minimum -48 ;
+        lv2:maximum 24 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 72 ;
+        lv2:symbol "band12_q" ;
+        lv2:name "Q" ;
+        lv2:default 0.7 ;
+        lv2:minimum 0.4 ;
+        lv2:maximum 10 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 73 ;
+        lv2:symbol "solo_band" ;
+        lv2:name "Solo Band" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 11 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 74 ;
+        lv2:symbol "solo_enabled" ;
+        lv2:name "Solo Enabled" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 75 ;
+        lv2:symbol "lowcut_enable" ;
+        lv2:name "Lowcut Enable" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 76 ;
+        lv2:symbol "lowcut_freq" ;
+        lv2:name "Lowcut Frequency" ;
+        lv2:default 19 ;
+        lv2:minimum 19 ;
+        lv2:maximum 2200 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 77 ;
+        lv2:symbol "highcut_enable" ;
+        lv2:name "Highcut Enable" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 78 ;
+        lv2:symbol "highcut_freq" ;
+        lv2:name "Highcut Frequency" ;
+        lv2:default 22000 ;
+        lv2:minimum 110 ;
+        lv2:maximum 22000 ;
+        lv2:portProperty lv2:logarithmic ;
+        units:unit units:hz ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 79 ;
+        lv2:symbol "smooth" ;
+        lv2:name "Smooth" ;
+        lv2:default 0.3 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 80 ;
+        lv2:symbol "dynamics" ;
+        lv2:name "Dynamics" ;
+        lv2:default 0 ;
+        lv2:minimum -1 ;
+        lv2:maximum 1 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 81 ;
+        lv2:symbol "tone_bias" ;
+        lv2:name "Tone Bias" ;
+        lv2:default 0 ;
+        lv2:minimum -1 ;
+        lv2:maximum 1 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 82 ;
+        lv2:symbol "volume_out" ;
+        lv2:name "Volume Out" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 12 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 83 ;
+        lv2:symbol "meter_l" ;
+        lv2:name "METER_L" ;
+        lv2:default -70.0 ;
+        lv2:minimum -130.0 ;
+        lv2:maximum 4.0 ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 84 ;
+        lv2:symbol "meter_r" ;
+        lv2:name "METER_R" ;
+        lv2:default -70.0 ;
+        lv2:minimum -130.0 ;
+        lv2:maximum 4.0 ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:AudioPort ;
+        lv2:index 85 ;
+        lv2:symbol "in_l" ;
+        lv2:name "Input L" ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:AudioPort ;
+        lv2:index 86 ;
+        lv2:symbol "in_r" ;
+        lv2:name "Input R" ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:AudioPort ;
+        lv2:index 87 ;
+        lv2:symbol "out_l" ;
+        lv2:name "Output L" ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:AudioPort ;
+        lv2:index 88 ;
+        lv2:symbol "out_r" ;
+        lv2:name "Output R" ;
+    ] ,
+
+    [
+        a lv2:OutputPort , atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        lv2:designation lv2:control ;
+        lv2:index 89 ;
+        lv2:symbol "NOTIFY" ;
+        lv2:name "NOTIFY";
+    ] ,
+
+    [
+        a lv2:InputPort , atom:AtomPort ;
+        atom:bufferType atom:Sequence ;
+        lv2:designation lv2:control ;
+        lv2:index 90 ;
+        lv2:symbol "CONTROL" ;
+        lv2:name "CONTROL";
+    ], 
+
+    [
+      a lv2:OutputPort,
+           lv2:ControlPort ;
+      lv2:index 91 ;
+      lv2:designation <http://lv2plug.in/ns/lv2core#latency>;
+      lv2:portProperty lv2:reportsLatency, lv2:integer;
+      units:unit units:frame;
+      lv2:symbol "latency" ;
+      lv2:name "Latency" ;
+      lv2:minimum 0 ;
+      lv2:maximum 192000 ;
+    ]
+
+    .
+
+<urn:brummer:toneshifteq_ui>
+   a guiext:X11UI;
+   guiext:binary <toneshifteq_ui.so> ;
+       lv2:extensionData guiext::idle ;
+       lv2:extensionData guiext:resize ;
+       lv2:extensionData guiext:idleInterface ;
+       lv2:requiredFeature guiext:idleInterface ;
+       lv2:optionalFeature opts:options ;
+       opts:supportedOption guiext:scaleFactor ; .

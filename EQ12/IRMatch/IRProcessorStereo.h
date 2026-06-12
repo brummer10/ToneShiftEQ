@@ -37,8 +37,8 @@ public:
     int lowcut_enabled = 0;
     int highcut_enabled = 0;
 
-    double lowcut = 100.0;
-    double highcut = 4000.0;
+    double lowcut = 19.0;
+    double highcut = 22000.0;
     double smooth_amount = 0.3;
     double dynamics_amount = 0.0;
     double tilt_amount = 0.0;
@@ -65,19 +65,32 @@ public:
         IRChannelData right;
     };
 
-    Band bands[6] = {
+    Band bands[12] = {
         // Low Shelf
-        {1, Band::LowShelf,  80.0,   0.0, 0.7, 0},
-        // Low-Mid
-        {1, Band::Peak,     150.0,   0.0, 1.0, 0},
-        // Mid 1
-        {1, Band::Peak,     500.0,   0.0, 1.0, 0},
-        // Mid 2
-        {1, Band::Peak,    1500.0,   0.0, 1.0, 0},
-        // High-Mid
-        {1, Band::Peak,    4500.0,   0.0, 1.0, 0},
+        {1, Band::LowShelf,    40.0,   0.0, 0.7, 0},
+
+        // Bass
+        {1, Band::Peak,        70.0,   0.0, 1.0, 0},
+        {1, Band::Peak,       120.0,   0.0, 1.0, 0},
+
+        // Low Mid
+        {1, Band::Peak,       210.0,   0.0, 1.0, 0},
+        {1, Band::Peak,       370.0,   0.0, 1.0, 0},
+
+        // Mid
+        {1, Band::Peak,       650.0,   0.0, 1.0, 0},
+        {1, Band::Peak,      1150.0,   0.0, 1.0, 0},
+
+        // Upper Mid
+        {1, Band::Peak,      2000.0,   0.0, 1.0, 0},
+        {1, Band::Peak,      3500.0,   0.0, 1.0, 0},
+
+        // Presence / Air
+        {1, Band::Peak,      6100.0,   0.0, 1.0, 0},
+        {1, Band::Peak,     10700.0,   0.0, 1.0, 0},
+
         // High Shelf
-        {1, Band::HighShelf, 10000.0, 0.0, 0.7, 0}
+        {1, Band::HighShelf, 18000.0,  0.0, 0.7, 0}
     };
 
     void computeIR(const Vec& refL, const Vec& refR,
@@ -108,6 +121,22 @@ public:
         synthesisN = next_pow2(irLength * 2);
 
         updateIR(refL_trunc, refR_trunc, srcL_trunc, srcR_trunc, rebuild);
+    }
+
+    void computeIR(double sampleRate_, size_t irLength_ = 4096,
+                   bool rebuild = false, size_t fftSize = 0) {
+
+        sampleRate = sampleRate_;
+        irLength = 4096;
+        haveFreshSource = rebuild;
+
+        haveReference = false;
+        haveSource = false;
+
+        analysisN = next_pow2(irLength * 2);
+        synthesisN = next_pow2(irLength * 2);
+
+        updateIR();
     }
 
     std::pair<Vec, Vec> createIRStereo() {
@@ -142,7 +171,7 @@ public:
         return mergeAverage(ir.first, ir.second);
     }
 
-    const Vec& getIRMag() const { return gui_ir_; }
+    const std::vector<float>& getIRMag() const { return gui_ir_; }
     const Vec& getDiffMag() const { return gui_diff_; }
     const Vec& getRefMag() const { return gui_ref_; }
     const Vec& getSrcMag() const { return gui_src_; }
@@ -174,7 +203,7 @@ private:
     Vec mag_ir_L_;
     Vec mag_ir_R_;
 
-    Vec gui_ir_;
+    std::vector<float> gui_ir_;
     Vec gui_ref_;
     Vec gui_diff_;
     Vec gui_src_;
@@ -219,8 +248,18 @@ private:
         return out;
     }
 
+    static std::vector<float> mergeAverageFloat(const Vec& L, const Vec& R) {
+        size_t n = std::min(L.size(), R.size());
+        std::vector<float> out(n);
+
+        for (size_t i = 0; i < n; ++i)
+            out[i] = (float) (0.5f * (L[i] + R[i]));
+
+        return out;
+    }
+
     void updateGuiCurves(const IRData& data) {
-        gui_ir_ = mergeAverage(mag_ir_L_, mag_ir_R_);
+        gui_ir_ = mergeAverageFloat(mag_ir_L_, mag_ir_R_);
         gui_ref_ = mergeAverage(data.left.ref, data.right.ref);
         gui_diff_ = mergeAverage(data.left.diff, data.right.diff);
         gui_src_ = mergeAverage(data.left.src, data.right.src);
@@ -230,6 +269,7 @@ private:
         size_t outBins = synthesisN / 2 + 1;
         size_t inBins  = in.size();
         Vec out(outBins);
+        if (!in.size()) return out;
 
         for (size_t i = 0; i < outBins; ++i) {
             double freqNorm = (double)i / (double)(outBins - 1);
@@ -276,7 +316,7 @@ private:
         //}
         if(highcut_enabled_) eq.apply_high_rolloff(mag_ir, sampleRate, highcut_);
 
-        Band localBands[6];
+        Band localBands[12];
         std::copy(std::begin(bands), std::end(bands), std::begin(localBands));
 
         for (auto& b : localBands) {
@@ -378,8 +418,11 @@ private:
                 for (auto& v : out.src)  v -= out.peak;
                 if (haveSource && haveReference) {
                     double peak_d = *std::max_element(out.diff.begin(), out.diff.end());
-                    peak_d = 0.0 - peak_d;
-                    for (auto& v : out.diff) v += peak_d;
+                    double peak_m = *std::min_element(out.diff.begin(), out.diff.end());
+                    std::cout << peak_d << "  " << peak_m << std::endl;
+                    //peak_d = 0.0 - peak_d;
+                    //std::cout << peak_d << std::endl;
+                    //for (auto& v : out.diff) v -= peak_d;
                 } else if (haveSource)
                     for (auto& v : out.diff) v -= out.peak;
             }
@@ -469,6 +512,16 @@ private:
             pendingSourceR = srcR;
 
             pendingRebuild = rebuild;
+        }
+
+        hasWork.store(true, std::memory_order_release);
+        cv.notify_one();
+    }
+
+    void updateIR() {
+        {
+            std::lock_guard<std::mutex> lock(workMutex);
+            pendingRebuild = false;
         }
 
         hasWork.store(true, std::memory_order_release);

@@ -36,3 +36,22 @@ jobs:
           extraargs: clap
           lto: false
           pawpaw: true
+
+  linux-lv2:
+    strategy:
+      matrix:
+        target: [linux-x86_64]
+    runs-on: ubuntu-22.04
+    permissions:
+        contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: ${{ matrix.target }}
+          suffix: -lv2
+          extraargs: lv2
+          lto: false
+          pawpaw: true

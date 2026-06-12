@@ -1,0 +1,380 @@
+
+/*
+ * ToneShiftEQ.cpp
+ *
+ * SPDX-License-Identifier:  BSD-3-Clause
+ *
+ * Copyright (C) 2026 brummer <brummer@web.de>
+ */
+
+#include <cstdlib>
+#include <cmath>
+#include <iostream>
+#include <cstring>
+#include <unistd.h>
+
+#include <lv2/core/lv2.h>
+#include <lv2/state/state.h>
+#include <lv2/worker/worker.h>
+#include <lv2/atom/atom.h>
+#include <lv2/options/options.h>
+
+#include <lv2/atom/util.h>
+#include <lv2/atom/forge.h>
+#include <lv2/midi/midi.h>
+#include <lv2/urid/urid.h>
+#include <lv2/patch/patch.h>
+
+#include "FFTAnalyzer.h"
+#include "IRProcessorStereo.h"
+#include "IRMorpherStereo.h"
+#include "GainStereo.h"
+#include "Engine.h"
+#include "ParallelThread.h"
+#include "Parameter.h"
+#define CLAPPLUG
+#include "SpectrumViewer.h"
+
+///////////////////////// URID SUPPORT ////////////////////////////////
+
+#define PLUGIN_URI "urn:brummer:toneshifteq"
+#define DOZENEQ_spectrum PLUGIN_URI "#spectrum"
+#define DOZENEQ_irdata PLUGIN_URI "#irdata"
+#define DOZENEQ_ir_request PLUGIN_URI "#ir_request"
+
+
+typedef struct {
+    LV2_URID atom_Object;
+    LV2_URID atom_Float;
+    LV2_URID atom_Double;
+    LV2_URID atom_Vector;
+    LV2_URID atom_URID;
+    LV2_URID atom_eventTransfer;
+    LV2_URID spectrum_data;
+    LV2_URID ir_data;
+    LV2_URID ir_request;
+} URIs;
+
+static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
+    uris->atom_Object             = map->map(map->handle, LV2_ATOM__Object);
+    uris->atom_Float              = map->map(map->handle, LV2_ATOM__Float);
+    uris->atom_Double             = map->map(map->handle, LV2_ATOM__Double);
+    uris->atom_Vector             = map->map(map->handle, LV2_ATOM__Vector);
+    uris->atom_URID               = map->map(map->handle, LV2_ATOM__URID);
+    uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
+    uris->spectrum_data           = map->map(map->handle, DOZENEQ_spectrum);
+    uris->ir_data                 = map->map(map->handle, DOZENEQ_irdata);
+    uris->ir_request              = map->map(map->handle, DOZENEQ_ir_request);
+}
+
+////////////////////////////// PLUG-IN CLASS ///////////////////////////
+
+namespace toneshifteq {
+
+class Xtoneshifteq
+{
+private:
+    Params*                 param;
+    FFTAnalyzer             ana;
+    IRProcessor             ip;
+    IRMorpherStereo         conv;
+    GainStereo              vu;
+    Engine                  engine;
+    
+    const LV2_Atom_Sequence* control;
+    LV2_Atom_Sequence* notify;
+    LV2_URID_Map* map;
+
+    LV2_Atom_Forge forge;
+    LV2_Atom_Sequence* notify_port;
+    LV2_Atom_Forge_Frame notify_frame;
+    URIs uris;
+    float* par[83]; // engine.param.getParamCount() +1
+    float* input0;
+    float* input1;
+    float* output0;
+    float* output1;
+    float* latency;
+
+    // private functions
+    inline void run_dsp_(uint32_t n_samples);
+    inline void connect_(uint32_t port,void* data);
+    inline void init_dsp_(uint32_t rate);
+    inline void connect_all__ports(uint32_t port, void* data);
+    inline void activate_f();
+    inline void clean_up();
+    inline void deactivate_f();
+    void analyse();
+public:
+    float sampleRate;
+
+    // LV2 Descriptor
+    static const LV2_Descriptor descriptor;
+    // static wrapper to private functions
+    static void deactivate(LV2_Handle instance);
+    static void cleanup(LV2_Handle instance);
+    static const void* extension_data(const char* uri);
+    static void run(LV2_Handle instance, uint32_t n_samples);
+    static void activate(LV2_Handle instance);
+    static void connect_port(LV2_Handle instance, uint32_t port, void* data);
+    static LV2_Handle instantiate(const LV2_Descriptor* descriptor,
+                                double rate, const char* bundle_path,
+                                const LV2_Feature* const* features);
+    Xtoneshifteq();
+    ~Xtoneshifteq();
+};
+
+// constructor
+Xtoneshifteq::Xtoneshifteq() :
+    ana(),
+    ip(),
+    conv(),
+    vu(),
+    engine(&ip, &conv, &ana, &vu),
+    input0(NULL),
+    input1(NULL),
+    output0(NULL),
+    output1(NULL),
+    latency(NULL) {};
+
+// destructor
+Xtoneshifteq::~Xtoneshifteq() {};
+
+///////////////////////// PRIVATE CLASS  FUNCTIONS /////////////////////
+
+void Xtoneshifteq::init_dsp_(uint32_t rate)
+{
+    sampleRate = (float)rate;
+    engine.init(rate, 20, 1);
+    float v = 0;
+    for (int i = 0; i< 83; i++) {
+        par[i] = &v;
+    }
+}
+
+// connect the Ports used by the plug-in class
+void Xtoneshifteq::connect_(uint32_t port,void* data)
+{
+    for (int i = 0; i< 83; i++) {
+        if (i == (int)port) {
+            par[i] = static_cast<float*>(data);
+            return;
+        }
+    }
+    switch (port)
+    {
+        case 83:
+            vu.meterLout = static_cast<float*>(data);
+            break;
+        case 84:
+            vu.meterRout = static_cast<float*>(data);
+            break;
+        case 85:
+            input0 = static_cast<float*>(data);
+            break;
+        case 86:
+            input1 = static_cast<float*>(data);
+            break;
+        case 87:
+            output0 = static_cast<float*>(data);
+            break;
+        case 88:
+            output1 = static_cast<float*>(data);
+            break;
+        case 89:
+            notify = (LV2_Atom_Sequence*)data;
+            break;
+        case 90:
+            control = (const LV2_Atom_Sequence*)data;
+            break;
+        case 91:
+            latency = static_cast<float*>(data);
+            break;
+        default:
+            break;
+    }
+}
+
+void Xtoneshifteq::activate_f()
+{
+    // allocate the internal DSP mem
+}
+
+void Xtoneshifteq::clean_up()
+{
+    // delete the internal DSP mem
+}
+
+void Xtoneshifteq::deactivate_f()
+{
+    // delete the internal DSP mem
+}
+
+void Xtoneshifteq::run_dsp_(uint32_t n_samples)
+{
+    if(n_samples<1) return;
+    URIs* uris = &this->uris;
+    const uint32_t notify_capacity = this->notify->atom.size;
+    lv2_atom_forge_set_buffer(&forge, (uint8_t*)notify, notify_capacity);
+    lv2_atom_forge_sequence_head(&forge, &notify_frame, 0);
+    if (notify_capacity<n_samples) return;
+
+    // do inplace processing on default
+    if(output0 != input0)
+        memcpy(output0, input0, n_samples*sizeof(float));
+    if(output1 != input1)
+        memcpy(output1, input1, n_samples*sizeof(float));
+
+    // check for parameter changes
+    for (int i = 0; i< engine.param.getParamCount(); i++) {
+        if (engine.param.getParam(i) != (*par[i])) {
+            if (i > 0 && i < 83) { // filter update
+                engine.processIR.store(true, std::memory_order_release);
+                engine.workToDo.store(true, std::memory_order_release);
+            }
+            engine.param.setParam((int)i, (*par[i]));
+        }
+    }
+    // get request from UI to send the IR data
+    LV2_ATOM_SEQUENCE_FOREACH(control, ev) {
+        if (lv2_atom_forge_is_object_type(&forge, ev->body.type)) {
+            const LV2_Atom_Object* obj = (LV2_Atom_Object*)&ev->body;
+            if (obj->body.otype == uris->ir_request) {
+                engine.processIR.store(true, std::memory_order_release);
+                engine.workToDo.store(true, std::memory_order_release);
+           }
+        }
+    }
+
+    engine.process(n_samples, input0, input1, output0, output1);
+
+    // send spectrum
+    if (ana.hasNewData()) {
+        LV2_Atom_Forge_Frame frame;
+        lv2_atom_forge_frame_time(&this->forge, 0);
+        lv2_atom_forge_object(&this->forge, &frame, 1, uris->spectrum_data);
+        lv2_atom_forge_property_head(&this->forge, uris->atom_Vector,0);
+        lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float, ana.getBins(), (void*)ana.getMagnitudes());
+        lv2_atom_forge_pop(&this->forge, &frame);
+        ana.clearFlag();
+    }
+    // send new IR data
+    if (engine.dataReady.load(std::memory_order_acquire)) {
+        engine.dataReady.store(false, std::memory_order_release);
+        LV2_Atom_Forge_Frame frame;
+        lv2_atom_forge_frame_time(&this->forge, 0);
+        lv2_atom_forge_object(&this->forge, &frame, 1, uris->ir_data);
+        lv2_atom_forge_property_head(&this->forge, uris->atom_Vector,0);
+        lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float, 4096, (void*)engine.ip->getIRMag().data());
+        lv2_atom_forge_pop(&this->forge, &frame);
+        engine.processIR.store(false, std::memory_order_release);
+    }
+    *(latency) = 384.0f; // PART_SIZE + FFT_SIZE
+}
+
+void Xtoneshifteq::connect_all__ports(uint32_t port, void* data)
+{
+    // connect the Ports used by the plug-in class
+    connect_(port,data); 
+}
+
+////////////////////// STATIC CLASS  FUNCTIONS  ////////////////////////
+
+LV2_Handle 
+Xtoneshifteq::instantiate(const LV2_Descriptor* descriptor,
+                            double rate, const char* bundle_path,
+                            const LV2_Feature* const* features)
+{
+    // init the plug-in class
+    Xtoneshifteq *self = new Xtoneshifteq();
+    if (!self) {
+        return NULL;
+    }
+
+    LV2_URID_Map* map = NULL;
+    for (int i = 0; features[i]; ++i) {
+        if (!strcmp(features[i]->URI, LV2_URID__map)) {
+            map = (LV2_URID_Map*)features[i]->data;
+        }
+    }
+    if (!map) {
+        delete self;
+        return NULL;
+    }
+
+    map_lv2_uris(map, &self->uris);
+    lv2_atom_forge_init(&self->forge, map);
+
+    self->map = map;
+
+    self->init_dsp_((uint32_t)rate);
+    return (LV2_Handle)self;
+}
+
+void Xtoneshifteq::connect_port(LV2_Handle instance, 
+                                   uint32_t port, void* data)
+{
+    // connect all ports
+    static_cast<Xtoneshifteq*>(instance)->connect_all__ports(port, data);
+}
+
+void Xtoneshifteq::activate(LV2_Handle instance)
+{
+    // allocate needed mem
+    static_cast<Xtoneshifteq*>(instance)->activate_f();
+}
+
+void Xtoneshifteq::run(LV2_Handle instance, uint32_t n_samples)
+{
+    // run dsp
+    static_cast<Xtoneshifteq*>(instance)->run_dsp_(n_samples);
+}
+
+void Xtoneshifteq::deactivate(LV2_Handle instance)
+{
+    // free allocated mem
+    static_cast<Xtoneshifteq*>(instance)->deactivate_f();
+}
+
+void Xtoneshifteq::cleanup(LV2_Handle instance)
+{
+    // well, clean up after us
+    Xtoneshifteq* self = static_cast<Xtoneshifteq*>(instance);
+    self->clean_up();
+    delete self;
+}
+
+const void* Xtoneshifteq::extension_data(const char* uri) {
+    return NULL;
+}
+
+const LV2_Descriptor Xtoneshifteq::descriptor =
+{
+    PLUGIN_URI ,
+    Xtoneshifteq::instantiate,
+    Xtoneshifteq::connect_port,
+    Xtoneshifteq::activate,
+    Xtoneshifteq::run,
+    Xtoneshifteq::deactivate,
+    Xtoneshifteq::cleanup,
+    Xtoneshifteq::extension_data
+};
+
+} // end namespace toneshifteq
+
+////////////////////////// LV2 SYMBOL EXPORT ///////////////////////////
+
+LV2_SYMBOL_EXPORT
+const LV2_Descriptor*
+lv2_descriptor(uint32_t index)
+{
+    switch (index)
+    {
+        case 0:
+            return &toneshifteq::Xtoneshifteq::descriptor;
+        default:
+            return NULL;
+    }
+}
+
+///////////////////////////// FIN //////////////////////////////////////

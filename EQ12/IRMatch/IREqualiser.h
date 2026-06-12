@@ -83,7 +83,7 @@ public:
         size_t n = mag_.size();
         Vec mag = mag_;
         const double nyquist = sr * 0.5;
-        const double threshold = 0.5;
+        const double threshold = 1.0;
         const double edge = 0.5;
 
         for (size_t i = 1; i < n; ++i) {
