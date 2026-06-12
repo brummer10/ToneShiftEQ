@@ -43,7 +43,7 @@ jobs:
         Type=Application
         Categories=AudioVideo;
         EOF
-        cp EQ12/Resources/toneshifteq.png AppDir/toneshifteq.png
+        cp EQ12/Resources/toneshifteq.svg AppDir/toneshifteq.svg
 
     - name: Download linuxdeploy
       run: |
@@ -57,7 +57,7 @@ jobs:
         ./linuxdeploy-x86_64.AppImage \
           --appdir AppDir \
           --desktop-file AppDir/toneshifteq.desktop \
-          --icon-file AppDir/toneshifteq.png \
+          --icon-file AppDir/toneshifteq.svg \
           --output appimage
 
     - name: Create release filename (tag)
