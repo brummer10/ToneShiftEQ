@@ -8,6 +8,10 @@
 
 **ToneShiftEQ** is a modern 12-band equalizer designed for precise spectral shaping, mixing, mastering, and corrective audio processing.
 
+It can operate in two different modes:
+
+* Master → Master → Perfect linear-phase response with 128 samples of latency, ideal for mastering and critical processing.
+* Live → Zero-latency processing with slight phase deviation, optimized for real-time performance and live use.
 
 ---
 
@@ -24,6 +28,12 @@
 * Stereo processing
 * Low CPU consumption
 * Real-time safe processing architecture
+
+---
+
+## Usage
+
+Band control points can be moved with the mouse to adjust frequency and gain. Use the mouse wheel over a control point to change the Q factor.
 
 ---
 
