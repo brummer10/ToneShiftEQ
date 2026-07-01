@@ -69,9 +69,9 @@ jobs:
         RELEASE_FILENAME="${RELEASE_BASENAME}.AppImage"
         echo "RELEASE_FILENAME=${RELEASE_FILENAME}" >> $GITHUB_ENV
 
-        BUILT=$(ls [Ss]mooth[Ii][Rr]-*.AppImage 2>/dev/null | head -n1 || true)
+        BUILT=$(ls [Tt]one[Ss]hift[Ee][Qq]-*.AppImage 2>/dev/null | head -n1 || true)
         if [[ -z "$BUILT" ]]; then
-          echo "ERROR: No built AppImage found matching SmoothIR-*.AppImage"
+          echo "ERROR: No built AppImage found matching ToneShiftEQ-*.AppImage"
           ls -la || true
           exit 1
         fi
