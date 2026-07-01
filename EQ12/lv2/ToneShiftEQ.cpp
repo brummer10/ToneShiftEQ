@@ -32,15 +32,13 @@
 #include "Engine.h"
 #include "ParallelThread.h"
 #include "Parameter.h"
-#define CLAPPLUG
-#include "SpectrumViewer.h"
 
 ///////////////////////// URID SUPPORT ////////////////////////////////
 
 #define PLUGIN_URI "urn:brummer:toneshifteq"
-#define DOZENEQ_spectrum PLUGIN_URI "#spectrum"
-#define DOZENEQ_irdata PLUGIN_URI "#irdata"
-#define DOZENEQ_ir_request PLUGIN_URI "#ir_request"
+#define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
+#define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
+#define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
 
 
 typedef struct {
@@ -62,9 +60,9 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
     uris->atom_Vector             = map->map(map->handle, LV2_ATOM__Vector);
     uris->atom_URID               = map->map(map->handle, LV2_ATOM__URID);
     uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
-    uris->spectrum_data           = map->map(map->handle, DOZENEQ_spectrum);
-    uris->ir_data                 = map->map(map->handle, DOZENEQ_irdata);
-    uris->ir_request              = map->map(map->handle, DOZENEQ_ir_request);
+    uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
+    uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
+    uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
 }
 
 ////////////////////////////// PLUG-IN CLASS ///////////////////////////
@@ -89,7 +87,7 @@ private:
     LV2_Atom_Sequence* notify_port;
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
-    float* par[83]; // engine.param.getParamCount() +1
+    float* par[84]; // engine.param.getParamCount() +1
     float* input0;
     float* input1;
     float* output0;
@@ -147,7 +145,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate)
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0;
-    for (int i = 0; i< 83; i++) {
+    for (int i = 0; i< 84; i++) {
         par[i] = &v;
     }
 }
@@ -155,7 +153,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate)
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data)
 {
-    for (int i = 0; i< 83; i++) {
+    for (int i = 0; i< 84; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -163,31 +161,31 @@ void Xtoneshifteq::connect_(uint32_t port,void* data)
     }
     switch (port)
     {
-        case 83:
+        case 84:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 84:
+        case 85:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 85:
+        case 86:
             input0 = static_cast<float*>(data);
             break;
-        case 86:
+        case 87:
             input1 = static_cast<float*>(data);
             break;
-        case 87:
+        case 88:
             output0 = static_cast<float*>(data);
             break;
-        case 88:
+        case 89:
             output1 = static_cast<float*>(data);
             break;
-        case 89:
+        case 90:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 90:
+        case 91:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 91:
+        case 92:
             latency = static_cast<float*>(data);
             break;
         default:
@@ -228,8 +226,11 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples)
     // check for parameter changes
     for (int i = 0; i< engine.param.getParamCount(); i++) {
         if (engine.param.getParam(i) != (*par[i])) {
-            if (i > 0 && i < 83) { // filter update
+            if (i > 0 && i < 82) { // filter update
                 engine.processIR.store(true, std::memory_order_release);
+                engine.workToDo.store(true, std::memory_order_release);
+            } else if (i == 83) { // mode switch
+                engine.switchMode.store(true, std::memory_order_release);
                 engine.workToDo.store(true, std::memory_order_release);
             }
             engine.param.setParam((int)i, (*par[i]));
@@ -269,7 +270,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples)
         lv2_atom_forge_pop(&this->forge, &frame);
         engine.processIR.store(false, std::memory_order_release);
     }
-    *(latency) = 384.0f; // PART_SIZE + FFT_SIZE
+    *(latency) = engine.conv->getLatency();
 }
 
 void Xtoneshifteq::connect_all__ports(uint32_t port, void* data)

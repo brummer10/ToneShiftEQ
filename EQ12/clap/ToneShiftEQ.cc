@@ -184,9 +184,7 @@ public:
 
         if (param->getParam(74)) copyValuesToGui(sw.solo[(int)param->getParam(73)], 1.0);
 
-        //copyValuesToGui(sw.lcenable,   (float)param->getParam(75));
         copyValuesToGui(sw.lowcut,     (float)param->getParam(76));
-        //copyValuesToGui(sw.hcenable,   (float)param->getParam(77));
         copyValuesToGui(sw.highcut,    (float)param->getParam(78));
 
         copyValuesToGui(sw.smooth,     (float)param->getParam(79));

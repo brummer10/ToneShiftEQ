@@ -27,16 +27,16 @@
 
 #include "LV2Connector.h"
 
-#define CLAPPLUG  // hide quit button
+#define LV2PLUG  // hide quit button
 #include "SpectrumViewer.h"
 
 
 #define PLUGIN_URI     "urn:brummer:toneshifteq"
 #define PLUGIN_UI_URI  "urn:brummer:toneshifteq_ui"
 
-#define DOZENEQ_spectrum PLUGIN_URI "#spectrum"
-#define DOZENEQ_irdata PLUGIN_URI "#irdata"
-#define DOZENEQ_ir_request PLUGIN_URI "#ir_request"
+#define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
+#define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
+#define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
 
 
 typedef struct {
@@ -58,9 +58,9 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
     uris->atom_Vector             = map->map(map->handle, LV2_ATOM__Vector);
     uris->atom_URID               = map->map(map->handle, LV2_ATOM__URID);
     uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
-    uris->spectrum_data           = map->map(map->handle, DOZENEQ_spectrum);
-    uris->ir_data                 = map->map(map->handle, DOZENEQ_irdata);
-    uris->ir_request              = map->map(map->handle, DOZENEQ_ir_request);
+    uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
+    uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
+    uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
 }
 
 
@@ -186,6 +186,9 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
     case 82:
         copyValuesToGui(sw.vug, value);
         break;
+    case 83:
+        copyValuesToGui(sw.mode, value);
+        break;
     default:
         break;
     }
@@ -225,9 +228,9 @@ void XToneShiftEQ_UI::port_event(LV2UI_Handle handle, uint32_t port, uint32_t bu
 
     if (format == 0) {
         const float value = *(const float*)buffer;
-        if (port == 83) {
+        if (port == 84) {
             adj_set_value(self->sw.vumeterL->adj, power2db(self->sw.vumeterL, value));
-        } else if (port == 84) {
+        } else if (port == 85) {
             adj_set_value(self->sw.vumeterR->adj, power2db(self->sw.vumeterR, value));
         } else {
             self->conn.setParValue(port, value);
@@ -324,7 +327,7 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
     LV2_Atom_Forge_Frame frame;
     LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_object(&self->forge, &frame, 0, self->uris.ir_request);
 
-    self->write_function(self->controller, 90, lv2_atom_total_size(msg),
+    self->write_function(self->controller, 91, lv2_atom_total_size(msg),
                        self->uris.atom_eventTransfer, msg);
 }
 

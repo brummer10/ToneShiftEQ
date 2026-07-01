@@ -130,7 +130,7 @@ endif
 	# invoke build files
 	OBJECTS = main.cpp
 
-	DEPS = $(NAME).d $(NAME)_ui.d
+	DEPS = $(NAME)_app.d $(NAME)_lv2.d $(NAME)_clap.d $(NAME).d $(NAME)_ui.d
 
 .PHONY : all 
 
@@ -141,6 +141,7 @@ all : check $(NAME)
 	@if ! [ -f ../bin/$(NAME)$(EXE) ]; then \
 		$(R_ECHO) "Sorry, build fail$(reset)"; \
 	fi
+	@$(B_ECHO) "=================== DONE =======================$(reset)"
 
 clap: $(NAME).clap
 	$(QUIET)mkdir -p ../bin/
@@ -154,9 +155,7 @@ lv2: $(NAME).$(LIB_EXT) $(NAME)_ui.$(LIB_EXT)
 	$(QUIET)$(TTLUPDATE)
 	$(QUIET)$(TTLUPDATEGUI)
 	$(QUIET)cp ./*.$(LIB_EXT) ../bin/$(BUNDLE)
-	@if [ -f ../bin/$(BUNDLE)/$(NAME).$(LIB_EXT) ]; then \
-		$(B_ECHO) "build finish, . . . $(reset)"; \
-	else \
+	@if ! [ -f ../bin/$(BUNDLE)/$(NAME).$(LIB_EXT) ]; then \
 		$(R_ECHO) "Sorry, build fail$(reset)"; \
 	fi
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
@@ -219,28 +218,29 @@ uninstall :
 	$(QUIET)rm -rf $(DESTDIR)$(CLAP_INSTAL_DIR)/$(PLUGNAME).clap
 
 $(NAME) : $(OBJECTS)
-	$(CXX) -MMD $(CXXFLAGS) $(OBJECTS) -o $(NAME)$(EXE) $(LDFLAGS)
+	@$(B_ECHO) "Compiling $(NAME) $(reset)"
+	$(QUIET)$(CXX) -MMD -MF $(NAME)_app.d $(CXXFLAGS) $(OBJECTS) -o $(NAME)$(EXE) $(LDFLAGS)
 ifneq ($(MAKECMDGOALS),debug)
-	$(STRIP) -s -x -X -R .note.ABI-tag $(NAME)$(EXE)
+	$(QUIET)$(STRIP) -s -x -X -R .note.ABI-tag $(NAME)$(EXE)
 endif
 
 $(NAME).clap: $(CLAP_SOURCES) $(CLAP_DIR)ToneShiftEQ.cc
 	@$(B_ECHO) "Compiling $(NAME).clap $(reset)"
-	$(CXX) -shared -MMD $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS)
+	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_clap.d $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
-	$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).clap
+	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).clap
 endif
 
-$(NAME)_ui.$(LIB_EXT): $(LV2_GUI).cpp $(GUIIMPL_SOURCE) $(UI_LIB)
+$(NAME)_ui.$(LIB_EXT): $(LV2_GUI).cpp $(UI_LIB)
 	@$(B_ECHO) "Compiling $(NAME)_ui.$(LIB_EXT) $(reset)"
-	$(QUIET)$(CXX) -shared -MMD $(CXXFLAGS) -I./ $(LV2_INCLUDE) $(LV2_GUI).cpp -L. $(UI_LIB) -o $@ $(LDFLAGS) $(GUI_LDFLAGS)
+	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_ui.d $(CXXFLAGS) -I./ $(LV2_INCLUDE) $(LV2_GUI).cpp -L. $(UI_LIB) -o $@ $(LDFLAGS) $(GUI_LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME)_ui.$(LIB_EXT)
 endif
 
 $(NAME).$(LIB_EXT): $(LV2_PLUGIN).cpp
 	@$(B_ECHO) "Compiling $(NAME).$(LIB_EXT) $(reset)"
-	$(QUIET)$(CXX) -shared -MMD $(CXXFLAGS) $(LV2_INCLUDE) $(LV2_PLUGIN).cpp -o $(NAME).$(LIB_EXT) $(LDFLAGS)
+	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_lv2.d $(CXXFLAGS) $(LV2_INCLUDE) $(LV2_PLUGIN).cpp -o $(NAME).$(LIB_EXT) $(LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).$(LIB_EXT)
 endif

@@ -15,7 +15,7 @@
 #include <atomic>
 #include <utility>
 
-#include "PartitionConvolverStereo.h"
+#include "Convolver.h"
 
 class IRMorpherStereo {
 public:
@@ -23,7 +23,7 @@ public:
     int bypass = 0;
 
     IRMorpherStereo(size_t blockSize = 256, size_t headSize  = 64) {
-        convA = std::make_unique<PartitionConvolverStereo>();
+        convA = std::make_unique<MasterConvolver>();
         bufferAL.resize(8194);
         bufferAR.resize(8194);
     }
@@ -46,6 +46,7 @@ public:
         bypass = bp;
     }
 
+    size_t getLatency() { return convA->getLatency(); }
 
     void process(uint32_t nframes, const float* inputL, const float* inputR,
                                             float* outputL, float* outputR) {
@@ -68,9 +69,17 @@ public:
         std::memcpy(outputR, bufferAR.data(), sizeof(float) * nframes);
     }
 
+    void setMode(int live, const std::pair<Vec, Vec> ir) {
+        if (live == 0)
+            convA = std::make_unique<MasterConvolver>();
+        else
+            convA = std::make_unique<LiveConvolver>();
+        setIR(ir);
+    }
+
 private:
 
-    std::unique_ptr<PartitionConvolverStereo> convA;
+    std::unique_ptr<ConvolverBase> convA;
 
     // current IR output
     std::vector<float> bufferAL;

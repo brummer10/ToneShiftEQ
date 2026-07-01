@@ -45,6 +45,7 @@ public:
     std::atomic<bool>            waitForIR {false};
     std::atomic<bool>            dataReady {false};
     std::atomic<bool>            convLoadIR {false};
+    std::atomic<bool>            switchMode {false};
 
     inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_);
 
@@ -58,6 +59,7 @@ private:
     ParallelThread               par;
     float*                       abuffer = nullptr;
     uint32_t                     frames = 0;
+    int                          mode = 0;
 
     void registerParameters();
 
@@ -116,6 +118,8 @@ void Engine::registerParameters() {
     param.registerParam("Tone Bias",      "IR", -1,   1,  0.0, 0.01,    (void*)&ip->tilt_amount,    false,  IS_DOUBLE);
    
     param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
+
+    param.registerParam("Mode",           "EQ",  0,   1,   0,    1,     (void*)&mode,                true,  IS_INT);
 };
 
 
@@ -148,6 +152,11 @@ void Engine::do_work_mono() {
     if (convLoadIR.load(std::memory_order_acquire)) {
         conv->setIR(ip->createIRStereo());
         convLoadIR.store(false, std::memory_order_release);
+    }
+
+    if (switchMode.load(std::memory_order_acquire)) {
+        conv->setMode(mode, ip->createIRStereo());
+        switchMode.store(false, std::memory_order_release);
     }
 
     execute.store(false, std::memory_order_release);

@@ -41,9 +41,9 @@ public:
     Widget_t* next[12];
 
     Widget_t* lowcut = nullptr;
-    Widget_t* lcenable = nullptr;
     Widget_t* highcut = nullptr;
-    Widget_t* hcenable = nullptr;
+
+    Widget_t* mode = nullptr;
 
     Widget_t* smooth = nullptr;
     Widget_t* dynamics = nullptr;
@@ -102,6 +102,7 @@ public:
 
         spec->parent_struct = this;
         spec->flags |= NO_PROPAGATE;
+        spec->scale.gravity = NORTHWEST;
         spec->func.expose_callback = draw_callback;
         spec->func.motion_callback = mouse_in_spec;
         spec->func.leave_callback = mouse_leave_spec;
@@ -109,14 +110,19 @@ public:
         spec->func.button_press_callback = mouse_set_spec;
 
         Widget_t* gframe = add_my_frame(top,"", width-79, 0, 78, height-82);
+        gframe->scale.gravity = WESTSOUTH;
         vumeterL = add_my_vmeter(gframe, "Meter", false, 35, 5, 10, height-88);
+        vumeterL->scale.gravity = WESTSOUTH;
         vumeterR = add_my_vmeter(gframe, "Meter", true, 45, 5, 10, height-88);
+        vumeterR->scale.gravity = WESTSOUTH;
         vug = add_my_vslider(gframe, "Gain", 8, 6, 20, height-90);
+        vug->scale.gravity = WESTSOUTH;
         vug->parent_struct = this;
         set_adjustment(vug->adj,0.0, 0.0, -46.0, 12.0, 0.1, CL_CONTINUOS);
         vug->func.value_changed_callback = set_gain;
 
         Widget_t* lframe = add_my_frame(top,"", width-79, 350, 78, 80);
+        lframe->scale.gravity = SOUTHWEST;
         curFreq = add_my_label(lframe, "",5,0,60,20);
         curGain = add_my_label(lframe, "",5,20,60,20);
 
@@ -126,17 +132,21 @@ public:
         bp->func.value_changed_callback = bp_response;
 
         #ifndef CLAPPLUG
+        #ifndef LV2PLUG
         Widget_t* quit = add_my_button(lframe, 5, 60, 60, 20, "Quit");
         quit->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         quit->parent_struct = this;
         quit->func.value_changed_callback = quit_response;
         #endif
+        #endif
 
         Widget_t* laframe = add_my_z_frame(spec,"", 1, 331, width-80, 100);
+        laframe->scale.gravity = WESTEAST;
 
         int x = 1;
         for (int i = 0; i<12; i++) {
             frame[i] = add_my_panel(laframe,"", 285, 0, 250, 99);
+            frame[i]->scale.gravity = NORTCENTER;
             double r,g,bcol;
             get_band_color(i, r, g, bcol);
             set_widget_color(frame[i], (Color_state)0, (Color_mod)1, r, g, bcol, 1.0);
@@ -273,10 +283,6 @@ public:
         lowcut->func.value_changed_callback = set_lowcut;
         lowcut->func.button_release_callback = set;
 
-        //lcenable = add_my_enable_button(lowcut, 19, 10, 20, 20, "");
-        //lcenable->parent_struct = this;
-        //lcenable->func.value_changed_callback = set_lowcut_enable;
-
         highcut = add_my_knob(laframe, "HighCut", "Hz", 120,26,60, 70);
         set_adjustment(highcut->adj, 22000.0, 22000.0, 110.0, 22000.0, 0.01, CL_LOGARITHMIC);
         highcut->flags = USE_TRANSPARENCY | FAST_REDRAW;
@@ -286,14 +292,20 @@ public:
         highcut->func.button_release_callback = set;
 
         #ifndef CLAPPLUG
+        mode = add_my_combobox(laframe,"Mode", 190, 25, 90, 20);
+        mode->parent_struct = this;
+        combobox_add_entry(mode,"Master");
+        combobox_add_entry(mode,"Live");
+        combobox_set_active_entry(mode, 0);
+        mode->func.value_changed_callback = set_mode;
+        add_tooltip(mode->childlist->childs[0], "Mode");
+
+        #ifndef LV2PLUG
         Widget_t* save = add_xsave_file_button(laframe, 190, 65, 90, 20, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
         #endif
-
-        //hcenable = add_my_enable_button(highcut, 19, 10, 20, 20, "");
-        //hcenable->parent_struct = this;
-        //hcenable->func.value_changed_callback = set_highcut_enable;
+        #endif
 
         smooth = add_my_knob(laframe, "Smooth", "", 590,26,60, 70);
         set_adjustment(smooth->adj, 0.3, 0.3, 0.0, 1.0, 0.01, CL_CONTINUOS);
@@ -427,6 +439,12 @@ private:
             self->run = false;
             destroy_widget(self->top, self->top->app);
         }
+    }
+
+    static void set_mode(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(83, adj_get_value(w->adj));
     }
 
     static void set_gain(void *w_, void* user_data) {
@@ -1101,7 +1119,7 @@ private:
             cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.7);
             cairo_move_to(cr, 5, y - 2);
             cairo_text_path (cr, buf);
-            cairo_fill (w->crb);
+            cairo_fill (cr);
         }
         cairo_destroy(cr);
     }
