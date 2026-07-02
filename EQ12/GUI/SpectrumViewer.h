@@ -627,7 +627,7 @@ private:
         Metrics_t m;
         os_get_window_metrics(spec, &m);
         const int width  = m.width;
-        const int height = m.height-80;
+        const int height = m.height- (80 * spec->app->hdpi);
         if ((int)y > height) {
             mouse_leave_spec(spec, nullptr);
             return;
@@ -901,7 +901,7 @@ private:
         Metrics_t m;
         os_get_window_metrics(spec, &m);
         const int width  = m.width;
-        const int height = m.height-80;
+        const int height = m.height- (80 * spec->app->hdpi);
         for (int i = 0; i < 12; ++i) {
             float x = freq_to_x(conn->getParameterValue(i * 6 + 4), f_min, f_max, width);
             float y = db_to_y(conn->getParameterValue(i * 6 + 5), db_min, db_max, height);
@@ -1164,7 +1164,7 @@ private:
         const float sample_rate = sampleRate;
 
         const int width  = m.width;
-        const int height = m.height-80;
+        const int height = m.height- (80 * w->app->hdpi);
         if (spec_height != height || spec_width != width) {
             create_background(w, width, height);
             create_eq_layer(w, width, height, sample_rate);

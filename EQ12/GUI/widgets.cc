@@ -60,9 +60,9 @@ void draw_label(void *w_, void* user_data) {
     if (!w) return;
     Metrics_t metrics;
     os_get_window_metrics(w, &metrics);
-    //int width = metrics.width-5;
-    //int height = metrics.height-5;
     if (!metrics.visible) return;
+    int width = metrics.width;
+    int height = metrics.height;
     char label[124];
     memset(label, '\0', sizeof(char)*124);
     utf8crop_middle(label, w->label, 39);
@@ -71,8 +71,7 @@ void draw_label(void *w_, void* user_data) {
     cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
     cairo_set_source_rgb(w->crb, 0.91, 0.949, 0.883);
     cairo_text_extents(w->crb, label, &extents_f);
-    double twf = extents_f.width/2.0;
-    cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
+    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
     cairo_text_path (w->crb, label);
     cairo_fill (w->crb);
     widget_reset_scale(w);
@@ -126,9 +125,9 @@ void draw_i_button(void *w_, void* user_data) {
     if (!w) return;
     Metrics_t metrics;
     os_get_window_metrics(w, &metrics);
-    //int width = metrics.width-5;
-    //int height = metrics.height-5;
     if (!metrics.visible) return;
+    int width = metrics.width;
+    int height = metrics.height;
     float offset = 0.0;
     float g = 0.0;
     if(w->state==1 && ! (int)w->adj_y->value) {
@@ -143,11 +142,10 @@ void draw_i_button(void *w_, void* user_data) {
     if(w->adj_y->value) g = -0.5;
     widget_set_scale(w);
     cairo_text_extents_t extents_f;
-    cairo_set_font_size (w->crb, w->app->normal_font + 1 + offset);
+    cairo_set_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi);
     cairo_set_source_rgb(w->crb, 0.91, 0.949 + g, 0.883 + g);
     cairo_text_extents(w->crb, w->label, &extents_f);
-    double twf = extents_f.width/2.0;
-    cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
+    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
     cairo_text_path (w->crb, w->label);
     cairo_fill (w->crb);
     widget_reset_scale(w);
@@ -286,6 +284,8 @@ static void draw_my_combobox(void *w_, void* user_data) {
     Metrics_t metrics;
     os_get_window_metrics(w, &metrics);
     if (!metrics.visible) return;
+    int width = metrics.width;
+    int height = metrics.height;
     int v = (int)adj_get_value(w->adj);
     int vl = v - (int) w->adj->min_value;
    // if (v<0) return;
@@ -296,14 +296,13 @@ static void draw_my_combobox(void *w_, void* user_data) {
     char label[32];
     memset(label, '\0', sizeof(char)*32);
     cairo_text_extents_t extents_f;
-    cairo_set_font_size (w->crb, w->app->normal_font);
-    if (w->state) cairo_set_font_size (w->crb, w->app->normal_font+2);
+    cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
+    if (w->state) cairo_set_font_size (w->crb, (w->app->normal_font+2) * w->app->hdpi);
     widget_set_scale(w);
     strcpy(label, comboboxlist->list_names[vl]);
     use_text_color_scheme(w, get_color_state(w));
     cairo_text_extents(w->crb, label, &extents_f);
-    double twf = extents_f.width/2.0;
-    cairo_move_to (w->crb, max(5 * w->app->hdpi,(w->scale.init_width*0.5)-twf), (w->scale.init_height - extents_f.height*0.5)  * w->app->hdpi );
+    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
     cairo_text_path (w->crb, label);
     cairo_fill (w->crb);
     widget_reset_scale(w);

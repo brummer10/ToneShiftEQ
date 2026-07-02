@@ -26,7 +26,7 @@ static void show_label(Widget_t *w, int width, int height) {
     cairo_set_source_rgba(w->crb, 0.61, 0.649, 0.583, 1.0);
     cairo_text_extents_t extents;
     /** show label below the knob**/
-    cairo_set_font_size (w->crb, w->app->normal_font/w->scale.ascale);
+    cairo_set_font_size (w->crb, (w->app->normal_font/w->scale.ascale) * w->app->hdpi);
     cairo_text_extents(w->crb,w->label , &extents);
     cairo_move_to (w->crb, (width*0.5)-(extents.width/2), height-(extents.height/4));
     cairo_text_path (w->crb, w->label);
@@ -88,7 +88,7 @@ static void draw_eq_knob(void *w_, void* user_data) {
     Metrics_t metrics;
     os_get_window_metrics(w, &metrics);
     const int width = metrics.width-2;
-    const int height = metrics.height - (w->app->small_font + 9 + w->app->normal_font);
+    const int height = metrics.height - ((w->app->small_font + 9 + w->app->normal_font) * w->app->hdpi);
     if (!metrics.visible) return;
 
     const int grow = (width > height+9) ? height+9:width;
@@ -170,14 +170,14 @@ static void draw_eq_knob(void *w_, void* user_data) {
     } else {
         snprintf(s, 63,"%d%s",  (int) value, w->input_label);
     }
-    cairo_set_font_size (w->crb, w->app->small_font/w->scale.ascale);
+    cairo_set_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi);
     cairo_text_extents(w->crb, s, &extents);
-    cairo_move_to (w->crb, knobx1-extents.width/2, height + 2 + (w->app->small_font)+extents.height/2);
+    cairo_move_to (w->crb, knobx1-extents.width/2, height + 2 + (w->app->small_font * w->app->hdpi)+extents.height/2);
     cairo_text_path (w->crb, s);
     cairo_fill (w->crb);
     cairo_new_path (w->crb);
 
-    show_label(w, width, height + (w->app->small_font + 9) + w->app->normal_font);
+    show_label(w, width, height + ((w->app->small_font + 9) + w->app->normal_font) * w->app->hdpi);
 
     cairo_pop_group_to_source (w->crb);
     cairo_paint (w->crb);
@@ -188,7 +188,7 @@ void draw_my_knob(void *w_, void* user_data) {
     Metrics_t metrics;
     os_get_window_metrics(w, &metrics);
     int width = metrics.width-2;
-    int height = metrics.height - (w->app->small_font + 9 + w->app->normal_font);
+    int height = metrics.height - (w->app->small_font + 9 + w->app->normal_font) * w->app->hdpi;
     if (!metrics.visible) return;
 
     const double scale_zero = 20 * (M_PI/180); // defines "dead zone" for knobs
@@ -241,14 +241,14 @@ void draw_my_knob(void *w_, void* user_data) {
     } else {
         snprintf(s, 63,"%d%s",  (int) value, w->input_label);
     }
-    cairo_set_font_size (w->crb, w->app->small_font/w->scale.ascale);
+    cairo_set_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi);
     cairo_text_extents(w->crb, s, &extents);
-    cairo_move_to (w->crb, knobx1-extents.width/2, height + (w->app->small_font)+extents.height/2);
+    cairo_move_to (w->crb, knobx1-extents.width/2, height + (w->app->small_font * w->app->hdpi)+extents.height/2);
     cairo_text_path (w->crb, s);
     cairo_fill (w->crb);
     cairo_new_path (w->crb);
 
-    show_label(w, width, height + (w->app->small_font + 9) + w->app->normal_font);
+    show_label(w, width, height + ((w->app->small_font + 9) + w->app->normal_font) * w->app->hdpi);
 }
 
 Widget_t* add_eq_knob(Widget_t *parent, const char * label, const char* type,
@@ -339,7 +339,7 @@ static void draw_z_frame(void *w_, void* user_data) {
 
     cairo_set_line_width(w->crb,2);
     cairo_set_source_rgba(w->crb, 0.15,0.15,0.17,1.0);
-    roundrec(w->crb, 2, 20, width_t-4, height_t-20, 5);
+    roundrec(w->crb, 2, 20 * w->app->hdpi, width_t-4, height_t- (20 * w->app->hdpi), 5);
     cairo_fill_preserve(w->crb);
 
     setFrameColour(w, w->crb, 5, 25, width_t-10, height_t-30);

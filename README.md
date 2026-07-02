@@ -10,7 +10,7 @@
 
 It can operate in two different modes:
 
-* Master → Master → Perfect linear-phase response with 128 samples of latency, ideal for mastering and critical processing.
+* Master → Perfect linear-phase response with 128 samples of latency, ideal for mastering and critical processing.
 * Live → Zero-latency processing with slight phase deviation, optimized for real-time performance and live use.
 
 ---
