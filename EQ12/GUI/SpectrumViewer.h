@@ -293,6 +293,7 @@ public:
 
         #ifndef CLAPPLUG
         mode = add_my_combobox(laframe,"Mode", 190, 25, 90, 20);
+        mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         combobox_add_entry(mode,"Master");
         combobox_add_entry(mode,"Live");
@@ -1103,8 +1104,8 @@ private:
                 sprintf(buf, "%.0fk", f / 1000.0);
             else
                 sprintf(buf, "%.0f", f);
-            if (f >= 500 && f <=999) ax = 18;
-            if (f >= 501 && f <=1000) ax = 15;
+            if (f >= 500 && f <=999) ax = 18 * w->app->hdpi;
+            if (f >= 501 && f <=1000) ax = 15 * w->app->hdpi;
             cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.7);
             cairo_move_to(cr, x + 4, (height - ax) - 6);
             cairo_text_path (cr, buf);
