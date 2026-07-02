@@ -55,6 +55,19 @@ void utf8crop_middle(char* dst, const char* src, size_t maxLen) {
     strcat(dst, tmp);
 }
 
+void adjust_font_size(cairo_t* cr, double font_size, int available_width, const char* label) {
+    cairo_text_extents_t extents;
+    cairo_set_font_size(cr, font_size);
+    cairo_text_extents(cr, label, &extents);
+    
+    if (extents.width > available_width - 4) {
+        double scale = (double)(available_width - 4) / extents.width;
+        font_size *= scale;
+        font_size = std::max<int>(font_size, 6.0);
+        cairo_set_font_size(cr, font_size);
+    }
+}
+
 void draw_label(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
@@ -68,7 +81,7 @@ void draw_label(void *w_, void* user_data) {
     utf8crop_middle(label, w->label, 39);
     cairo_text_extents_t extents_f;
     widget_set_scale(w);
-    cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
+    adjust_font_size(w->crb, w->app->normal_font * w->app->hdpi, width, label);
     cairo_set_source_rgb(w->crb, 0.91, 0.949, 0.883);
     cairo_text_extents(w->crb, label, &extents_f);
     cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
@@ -142,7 +155,7 @@ void draw_i_button(void *w_, void* user_data) {
     if(w->adj_y->value) g = -0.5;
     widget_set_scale(w);
     cairo_text_extents_t extents_f;
-    cairo_set_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi);
+    adjust_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi, width, w->label);
     cairo_set_source_rgb(w->crb, 0.91, 0.949 + g, 0.883 + g);
     cairo_text_extents(w->crb, w->label, &extents_f);
     cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
@@ -296,8 +309,8 @@ static void draw_my_combobox(void *w_, void* user_data) {
     char label[32];
     memset(label, '\0', sizeof(char)*32);
     cairo_text_extents_t extents_f;
-    cairo_set_font_size (w->crb, w->app->normal_font * w->app->hdpi);
-    if (w->state) cairo_set_font_size (w->crb, (w->app->normal_font+2) * w->app->hdpi);
+    adjust_font_size (w->crb, w->app->normal_font * w->app->hdpi, width, label);
+    if (w->state) adjust_font_size (w->crb, (w->app->normal_font+2) * w->app->hdpi, width, label);
     widget_set_scale(w);
     strcpy(label, comboboxlist->list_names[vl]);
     use_text_color_scheme(w, get_color_state(w));

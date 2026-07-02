@@ -84,6 +84,7 @@ public:
 
     void init(int width = 880, int height = 430) {
         main_init(&main);
+        main.hdpi = 1.8;
         top = create_window(&main, os_get_root_window(&main, IS_WINDOW), 0, 0, width, height);
         widget_set_title(top, "ToneShift-EQ12");
         widget_set_icon_from_png(top,LDVAR(toneshifteq_png));
@@ -104,6 +105,8 @@ public:
         spec->flags |= NO_PROPAGATE;
         spec->scale.gravity = NORTHWEST;
         spec->func.expose_callback = draw_callback;
+        spec->func.key_press_callback = get_key;
+        spec->func.key_release_callback = release_key;
         spec->func.motion_callback = mouse_in_spec;
         spec->func.leave_callback = mouse_leave_spec;
         spec->func.button_release_callback = mouse_move_spec;
@@ -152,20 +155,20 @@ public:
             set_widget_color(frame[i], (Color_state)0, (Color_mod)1, r, g, bcol, 1.0);
            
 
-            prev[i] = add_my_button(frame[i], 10, 78, 20, 20, "<");
+            prev[i] = add_my_button(frame[i], 10, 78, 20, 18, "<");
             prev[i]->data = i;
             prev[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             prev[i]->parent_struct = this;
             prev[i]->func.value_changed_callback = prev_response;
 
-            solo[i] = add_my_toggle_button(frame[i], 40, 78, 20, 20, "S");
+            solo[i] = add_my_toggle_button(frame[i], 40, 78, 20, 18, "S");
             solo[i]->data = i;
             solo[i]->flags |= IS_RADIO;
             solo[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             solo[i]->parent_struct = this;
             solo[i]->func.value_changed_callback = solo_response;
 
-            mute[i] = add_my_toggle_button(frame[i], 60, 78, 20, 20, "M");
+            mute[i] = add_my_toggle_button(frame[i], 60, 78, 20, 18, "M");
             mute[i]->data = i;
             mute[i]->flags |= IS_RADIO;
             mute[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
@@ -197,7 +200,7 @@ public:
 
             set_widget_color(fenable[i], (Color_state)0, (Color_mod)0, r, g, bcol, 1.0);
 
-            next[i] = add_my_button(frame[i], 220, 78, 20, 20, ">");
+            next[i] = add_my_button(frame[i], 220, 78, 20, 18, ">");
             next[i]->data = i;
             next[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             next[i]->parent_struct = this;
@@ -410,6 +413,7 @@ private:
     int spec_height = 0;
     cairo_surface_t *eq_layer = nullptr;
     bool rebuild_eq_layer = true;
+    bool capture_line = false;
     std::atomic<bool> set_leak {false};
 
     const float f_min = 20.0f;
@@ -446,6 +450,26 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(83, adj_get_value(w->adj));
+    }
+
+    static void get_key(void *w_, void *key_, void *user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        if (!w) return;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        XKeyEvent *key = (XKeyEvent*)key_;
+        if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
+            self->capture_line = true;
+        }
+    }
+
+    static void release_key(void *w_, void *key_, void *user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        if (!w) return;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        XKeyEvent *key = (XKeyEvent*)key_;
+        if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
+            self->capture_line = false;
+        }
     }
 
     static void set_gain(void *w_, void* user_data) {
@@ -668,6 +692,30 @@ private:
         expose_widget(self->curGain);
     }
 
+    int find_band_for_freq(float target_freq) {
+        static const float band_min[12] = {
+            20.0f, 40.0f, 70.0f, 120.0f, 200.0f, 350.0f,
+            650.0f, 1100.0f, 1800.0f, 3500.0f, 6000.0f, 10000.0f
+        };
+        static const float band_max[12] = {
+            60.0f, 100.0f, 180.0f, 300.0f, 550.0f, 900.0f,
+            1600.0f, 2800.0f, 5000.0f, 9000.0f, 15000.0f, 20000.0f
+        };
+
+        for (int i = 0; i < 12; ++i) {
+            if (target_freq >= band_min[i] && target_freq <= band_max[i])
+                return i;
+        }
+        int best = 0;
+        float best_dist = 1e9f;
+        for (int i = 0; i < 12; ++i) {
+            float center = adj_get_value(freq[i]->adj);
+            float dist = std::abs(std::log(target_freq / center));
+            if (dist < best_dist) { best_dist = dist; best = i; }
+        }
+        return best;
+    }
+
     static void mouse_in_spec(void *w_, void *xmotion_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         XMotionEvent *xmotion = (XMotionEvent*)xmotion_;
@@ -678,21 +726,43 @@ private:
         self->infoString(x1, y1);
         //std::cout << "x " << x1 << " y " << y1 << std::endl;
         if(xmotion->state & Button1Mask) {
-            self->match_state = 1;
-            if (self->band_match) {
-                float v = adj_get_value(self->freq[self->match_band]->adj);
-                float deltaX = (float)x1 - self->mx;
-                v *= std::pow(2.0, deltaX * 0.005);
-                self->mx = x1;
-                adj_set_value(self->freq[self->match_band]->adj, v);
+            if (self->capture_line) {
+                Metrics_t m;
+                os_get_window_metrics(w, &m);
+                const int width  = m.width;
+                const int height = m.height - (80 * w->app->hdpi);
 
-                float vg = adj_get_value(self->fgain[self->match_band]->adj);
-                float deltay = (float)y1 - self->my;
-                vg += deltay * -0.1;
-                self->my = y1;
-                if (std::abs(vg) < 0.2) vg = 0.0;
-                adj_set_value(self->fgain[self->match_band]->adj, vg);
+                float target_freq = x_to_freq(x1, self->f_min, self->f_max, width);
+                float target_gain = y_to_db(y1, self->db_min, self->db_max, height);
+
+                int band = self->find_band_for_freq(target_freq);
+
+                target_gain = std::clamp(target_gain, -48.0f, 24.0f);
+                adj_set_value(self->fgain[band]->adj, target_gain);
+                self->sendValueChanged(5 + (6 * band), target_gain);
+
+                self->rebuild_eq_layer = true;
                 expose_widget(self->spec);
+
+                self->mx = x1;
+                self->my = y1;
+            } else {
+                self->match_state = 1;
+                if (self->band_match) {
+                    float v = adj_get_value(self->freq[self->match_band]->adj);
+                    float deltaX = (float)x1 - self->mx;
+                    v *= std::pow(2.0, deltaX * 0.005);
+                    self->mx = x1;
+                    adj_set_value(self->freq[self->match_band]->adj, v);
+
+                    float vg = adj_get_value(self->fgain[self->match_band]->adj);
+                    float deltay = (float)y1 - self->my;
+                    vg += deltay * -0.1;
+                    self->my = y1;
+                    if (std::abs(vg) < 0.2) vg = 0.0;
+                    adj_set_value(self->fgain[self->match_band]->adj, vg);
+                    expose_widget(self->spec);
+                }
             }
         } else {
             self->find_hovered_band(x1, y1);

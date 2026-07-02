@@ -18,7 +18,18 @@ static void null_call(void *w_, void *user_data) {
     
 }
 
-
+void adjust_eq_font_size(cairo_t* cr, double font_size, int available_width, const char* label) {
+    cairo_text_extents_t extents;
+    cairo_set_font_size(cr, font_size);
+    cairo_text_extents(cr, label, &extents);
+    
+    if (extents.width > available_width - 4) {
+        double scale = (double)(available_width - 4) / extents.width;
+        font_size *= scale;
+        font_size = std::max<int>(font_size, 6.0);
+        cairo_set_font_size(cr, font_size);
+    }
+}
 
 // knob
 static void show_label(Widget_t *w, int width, int height) {
@@ -26,7 +37,7 @@ static void show_label(Widget_t *w, int width, int height) {
     cairo_set_source_rgba(w->crb, 0.61, 0.649, 0.583, 1.0);
     cairo_text_extents_t extents;
     /** show label below the knob**/
-    cairo_set_font_size (w->crb, (w->app->normal_font/w->scale.ascale) * w->app->hdpi);
+    adjust_eq_font_size (w->crb, (w->app->normal_font * w->app->hdpi)/w->scale.ascale, width, w->label);
     cairo_text_extents(w->crb,w->label , &extents);
     cairo_move_to (w->crb, (width*0.5)-(extents.width/2), height-(extents.height/4));
     cairo_text_path (w->crb, w->label);
@@ -170,7 +181,7 @@ static void draw_eq_knob(void *w_, void* user_data) {
     } else {
         snprintf(s, 63,"%d%s",  (int) value, w->input_label);
     }
-    cairo_set_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi);
+    adjust_eq_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi, width, s);
     cairo_text_extents(w->crb, s, &extents);
     cairo_move_to (w->crb, knobx1-extents.width/2, height + 2 + (w->app->small_font * w->app->hdpi)+extents.height/2);
     cairo_text_path (w->crb, s);
@@ -241,7 +252,7 @@ void draw_my_knob(void *w_, void* user_data) {
     } else {
         snprintf(s, 63,"%d%s",  (int) value, w->input_label);
     }
-    cairo_set_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi);
+    adjust_eq_font_size (w->crb, (w->app->small_font/w->scale.ascale) * w->app->hdpi, width, s);
     cairo_text_extents(w->crb, s, &extents);
     cairo_move_to (w->crb, knobx1-extents.width/2, height + (w->app->small_font * w->app->hdpi)+extents.height/2);
     cairo_text_path (w->crb, s);
@@ -1001,7 +1012,7 @@ void draw_my_valuedisplay(void *w_, void* user_data) {
     
     use_text_color_scheme(w, get_color_state(w));
     float font_size = w->app->normal_font/w->scale.ascale;
-    cairo_set_font_size (w->crb, font_size);
+    adjust_eq_font_size (w->crb, font_size, width, s);
     cairo_text_extents(w->crb,s , &extents);
     cairo_move_to (w->crb, (width-extents.width)*0.5, (height+extents.height)*0.55);
     cairo_text_path (w->crb, s);
