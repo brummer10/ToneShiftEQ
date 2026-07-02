@@ -84,7 +84,6 @@ public:
 
     void init(int width = 880, int height = 430) {
         main_init(&main);
-        main.hdpi = 1.8;
         top = create_window(&main, os_get_root_window(&main, IS_WINDOW), 0, 0, width, height);
         widget_set_title(top, "ToneShift-EQ12");
         widget_set_icon_from_png(top,LDVAR(toneshifteq_png));
