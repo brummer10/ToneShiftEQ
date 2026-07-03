@@ -106,6 +106,7 @@ endif
 	CLAP_INCLUDE := -I./clap/clap/ -I./clap/
 	CLAP_SOURCES := $(CLAP_DIR)ToneShiftEQClap.cpp
 
+ifeq ($(TARGET), Linux)
 	# set compile flags
 	GUI_LDFLAGS += -I$(HEADER_DIR) -Wl,-Bstatic -L. $(UI_LIB) \
 	-Wl,-Bdynamic `pkg-config --cflags --libs cairo x11` 
@@ -126,6 +127,25 @@ endif
 		CXXFLAGS := $(filter-out -fstrength-reduce,$(CXXFLAGS))
 		CXXFLAGS += -Wno-unused-private-field
 	endif
+else ifeq ($(TARGET), Windows)
+
+	LDFLAGS += $(INCLUDES) -I. -shared -lm $(PAWPAW_LFLAGS) -Wl,--gc-sections \
+	-Wl,--exclude-libs,ALL `$(PKGCONFIG) --libs --libs sndfile fftw3 fftw3f`
+
+	GUI_LDFLAGS += -I$(HEADER_DIR) -static-libgcc -static-libstdc++ \
+	`$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags --libs cairo ` \
+	-L. $(UI_LIB) -lm $(PAWPAW_LFLAGS)
+
+	CFLAGS := -Wall -fstack-protector -fvisibility=hidden \
+	-fdata-sections -Wl,--gc-sections -Wl,--exclude-libs,ALL \
+	`$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags sndfile fftw3 `
+
+	CXXFLAGS += -MMD -std=c++17 -fno-math-errno -fno-trapping-math -fPIC -DALVER=\"$(VER)\" $(CFLAGS)
+
+	TTLUPDATE = sed -i '/lv2:binary/ s/\.so/\.dll/ ' ../bin/$(BUNDLE)/manifest.ttl
+	TTLUPDATEGUI = sed -i '/a guiext:X11UI/ s/X11UI/WindowsUI/ ; /guiext:binary/ s/\.so/\.dll/ ' ../bin/$(BUNDLE)/$(NAME).ttl
+
+endif
 
 	# invoke build files
 	OBJECTS = main.cpp
@@ -176,7 +196,7 @@ info:
 
 
 clean :
-	$(QUIET)rm -f *.o *.d *.a *.lib *.clap *.$(LIB_EXT)
+	$(QUIET)rm -f *.o *.d *.a *.lib *.clap *.so *.dll
 	$(QUIET)rm -f $(NAME) $(NAME).exe 
 	$(QUIET)rm -rf ../bin
 
@@ -226,7 +246,7 @@ endif
 
 $(NAME).clap: $(CLAP_SOURCES) $(CLAP_DIR)ToneShiftEQ.cc
 	@$(B_ECHO) "Compiling $(NAME).clap $(reset)"
-	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_clap.d $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS)
+	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_clap.d $(CXXFLAGS) $(CLAP_INCLUDE) $(CLAP_SOURCES) -o $(NAME).clap  $(LDFLAGS) $(GUI_LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).clap
 endif

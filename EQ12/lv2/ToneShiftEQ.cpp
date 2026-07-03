@@ -24,6 +24,8 @@
 #include <lv2/midi/midi.h>
 #include <lv2/urid/urid.h>
 #include <lv2/patch/patch.h>
+#include "inline-display.h"
+#include <cairo/cairo.h>
 
 #include "FFTAnalyzer.h"
 #include "IRProcessorStereo.h"
@@ -105,6 +107,23 @@ private:
     void analyse();
 public:
     float sampleRate;
+    // inline display
+    float lowcut;
+    float highcut;
+    int hpslopes;
+    int lpslopes;
+    uint32_t width;
+    uint32_t height;
+    uint32_t stride;
+    uint8_t* data;
+    cairo_surface_t* surface;
+    LV2_Inline_Display_Image_Surface img;
+    LV2_Inline_Display*  queue_draw = nullptr;
+    const std::vector<float>& getIRMag();
+    const float* getMagnitudes();
+    const int getBins();
+    static const LV2_Inline_Display_Image_Surface* render_inline(
+                LV2_Handle instance, uint32_t width, uint32_t height);
 
     // LV2 Descriptor
     static const LV2_Descriptor descriptor;
@@ -136,12 +155,18 @@ Xtoneshifteq::Xtoneshifteq() :
     latency(NULL) {};
 
 // destructor
-Xtoneshifteq::~Xtoneshifteq() {};
+Xtoneshifteq::~Xtoneshifteq() {
+    cairo_surface_destroy(surface);
+};
 
 ///////////////////////// PRIVATE CLASS  FUNCTIONS /////////////////////
 
-void Xtoneshifteq::init_dsp_(uint32_t rate)
-{
+void Xtoneshifteq::init_dsp_(uint32_t rate) {
+    width = 1;
+    height = 1;
+    stride = 1;
+    data = nullptr;
+    surface = nullptr;
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0;
@@ -151,8 +176,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate)
 }
 
 // connect the Ports used by the plug-in class
-void Xtoneshifteq::connect_(uint32_t port,void* data)
-{
+void Xtoneshifteq::connect_(uint32_t port,void* data) {
     for (int i = 0; i< 84; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
@@ -193,23 +217,19 @@ void Xtoneshifteq::connect_(uint32_t port,void* data)
     }
 }
 
-void Xtoneshifteq::activate_f()
-{
+void Xtoneshifteq::activate_f() {
     // allocate the internal DSP mem
 }
 
-void Xtoneshifteq::clean_up()
-{
+void Xtoneshifteq::clean_up() {
     // delete the internal DSP mem
 }
 
-void Xtoneshifteq::deactivate_f()
-{
+void Xtoneshifteq::deactivate_f() {
     // delete the internal DSP mem
 }
 
-void Xtoneshifteq::run_dsp_(uint32_t n_samples)
-{
+void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
     if(n_samples<1) return;
     URIs* uris = &this->uris;
     const uint32_t notify_capacity = this->notify->atom.size;
@@ -257,6 +277,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples)
         lv2_atom_forge_property_head(&this->forge, uris->atom_Vector,0);
         lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float, ana.getBins(), (void*)ana.getMagnitudes());
         lv2_atom_forge_pop(&this->forge, &frame);
+        if (queue_draw) queue_draw->queue_draw (queue_draw->handle);
         ana.clearFlag();
     }
     // send new IR data
@@ -273,19 +294,59 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples)
     *(latency) = engine.conv->getLatency();
 }
 
-void Xtoneshifteq::connect_all__ports(uint32_t port, void* data)
-{
+void Xtoneshifteq::connect_all__ports(uint32_t port, void* data) {
     // connect the Ports used by the plug-in class
     connect_(port,data); 
 }
 
+const std::vector<float>& Xtoneshifteq::getIRMag() {
+    return ip.getIRMag();
+}
+
+const float* Xtoneshifteq::getMagnitudes() {
+    return ana.getMagnitudes();
+}
+
+const int Xtoneshifteq::getBins() {
+    return ana.getBins();
+}
+
 ////////////////////// STATIC CLASS  FUNCTIONS  ////////////////////////
+
+#include "DrawInline.cc"
+
+const LV2_Inline_Display_Image_Surface* Xtoneshifteq::render_inline(
+            LV2_Handle instance, uint32_t width, uint32_t height) {
+
+    Xtoneshifteq* self = (Xtoneshifteq*)instance;
+
+    if (!self->data || self->width != width || self->height != height * 0.5 || !self->surface) {
+        free(self->data);
+        self->width  = width;
+        self->height = height * 0.5;
+        self->stride = width * 4;
+        self->data = (uint8_t*)calloc(1, self->stride * self->height);
+        cairo_surface_destroy(self->surface);
+        self->surface = cairo_image_surface_create_for_data(
+            self->data, CAIRO_FORMAT_ARGB32, self->width, self->height, self->stride);
+    }
+
+    cairo_t* cr = cairo_create(self->surface);
+    draw_inline(self, cr);
+    cairo_destroy(cr);
+
+    self->img.data   = self->data;
+    self->img.width  = self->width;
+    self->img.height = self->height;
+    self->img.stride = self->stride;
+
+    return &self->img;
+}
 
 LV2_Handle 
 Xtoneshifteq::instantiate(const LV2_Descriptor* descriptor,
                             double rate, const char* bundle_path,
-                            const LV2_Feature* const* features)
-{
+                            const LV2_Feature* const* features) {
     // init the plug-in class
     Xtoneshifteq *self = new Xtoneshifteq();
     if (!self) {
@@ -296,6 +357,9 @@ Xtoneshifteq::instantiate(const LV2_Descriptor* descriptor,
     for (int i = 0; features[i]; ++i) {
         if (!strcmp(features[i]->URI, LV2_URID__map)) {
             map = (LV2_URID_Map*)features[i]->data;
+        }
+        if (!strcmp(features[i]->URI, LV2_INLINEDISPLAY__queue_draw)) {
+            self->queue_draw = (LV2_Inline_Display*) features[i]->data;
         }
     }
     if (!map) {
@@ -313,32 +377,27 @@ Xtoneshifteq::instantiate(const LV2_Descriptor* descriptor,
 }
 
 void Xtoneshifteq::connect_port(LV2_Handle instance, 
-                                   uint32_t port, void* data)
-{
+                                   uint32_t port, void* data) {
     // connect all ports
     static_cast<Xtoneshifteq*>(instance)->connect_all__ports(port, data);
 }
 
-void Xtoneshifteq::activate(LV2_Handle instance)
-{
+void Xtoneshifteq::activate(LV2_Handle instance) {
     // allocate needed mem
     static_cast<Xtoneshifteq*>(instance)->activate_f();
 }
 
-void Xtoneshifteq::run(LV2_Handle instance, uint32_t n_samples)
-{
+void Xtoneshifteq::run(LV2_Handle instance, uint32_t n_samples) {
     // run dsp
     static_cast<Xtoneshifteq*>(instance)->run_dsp_(n_samples);
 }
 
-void Xtoneshifteq::deactivate(LV2_Handle instance)
-{
+void Xtoneshifteq::deactivate(LV2_Handle instance) {
     // free allocated mem
     static_cast<Xtoneshifteq*>(instance)->deactivate_f();
 }
 
-void Xtoneshifteq::cleanup(LV2_Handle instance)
-{
+void Xtoneshifteq::cleanup(LV2_Handle instance) {
     // well, clean up after us
     Xtoneshifteq* self = static_cast<Xtoneshifteq*>(instance);
     self->clean_up();
@@ -346,6 +405,12 @@ void Xtoneshifteq::cleanup(LV2_Handle instance)
 }
 
 const void* Xtoneshifteq::extension_data(const char* uri) {
+    if (!strcmp(uri, LV2_INLINEDISPLAY__interface)) {
+        static const LV2_Inline_Display_Interface iface = {
+            render_inline
+        };
+        return &iface;
+    }
     return NULL;
 }
 
@@ -367,8 +432,7 @@ const LV2_Descriptor Xtoneshifteq::descriptor =
 
 LV2_SYMBOL_EXPORT
 const LV2_Descriptor*
-lv2_descriptor(uint32_t index)
-{
+lv2_descriptor(uint32_t index) {
     switch (index)
     {
         case 0:

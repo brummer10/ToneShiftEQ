@@ -96,9 +96,11 @@ public:
         spec_height = 0;
 
         spec = create_widget(&main, top,0, 0, width-80, height);
+        #ifndef _WIN32
         XSelectInput(spec->app->dpy, spec->widget,StructureNotifyMask|ExposureMask|KeyPressMask 
                     |EnterWindowMask|LeaveWindowMask|ButtonReleaseMask|KeyReleaseMask
                     |ButtonPressMask|Button1MotionMask|PointerMotionMask);
+        #endif
 
         spec->parent_struct = this;
         spec->flags |= NO_PROPAGATE;
@@ -110,6 +112,9 @@ public:
         spec->func.leave_callback = mouse_leave_spec;
         spec->func.button_release_callback = mouse_move_spec;
         spec->func.button_press_callback = mouse_set_spec;
+        top->parent_struct = this;
+        top->func.key_press_callback = get_key;
+        top->func.key_release_callback = release_key;
 
         Widget_t* gframe = add_my_frame(top,"", width-79, 0, 78, height-82);
         gframe->scale.gravity = WESTSOUTH;

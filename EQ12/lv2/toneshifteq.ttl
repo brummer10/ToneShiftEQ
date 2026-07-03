@@ -13,6 +13,10 @@
 @prefix urid:   <http://lv2plug.in/ns/ext/urid#> .
 @prefix pprop:  <http://lv2plug.in/ns/ext/port-props#> .
 @prefix midi:   <http://lv2plug.in/ns/ext/midi#> .
+@prefix idpy:   <http://harrisonconsoles.com/lv2/inlinedisplay#> .
+
+idpy:queue_draw a lv2:Feature .
+idpy:interface a lv2:ExtensionData .
 
 <urn:name#me>
    a foaf:Person ;
@@ -24,7 +28,9 @@
     doap:maintainer <urn:name#me> ;
     lv2:requiredFeature urid:map ;
     lv2:optionalFeature lv2:hardRTCapable ;
-    lv2:minorVersion 1 ;
+    lv2:optionalFeature idpy:queue_draw ;
+    lv2:extensionData idpy:interface ;
+    lv2:minorVersion 3 ;
     lv2:microVersion 0 ;
 
 guiext:ui <urn:brummer:toneshifteq_ui> ;

@@ -303,7 +303,7 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
 
     #if defined(_WIN32)
     self->sw.top  = create_window(self->sw.getMain(), (HWND) self->parentXwindow, 0, 0, 880, 430);
-    self->sw.top->func.expose_callback = sw.draw_window;
+    self->sw.top->func.expose_callback = self->sw.draw_window;
     #else
     self->sw.top  = create_window(self->sw.getMain(), (Window) self->parentXwindow, 0, 0, 880, 430);
     self->sw.top->func.expose_callback = self->sw.draw_window;
