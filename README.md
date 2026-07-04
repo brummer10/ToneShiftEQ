@@ -1,17 +1,11 @@
-
 # ToneShift-EQ12
 
 <p align="center">
     <img src="https://github.com/brummer10/ToneShiftEQ/blob/main/ToneShiftEQ.png?raw=true" />
 </p>
 
-
-**ToneShiftEQ** is a modern 12-band equalizer designed for precise spectral shaping, mixing, mastering, and corrective audio processing.
-
-It can operate in two different modes:
-
-* Master → Perfect linear-phase response with 128 samples of latency, ideal for mastering and critical processing.
-* Live → Zero-latency processing with slight phase deviation, optimized for real-time performance and live use.
+**ToneShiftEQ** is a modern 12-band minimum-phase parametric convolution equalizer
+designed for precise spectral shaping, mixing, mastering, and corrective audio processing.
 
 ---
 
@@ -24,16 +18,23 @@ It can operate in two different modes:
 * Tilt control for broad spectral balancing
 * Smooth control for natural filter transitions
 * Dynamics control for adaptive processing
-* Real-time spectrum display
+* Real-time spectrum display with phase overlay
+* Interactive curve drawing with Ctrl + drag
 * Stereo processing
 * Low CPU consumption
 * Real-time safe processing architecture
+* 128 samples latency, host-compensated
 
 ---
 
 ## Usage
 
-Band control points can be moved with the mouse to adjust frequency and gain. Use the mouse wheel over a control point to change the Q factor.
+Band control points can be moved with the mouse to adjust frequency and gain.
+Use the mouse wheel over a control point to change the Q factor.
+
+Hold Ctrl and drag the left mouse button across the spectrum display to draw
+a gain curve directly. ToneShiftEQ automatically selects the nearest band
+for each position.
 
 ---
 
@@ -41,20 +42,31 @@ Band control points can be moved with the mouse to adjust frequency and gain. Us
 
 ToneShiftEQ was developed with a focus on:
 
-* Transparent sound quality
+* Transparent, musically natural sound quality
+* Minimum-phase response
 * Precise frequency shaping
-* Low latency operation
 * Efficient CPU usage
 * Intuitive visual workflow
 
-The plugin is equally suited for detailed corrective equalization, mastering applications, and creative sound design.
+The plugin is equally suited for detailed corrective equalization,
+mastering applications, and creative sound design.
 
 ---
 
 ## Technical Overview
 
 ToneShiftEQ combines parametric filter design with a partitioned convolution engine.
-Filter responses are generated and updated in the background while audio processing remains real-time safe.
+All 12 band responses are combined into a single minimum-phase impulse response
+of 4096 samples, which is applied to the audio signal using a partitioned
+overlap-add FFT convolution engine (FFTW3).
+
+Filter responses are generated and updated in the background while audio
+processing remains real-time safe. The convolution engine introduces a fixed
+latency of 128 samples, which is reported to the host for automatic compensation.
+
+Minimum-phase processing means the phase response behaves similarly to analog
+equalizers: phase and amplitude are coupled, producing a natural character
+without pre-ringing.
 
 ---
 
@@ -72,11 +84,11 @@ ToneShiftEQ is available as:
 
 ToneShiftEQ relies on a small set of widely available libraries:
 
-* **X11** – windowing (Linux)  
-* **cairo** – UI rendering  
-* **libsndfile** – audio I/O  
-* **FFTW3** – spectral processing  
-* **jackd** – Stand-alone real-time audio  
+* **X11** – windowing (Linux)
+* **cairo** – UI rendering
+* **libsndfile** – audio I/O
+* **FFTW3** – spectral processing
+* **jackd** – Stand-alone real-time audio
 
 ### Install (Debian/Ubuntu)
 
@@ -93,7 +105,7 @@ ToneShiftEQ relies on a small set of widely available libraries:
     make
     sudo make install
 
-## Build as Clap plugin
+## Build as CLAP plugin
 
     make clap
     make install

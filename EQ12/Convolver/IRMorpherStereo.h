@@ -23,7 +23,7 @@ public:
     int bypass = 0;
 
     IRMorpherStereo(size_t blockSize = 256, size_t headSize  = 64) {
-        convA = std::make_unique<MasterConvolver>();
+        convA = std::make_unique<Convolver>();
         bufferAL.resize(8194);
         bufferAR.resize(8194);
     }
@@ -69,17 +69,9 @@ public:
         std::memcpy(outputR, bufferAR.data(), sizeof(float) * nframes);
     }
 
-    void setMode(int live, const std::pair<Vec, Vec> ir) {
-        if (live == 0)
-            convA = std::make_unique<MasterConvolver>();
-        else
-            convA = std::make_unique<LiveConvolver>();
-        setIR(ir);
-    }
-
 private:
 
-    std::unique_ptr<ConvolverBase> convA;
+    std::unique_ptr<Convolver> convA;
 
     // current IR output
     std::vector<float> bufferAL;

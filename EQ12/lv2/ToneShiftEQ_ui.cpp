@@ -186,9 +186,6 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
     case 82:
         copyValuesToGui(sw.vug, value);
         break;
-    case 83:
-        copyValuesToGui(sw.mode, value);
-        break;
     default:
         break;
     }

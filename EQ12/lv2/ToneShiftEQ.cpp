@@ -249,9 +249,6 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
             if (i > 0 && i < 82) { // filter update
                 engine.processIR.store(true, std::memory_order_release);
                 engine.workToDo.store(true, std::memory_order_release);
-            } else if (i == 83) { // mode switch
-                engine.switchMode.store(true, std::memory_order_release);
-                engine.workToDo.store(true, std::memory_order_release);
             }
             engine.param.setParam((int)i, (*par[i]));
         }

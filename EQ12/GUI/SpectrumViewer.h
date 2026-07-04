@@ -43,8 +43,6 @@ public:
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
 
-    Widget_t* mode = nullptr;
-
     Widget_t* smooth = nullptr;
     Widget_t* dynamics = nullptr;
     Widget_t* tilt = nullptr;
@@ -299,15 +297,6 @@ public:
         highcut->func.button_release_callback = set;
 
         #ifndef CLAPPLUG
-        mode = add_my_combobox(laframe,"Mode", 190, 25, 90, 20);
-        mode->scale.gravity = ASPECT;
-        mode->parent_struct = this;
-        combobox_add_entry(mode,"Master");
-        combobox_add_entry(mode,"Live");
-        combobox_set_active_entry(mode, 0);
-        mode->func.value_changed_callback = set_mode;
-        add_tooltip(mode->childlist->childs[0], "Mode");
-
         #ifndef LV2PLUG
         Widget_t* save = add_xsave_file_button(laframe, 190, 65, 90, 20, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
@@ -448,12 +437,6 @@ private:
             self->run = false;
             destroy_widget(self->top, self->top->app);
         }
-    }
-
-    static void set_mode(void *w_, void* user_data) {
-        Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(83, adj_get_value(w->adj));
     }
 
     static void get_key(void *w_, void *key_, void *user_data) {

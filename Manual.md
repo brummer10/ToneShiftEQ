@@ -2,10 +2,10 @@
 
 ## Introduction
 
-ToneShiftEQ is a 12-band spectral equalizer designed for precision tone shaping,
-corrective processing, mixing, mastering, and live audio applications.
+ToneShiftEQ is a 12-band minimum-phase parametric convolution equalizer designed
+for precision tone shaping, corrective processing, mixing, and mastering.
 It combines interactive spectrum visualization with flexible filter controls
-and multiple operating modes to provide both transparent and responsive equalization workflows.
+to provide transparent and musically natural equalization.
 
 The interface is designed around direct visual interaction,
 allowing adjustments either through dedicated controls or directly inside the spectrum display.
@@ -77,6 +77,7 @@ Ctrl + Left Mouse Button
 Drag vertically across the spectrum area.
 
 ToneShiftEQ automatically selects the nearest band and adjusts its gain.
+This also functions as a jump-to-position shortcut for individual bands.
 
 ---
 
@@ -201,46 +202,6 @@ Typical uses:
 Range:
 
 110 Hz – 22 kHz
-
----
-
-# Processing Mode
-
-ToneShiftEQ provides two operating modes.
-
-## Master Mode
-
-Linear-phase processing with fixed latency.
-
-Recommended for:
-
-* Mastering
-* Critical listening
-* Transparent processing
-
-Characteristics:
-
-* Maximum precision
-* Minimal phase coloration
-* Introduces processing latency
-
----
-
-## Live Mode
-
-Zero-latency processing optimized for real-time use.
-
-Recommended for:
-
-* Live performance
-* Monitoring
-* Low-latency workflows
-
-Characteristics:
-
-* No processing delay
-* Fast response
-* Controlled phase deviation
 
 ---
 
@@ -378,13 +339,26 @@ Temporarily disables ToneShiftEQ processing for A/B comparison.
 
 # Saving Impulse Responses
 
-ToneShiftEQ can export generated impulse responses.
+ToneShiftEQ can export the current EQ curve as a minimum-phase impulse response.
 
 Use:
 
 Save IR
 
-The exported impulse response can be used in compatible convolution engines and external processing environments.
+The exported impulse response can be used in compatible convolution engines
+and external processing environments.
+
+---
+
+# Technical Notes
+
+ToneShiftEQ uses a minimum-phase convolution engine. This means the phase
+response behaves similarly to analog equalizers: phase and amplitude are
+coupled, which produces a natural and musical character without pre-ringing.
+
+Processing introduces a fixed latency of 128 samples, which is automatically
+reported to the host for compensation. In practice this latency is inaudible
+and transparent in any DAW that supports latency compensation.
 
 ---
 
@@ -401,6 +375,3 @@ The exported impulse response can be used in compatible convolution engines and 
 5. Compare using Bypass.
 
 6. Fine-tune output gain.
-
-7. Switch between Master and Live mode according to application requirements.
-

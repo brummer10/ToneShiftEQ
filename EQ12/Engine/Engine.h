@@ -45,7 +45,6 @@ public:
     std::atomic<bool>            waitForIR {false};
     std::atomic<bool>            dataReady {false};
     std::atomic<bool>            convLoadIR {false};
-    std::atomic<bool>            switchMode {false};
 
     inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_);
 
@@ -152,11 +151,6 @@ void Engine::do_work_mono() {
     if (convLoadIR.load(std::memory_order_acquire)) {
         conv->setIR(ip->createIRStereo());
         convLoadIR.store(false, std::memory_order_release);
-    }
-
-    if (switchMode.load(std::memory_order_acquire)) {
-        conv->setMode(mode, ip->createIRStereo());
-        switchMode.store(false, std::memory_order_release);
     }
 
     execute.store(false, std::memory_order_release);
