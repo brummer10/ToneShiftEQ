@@ -142,28 +142,42 @@ public:
     std::pair<Vec, Vec> createIRStereo() {
         if (!mag_ir_L_.size()) make_flat(mag_ir_L_, analysisN / 2 + 1);
         if (!mag_ir_R_.size()) make_flat(mag_ir_R_, analysisN / 2 + 1);
-       
-        auto buildChannel = [this](const Vec& mag) {
+
+        auto buildChannel = [this](const Vec& mag, Vec& phaseOut) {
             Vec synthMag = remap_mag_bins(mag, analysisN, synthesisN);
             CVec Hs = spectrum2fft(synthMag);
             CVec Hmin = fp.mps(Hs);
-            CVec ir_full = fp.ifft(Hmin);
 
+            size_t phaseResolution = 1024;
+            phaseOut.resize(phaseResolution);
+            for (size_t k = 0; k < phaseResolution; ++k) {
+                size_t srcBin = k * (synthesisN / 2 + 1) / phaseResolution;
+                phaseOut[k] = std::arg(Hmin[srcBin]) * (180.0 / M_PI);
+            }
+
+            CVec ir_full = fp.ifft(Hmin);
             size_t tail = std::min<size_t>(64, irLength / 4);
             apply_window(ir_full, tail);
             Vec ir(irLength);
-
             for (size_t i = 0; i < irLength; ++i)
                 ir[i] = ir_full[i].real();
-
-            //if (haveFreshSource) normalize(ir);
             return ir;
         };
 
-        return {
-            buildChannel(mag_ir_L_),
-            buildChannel(mag_ir_R_)
-        };
+        Vec phaseL, phaseR;
+        auto irL = buildChannel(mag_ir_L_, phaseL);
+        auto irR = buildChannel(mag_ir_R_, phaseR);
+
+        size_t n = std::min(phaseL.size(), phaseR.size());
+        gui_phase_.resize(n);
+        constexpr float phaseRange = 180.0f;
+        constexpr float dbRange = 12.0f;
+        for (size_t i = 0; i < n; ++i) {
+            float phase = (float)(0.5 * (phaseL[i] + phaseR[i]));
+            gui_phase_[i] = (phase / phaseRange) * dbRange;
+        }
+
+        return { irL, irR };
     }
 
     Vec createIR() {
@@ -172,6 +186,7 @@ public:
     }
 
     const std::vector<float>& getIRMag() const { return gui_ir_; }
+    const std::vector<float>& getIRPhase() const { return gui_phase_; }
     const Vec& getDiffMag() const { return gui_diff_; }
     const Vec& getRefMag() const { return gui_ref_; }
     const Vec& getSrcMag() const { return gui_src_; }
@@ -204,6 +219,7 @@ private:
     Vec mag_ir_R_;
 
     std::vector<float> gui_ir_;
+    std::vector<float> gui_phase_;
     Vec gui_ref_;
     Vec gui_diff_;
     Vec gui_src_;
@@ -365,7 +381,7 @@ private:
                 }
             }
         }
-        designer.smooth_low_end_hermite(mag_ir, sampleRate);
+        //designer.smooth_low_end_hermite(mag_ir, sampleRate);
     }
 
     void processChannel(const Vec& reference, const Vec& source, IRChannelData& out, Vec& mag_ir, bool rebuild) {

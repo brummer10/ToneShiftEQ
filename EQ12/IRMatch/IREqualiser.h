@@ -173,7 +173,7 @@ public:
     }
 
     static double eval_low_shelf(double freq, double f0, double gain, double Q) {
-        double slope = mapQ(Q) * 1.5;
+        double slope = Q * 3.0; // mapQ(Q) * 1.5;
         double x = log_distance(freq, f0);
 
         double g = 0.5 * (1.0 - std::tanh(slope * x));
@@ -184,19 +184,23 @@ public:
                     double freq, double gain_db, double Q) {
         size_t n = mag.size();
         double nyquist = sr * 0.5;
-        double slope = mapQ(Q) * 1.5;
+        double slope = Q * 3.0; //mapQ(Q) * 1.5;
+        double f_min = 2.0 * nyquist / (n - 1);
+        double g_dc = 0.5 * (1.0 - std::tanh(slope * log_distance(f_min, freq)));
 
         for (size_t i = 1; i < n; ++i) {
             double f = (double)i / (n - 1) * nyquist;
-            if (f < 10.0) continue;
+            //if (f < 10.0) continue;
             double x = log_distance(f, freq);
-            double g = 0.5 * (1.0 - std::tanh(slope * x));
+            double g;
+            if (f <= f_min) g = g_dc; 
+            else g = 0.5 * (1.0 - std::tanh(slope * x));
             mag[i] += gain_db * g;
         }
     }
 
     static double eval_high_shelf(double freq, double f0, double gain, double Q) {
-        double slope = mapQ(Q) * 1.5;
+        double slope = Q * 3.0;
         double x = log_distance(freq, f0);
 
         double g = 0.5 * (1.0 + std::tanh(slope * x));
@@ -207,13 +211,16 @@ public:
                     double freq, double gain_db, double Q) {
         size_t n = mag.size();
         double nyquist = sr * 0.5;
-        double slope = mapQ(Q) * 1.5;
+        double slope =  Q * 3.0; //mapQ(Q) * 1.5;
+        double f_max = (n - 2) * nyquist / (n - 1);
+        double g_nyq = 0.5 * (1.0 + std::tanh(slope * log_distance(f_max, freq)));
 
         for (size_t i = 1; i < n; ++i) {
             double f = (double)i / (n - 1) * nyquist;
             if (f < 10.0) continue;
-            double x = log_distance(f, freq);
-            double g = 0.5 * (1.0 + std::tanh(slope * x));
+            double g;
+            if (f >= f_max) g = g_nyq;
+            else g = 0.5 * (1.0 + std::tanh(slope * log_distance(f, freq)));
             mag[i] += gain_db * g;
         }
     }

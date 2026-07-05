@@ -100,6 +100,10 @@ public:
         return dummy; //suppress warning 
     }
 
+    const std::vector<float>& getPhase() override {
+        return dummy; //suppress warning 
+    }
+
     const std::pair<std::vector<double>, std::vector<double> > get_ir() override {
         return dummy2; //suppress warning 
     }

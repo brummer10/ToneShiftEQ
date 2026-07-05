@@ -40,6 +40,7 @@
 #define PLUGIN_URI "urn:brummer:toneshifteq"
 #define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
 #define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
+#define TONESHIFTEQ_irphase PLUGIN_URI "#irphase"
 #define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
 
 
@@ -52,6 +53,7 @@ typedef struct {
     LV2_URID atom_eventTransfer;
     LV2_URID spectrum_data;
     LV2_URID ir_data;
+    LV2_URID ir_phase;
     LV2_URID ir_request;
 } URIs;
 
@@ -64,6 +66,7 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
     uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
     uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
     uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
+    uris->ir_phase                = map->map(map->handle, TONESHIFTEQ_irphase);
     uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
 }
 
@@ -89,6 +92,7 @@ private:
     LV2_Atom_Sequence* notify_port;
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
+    std::atomic<bool> pullPhase {false};
     float* par[84]; // engine.param.getParamCount() +1
     float* input0;
     float* input1;
@@ -266,28 +270,59 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
 
     engine.process(n_samples, input0, input1, output0, output1);
 
+    static constexpr size_t atom_overhead = sizeof(LV2_Atom_Object) + sizeof(LV2_Atom_Property_Body)
+                                          + sizeof(LV2_Atom_Vector_Body) + 64; 
+
     // send spectrum
     if (ana.hasNewData()) {
-        LV2_Atom_Forge_Frame frame;
-        lv2_atom_forge_frame_time(&this->forge, 0);
-        lv2_atom_forge_object(&this->forge, &frame, 1, uris->spectrum_data);
-        lv2_atom_forge_property_head(&this->forge, uris->atom_Vector,0);
-        lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float, ana.getBins(), (void*)ana.getMagnitudes());
-        lv2_atom_forge_pop(&this->forge, &frame);
-        if (queue_draw) queue_draw->queue_draw (queue_draw->handle);
-        ana.clearFlag();
+        size_t needed = atom_overhead + ana.getBins() * sizeof(float);
+        if (forge.size - forge.offset >= needed) {
+            LV2_Atom_Forge_Frame frame;
+            lv2_atom_forge_frame_time(&this->forge, 0);
+            lv2_atom_forge_object(&this->forge, &frame, 1, uris->spectrum_data);
+            lv2_atom_forge_property_head(&this->forge, uris->atom_Vector, 0);
+            lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float,
+                                  ana.getBins(), (void*)ana.getMagnitudes());
+            lv2_atom_forge_pop(&this->forge, &frame);
+            if (queue_draw) queue_draw->queue_draw(queue_draw->handle);
+            ana.clearFlag();
+        }
     }
+
+    // send phase data
+    if (pullPhase.load(std::memory_order_acquire)) {
+        const std::vector<float> phaseData = engine.ip->getIRPhase();
+        size_t phaseSize = phaseData.size();
+        size_t needed = atom_overhead + phaseSize * sizeof(float);
+        if (phaseData.data() != nullptr && phaseSize > 0 && forge.size - forge.offset >= needed) {
+            pullPhase.store(false, std::memory_order_release);
+            LV2_Atom_Forge_Frame frame;
+            lv2_atom_forge_frame_time(&this->forge, 0);
+            lv2_atom_forge_object(&this->forge, &frame, 1, uris->ir_phase);
+            lv2_atom_forge_property_head(&this->forge, uris->atom_Vector, 0);
+            lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float,
+                                                    phaseSize, (void*)phaseData.data());
+            lv2_atom_forge_pop(&this->forge, &frame);
+        }
+    }
+
     // send new IR data
     if (engine.dataReady.load(std::memory_order_acquire)) {
-        engine.dataReady.store(false, std::memory_order_release);
-        LV2_Atom_Forge_Frame frame;
-        lv2_atom_forge_frame_time(&this->forge, 0);
-        lv2_atom_forge_object(&this->forge, &frame, 1, uris->ir_data);
-        lv2_atom_forge_property_head(&this->forge, uris->atom_Vector,0);
-        lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float, 4096, (void*)engine.ip->getIRMag().data());
-        lv2_atom_forge_pop(&this->forge, &frame);
-        engine.processIR.store(false, std::memory_order_release);
+        size_t needed = atom_overhead + 4096 * sizeof(float);
+        if (forge.size - forge.offset >= needed) {
+            engine.dataReady.store(false, std::memory_order_release);
+            LV2_Atom_Forge_Frame frame;
+            lv2_atom_forge_frame_time(&this->forge, 0);
+            lv2_atom_forge_object(&this->forge, &frame, 1, uris->ir_data);
+            lv2_atom_forge_property_head(&this->forge, uris->atom_Vector, 0);
+            lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float,
+                                  4096, (void*)engine.ip->getIRMag().data());
+            lv2_atom_forge_pop(&this->forge, &frame);
+            engine.processIR.store(false, std::memory_order_release);
+            pullPhase.store(true, std::memory_order_release);
+        }
     }
+
     *(latency) = engine.conv->getLatency();
 }
 

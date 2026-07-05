@@ -63,6 +63,10 @@ public:
         ir_.assign(ir.begin(), ir.end());
     }
 
+    void setPhase(const std::vector<float>& phase) {
+        phase_.assign(phase.begin(), phase.end());
+    }
+
     void setSpec(const float* data, int bin) {
         mag_.clear();
         for (int i = 0; i<bin; i++) {
@@ -78,6 +82,13 @@ public:
         }
         rebuild_eq_layer = true;
         expose_widget(spec);
+    }
+
+    void setPhase(const float* data, int bin) {
+        phase_.clear();
+        for (int i = 0; i<bin; i++) {
+            phase_.push_back(data[i]);
+        }
     }
 
     void init(int width = 880, int height = 430) {
@@ -147,6 +158,10 @@ public:
 
         Widget_t* laframe = add_my_z_frame(spec,"", 1, 331, width-80, 100);
         laframe->scale.gravity = WESTEAST;
+
+        Widget_t* ph = add_my_button(spec, width-105, 0, 20, 20, "φ");
+        ph->parent_struct = this;
+        ph->func.value_changed_callback = show_phase;
 
         int x = 1;
         for (int i = 0; i<12; i++) {
@@ -369,6 +384,7 @@ public:
     void check_irmatch() {
         if (conn->haveData()) {
             setData(conn->getIR());
+            setPhase(conn->getPhase());
             rebuild_eq_layer = true;
             expose_widget(spec);
         }
@@ -391,12 +407,14 @@ private:
     IConnector* conn = nullptr;
     AudioFile af;
     Vec ir_; // filter
+    Vec phase_; // phase
     Vec mag_; // spectrum
 
     char cfreq[64];
     char cgain[64];
     double sampleRate = 48000.0;
     bool band_match = false;
+    bool show_ph = false;
     int match_state = -1;
     int match_band = -1;
     int mx = 0;
@@ -436,6 +454,17 @@ private:
         if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
             self->run = false;
             destroy_widget(self->top, self->top->app);
+        }
+    }
+
+    static void show_phase(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
+            self->show_ph = self->show_ph ? false : true;
+            self->rebuild_eq_layer = true;
+            expose_widget(self->spec);
+
         }
     }
 
@@ -1205,6 +1234,7 @@ private:
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         draw_band_points(cr, width, height);
         draw_band_curves(cr, width, height);
+        if (show_ph) drawSpectrum(cr, phase_, width, height, 1, sample_rate, 0.945, 0.114, 0.192, "",        height-80);
         drawSpectrum(cr, ir_,    width, height, 2.5, sample_rate, 0.545, 0.914, 0.992, "",      height-80);
         cairo_destroy(cr);
         rebuild_eq_layer = false;

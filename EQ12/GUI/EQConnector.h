@@ -87,6 +87,10 @@ public:
         return engine->ip->getIRMag();
     }
 
+    const std::vector<float>& getPhase() override {
+        return engine->ip->getIRPhase();
+    }
+
     const std::pair<std::vector<double>, std::vector<double> > get_ir() override {
         return engine->ip->createIRStereo();
     }

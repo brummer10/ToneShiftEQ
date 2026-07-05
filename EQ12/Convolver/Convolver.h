@@ -24,6 +24,10 @@
 class Convolver {
 public:
     Convolver() {
+        buildIn   = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
+        buildFreq = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
+        buildPlan = fftw_plan_dft_r2c_1d(FFT_SIZE, buildIn, buildFreq, FFTW_ESTIMATE);
+
         init(chL);
         init(chR);
     }
@@ -34,6 +38,10 @@ public:
         delete activeIR.load();
         delete pendingIR.load();
         delete trash;
+
+        fftw_destroy_plan(buildPlan);
+        fftw_free(buildIn);
+        fftw_free(buildFreq);
     }
 
     void setBypass(int bp) { bypass = bp; }
@@ -79,10 +87,13 @@ private:
 
     int bypass = 0;
 
+    double*       buildIn   = nullptr;
+    fftw_complex* buildFreq = nullptr;
+    fftw_plan     buildPlan = nullptr;
+
     struct Complex { double re = 0.0, im = 0.0; };
     using Spectrum = std::array<Complex, NUM_BINS>;
-
-    using Part = std::array<Spectrum, NUM_PARTS>;
+    using Part     = std::array<Spectrum, NUM_PARTS>;
 
     struct IRData { Part H_L, H_R; };
 
@@ -99,12 +110,12 @@ private:
         size_t historyPos = 0;
         std::array<double, PART_SIZE> overlap{};
 
-        double* fftIn           = nullptr;
-        double* fftOut          = nullptr;
-        fftw_complex* fftFreq   = nullptr;
-        fftw_complex* fftAccum  = nullptr;
-        fftw_plan planFwd       = nullptr;
-        fftw_plan planInv       = nullptr;
+        double*       fftIn    = nullptr;
+        double*       fftOut   = nullptr;
+        fftw_complex* fftFreq  = nullptr;
+        fftw_complex* fftAccum = nullptr;
+        fftw_plan     planFwd  = nullptr;
+        fftw_plan     planInv  = nullptr;
     };
 
     Channel chL, chR;
@@ -112,12 +123,12 @@ private:
     std::atomic<IRData*> pendingIR{nullptr};
 
     void init(Channel& ch) {
-        ch.fftIn    = (double*)fftw_malloc(sizeof(double) * FFT_SIZE);
-        ch.fftOut   = (double*)fftw_malloc(sizeof(double) * FFT_SIZE);
+        ch.fftIn    = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
+        ch.fftOut   = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
         ch.fftFreq  = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
         ch.fftAccum = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
-        ch.planFwd  = fftw_plan_dft_r2c_1d(FFT_SIZE, ch.fftIn, ch.fftFreq, FFTW_MEASURE);
-        ch.planInv  = fftw_plan_dft_c2r_1d(FFT_SIZE, ch.fftAccum, ch.fftOut, FFTW_MEASURE);
+        ch.planFwd  = fftw_plan_dft_r2c_1d(FFT_SIZE, ch.fftIn,    ch.fftFreq,  FFTW_ESTIMATE);
+        ch.planInv  = fftw_plan_dft_c2r_1d(FFT_SIZE, ch.fftAccum, ch.fftOut,   FFTW_ESTIMATE);
         ch.dryDelay.fill(0.0f);
         ch.dryIdx = 0;
         ch.inFifo.fill(0.0f);
@@ -126,7 +137,7 @@ private:
         ch.outRead = ch.outWrite = ch.available = 0;
         ch.overlap.fill(0.0);
         ch.historyPos = 0;
-        for (auto& s : ch.Xhistory) 
+        for (auto& s : ch.Xhistory)
             for (auto& b : s)
                 b = {0.0, 0.0};
     }
@@ -141,22 +152,19 @@ private:
     }
 
     void build(Part& H, const double* ir) {
-        double time[FFT_SIZE]{};
-        fftw_complex freq[NUM_BINS]{};
-        fftw_plan tmp = fftw_plan_dft_r2c_1d(FFT_SIZE, time, freq, FFTW_ESTIMATE);
+        // Reuse permanent buildPlan — no planner access at runtime
         for (size_t p = 0; p < NUM_PARTS; ++p) {
-            std::memset(time, 0, sizeof(time));
+            std::memset(buildIn, 0, sizeof(double) * FFT_SIZE);
             for (size_t i = 0; i < PART_SIZE; ++i) {
                 size_t idx = p * PART_SIZE + i;
-                if (idx < IR_LENGTH) time[i] = ir[idx];
+                if (idx < IR_LENGTH) buildIn[i] = ir[idx];
             }
-            fftw_execute(tmp);
+            fftw_execute(buildPlan);
             for (size_t k = 0; k < NUM_BINS; ++k) {
-                H[p][k].re = freq[k][0];
-                H[p][k].im = freq[k][1];
+                H[p][k].re = buildFreq[k][0];
+                H[p][k].im = buildFreq[k][1];
             }
         }
-        fftw_destroy_plan(tmp);
     }
 
     void swapIR() {
@@ -172,8 +180,8 @@ private:
         return out;
     }
 
-    void processChannel(Channel& ch, const Part& H, size_t n, 
-                                const float* in, float* out) {
+    void processChannel(Channel& ch, const Part& H, size_t n,
+                        const float* in, float* out) {
         for (size_t i = 0; i < n; ++i) {
             float wet = popOutput(ch);
             float dry = processDry(ch, in[i]);

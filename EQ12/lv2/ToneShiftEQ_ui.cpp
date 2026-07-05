@@ -36,6 +36,7 @@
 
 #define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
 #define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
+#define TONESHIFTEQ_irphase PLUGIN_URI "#irphase"
 #define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
 
 
@@ -48,6 +49,7 @@ typedef struct {
     LV2_URID atom_eventTransfer;
     LV2_URID spectrum_data;
     LV2_URID ir_data;
+    LV2_URID ir_phase;
     LV2_URID ir_request;
 } URIs;
 
@@ -60,6 +62,7 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
     uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
     uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
     uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
+    uris->ir_phase                = map->map(map->handle, TONESHIFTEQ_irphase);
     uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
 }
 
@@ -145,6 +148,16 @@ void XToneShiftEQ_UI::handleAtom(const LV2_Atom_Object* obj) {
             const float* data =  (float*) LV2_ATOM_BODY(&vec->atom);
             uint32_t bins = (vector_data->size - sizeof(LV2_Atom_Vector_Body)) / vec->atom.size;
             sw.setFilter(data, bins);
+        }
+    } else if (obj->body.otype == uris.ir_phase) {
+        const LV2_Atom* vector_data = NULL;
+        const int n_props  = lv2_atom_object_get(obj,uris.atom_Vector, &vector_data, NULL);
+        if (!n_props) return;
+        const LV2_Atom_Vector* vec = (LV2_Atom_Vector*)LV2_ATOM_BODY(vector_data);
+        if (vec->atom.type == uris.atom_Float) {
+            const float* data =  (float*) LV2_ATOM_BODY(&vec->atom);
+            uint32_t bins = (vector_data->size - sizeof(LV2_Atom_Vector_Body)) / vec->atom.size;
+            sw.setPhase(data, bins);
         }
     }
 }
