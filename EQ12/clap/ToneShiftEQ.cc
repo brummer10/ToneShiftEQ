@@ -192,6 +192,7 @@ public:
         copyValuesToGui(sw.tilt,       (float)param->getParam(81));
 
         copyValuesToGui(sw.vug,        (float)param->getParam(82));
+        copyValuesToGui(sw.mode,       (float)param->getParam(83));
     }
 
 

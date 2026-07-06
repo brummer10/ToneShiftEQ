@@ -31,6 +31,11 @@ typedef struct toneshifteq_plugin_t toneshifteq_plugin_t;
 
 #include "ToneShiftEQ.cc"
 
+enum PluginMode {
+    MODE_MASTER,
+    MODE_LIVE
+};
+
 // Plugin data structure
 struct toneshifteq_plugin_t {
     clap_plugin_t plugin;
@@ -39,6 +44,7 @@ struct toneshifteq_plugin_t {
     std::string state;
     bool isInited;
     bool guiIsCreated;
+    PluginMode mode;
     uint32_t latency;
     uint32_t width;
     uint32_t height;
@@ -192,7 +198,7 @@ static const clap_plugin_audio_ports_t audio_ports = {
 
 static uint32_t toneshifteq_latency_get(const clap_plugin_t *plugin) {
     toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
-    return plug->r->engine.conv->getLatency();
+    return plug->mode ? 0 : plug->r->engine.conv->getLatency();
 }
 
 static const clap_plugin_latency_t latency_extension = {
@@ -435,7 +441,7 @@ static bool toneshifteq_activate(const struct clap_plugin *plugin,
                              uint32_t                  max_frames_count) {
     toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->initEngine(sample_rate, 25, 1);
-    plug->isInited = true;
+    plug->r->engine.param.setParam(83,(int)plug->mode);
     if(!plug->state.empty()) plug->r->readState(plug->state);
     return true;
 }
@@ -453,16 +459,30 @@ static void toneshifteq_stop_processing(const struct clap_plugin *plugin) {}
 static void toneshifteq_reset(const struct clap_plugin *plugin) {}
 
 // CLAP plugin descriptor
-static const clap_plugin_descriptor_t toneshifteq_descriptor = {
+static const clap_plugin_descriptor_t toneshifteq_master_descriptor = {
     .clap_version = CLAP_VERSION_INIT,
-    .id = "com.brummer10.ToneShiftEQ",
-    .name = "ToneShift-EQ12",
+    .id = "com.brummer10.ToneShiftEQ.Master",
+    .name = "ToneShift-EQ12M",
     .vendor = "brummer10",
     .url = "https://github.com/brummer10/ToneShiftEQ",
     .manual_url = "https://github.com/brummer10/ToneShiftEQ",
     .support_url = "https://github.com/brummer10/ToneShiftEQ",
     .version = "0.3.0",
-    .description = "12 band liner phase EQ (128 samples latency)",
+    .description = "12 band minum phase EQ (128 samples latency)",
+    .features = (const char *[]){ CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, NULL },
+};
+
+// CLAP plugin descriptor
+static const clap_plugin_descriptor_t toneshifteq_live_descriptor = {
+    .clap_version = CLAP_VERSION_INIT,
+    .id = "com.brummer10.ToneShiftEQ.Live",
+    .name = "ToneShift-EQ12L",
+    .vendor = "brummer10",
+    .url = "https://github.com/brummer10/ToneShiftEQ",
+    .manual_url = "https://github.com/brummer10/ToneShiftEQ",
+    .support_url = "https://github.com/brummer10/ToneShiftEQ",
+    .version = "0.3.0",
+    .description = "12 band Biquad EQ (0 sampels latency)",
     .features = (const char *[]){ CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, NULL },
 };
 
@@ -477,7 +497,7 @@ static const void *toneshifteq_get_extension(const clap_plugin_t *plugin, const 
 }
 
 // Create the plugin
-static const clap_plugin_t *toneshifteq_create(const clap_host_t *host) {
+static const clap_plugin_t *toneshifteq_create(const clap_host_t *host, PluginMode mode) {
     toneshifteq_plugin_t *plug = new toneshifteq_plugin_t{};
     if (!plug) return NULL;
     plug->r = new ToneShiftEQ();
@@ -485,7 +505,9 @@ static const clap_plugin_t *toneshifteq_create(const clap_host_t *host) {
     plug->isInited = false;
     plug->width = WINDOW_WIDTH;
     plug->height = WINDOW_HEIGHT;
-    plug->plugin.desc = &toneshifteq_descriptor;
+    plug->mode = mode;
+    plug->plugin.desc = (plug->mode == MODE_MASTER) ? 
+        &toneshifteq_master_descriptor : &toneshifteq_live_descriptor;
     plug->plugin.plugin_data = plug;
     plug->plugin.init = toneshifteq_init;
     plug->plugin.destroy = toneshifteq_destroy;
@@ -506,14 +528,16 @@ static const clap_plugin_t *toneshifteq_create(const clap_host_t *host) {
  */
 
 static uint32_t plugin_factory_get_plugin_count(const struct clap_plugin_factory *factory) {
-   return 1;
+   return 2;
 }
 
 static const clap_plugin_descriptor_t *plugin_factory_get_toneshifteq_descriptor
                     (const struct clap_plugin_factory *factory, uint32_t index) {
     switch(index) {
         case 0:
-            return &toneshifteq_descriptor;
+            return &toneshifteq_master_descriptor;
+        case 1:
+            return &toneshifteq_live_descriptor;
         default:
             return nullptr;
     }
@@ -527,8 +551,11 @@ static const clap_plugin_t *plugin_factory_create_toneshifteq
       return NULL;
    }
 
-    if (!strcmp(plugin_id, toneshifteq_descriptor.id))
-        return toneshifteq_create(host);
+    if (!strcmp(plugin_id, toneshifteq_master_descriptor.id))
+        return toneshifteq_create(host, MODE_MASTER);
+
+    if (!strcmp(plugin_id, toneshifteq_live_descriptor.id))
+        return toneshifteq_create(host, MODE_LIVE);
     return NULL;
 }
 

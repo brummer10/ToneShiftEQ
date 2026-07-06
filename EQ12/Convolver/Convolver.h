@@ -58,6 +58,11 @@ public:
         delete old;
     }
 
+    void reset() {
+        resetChannel(chL);
+        resetChannel(chR);
+    }
+
     void process(size_t n, const float* inL, const float* inR,
                            float* outL, float* outR) {
         swapIR();
@@ -129,6 +134,20 @@ private:
         ch.fftAccum = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
         ch.planFwd  = fftw_plan_dft_r2c_1d(FFT_SIZE, ch.fftIn,    ch.fftFreq,  FFTW_ESTIMATE);
         ch.planInv  = fftw_plan_dft_c2r_1d(FFT_SIZE, ch.fftAccum, ch.fftOut,   FFTW_ESTIMATE);
+        ch.dryDelay.fill(0.0f);
+        ch.dryIdx = 0;
+        ch.inFifo.fill(0.0f);
+        ch.inFill = 0;
+        ch.outFifo.fill(0.0f);
+        ch.outRead = ch.outWrite = ch.available = 0;
+        ch.overlap.fill(0.0);
+        ch.historyPos = 0;
+        for (auto& s : ch.Xhistory)
+            for (auto& b : s)
+                b = {0.0, 0.0};
+    }
+
+    void resetChannel(Channel& ch) {
         ch.dryDelay.fill(0.0f);
         ch.dryIdx = 0;
         ch.inFifo.fill(0.0f);

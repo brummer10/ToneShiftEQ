@@ -23,6 +23,7 @@
 #include "Parameter.h"
 #include "AudioFile.h"
 #include "ParallelThread.h"
+#include "Biquad.h"
 
 
 class Engine
@@ -35,6 +36,7 @@ public:
     IRMorpherStereo*             conv = nullptr;
     FFTAnalyzer*                 ana = nullptr;
     GainStereo*                  vu = nullptr;
+    ToneShiftCascade             tsc;
     uint32_t                     s_rate = 48000;
     size_t                       irLength = 4096;          
     std::string                  revfile;
@@ -60,8 +62,16 @@ private:
     uint32_t                     frames = 0;
     int                          mode = 0;
 
-    void registerParameters();
+    enum class ModeState { Running, FadingOut, FadingIn };
+    ModeState modeState = ModeState::Running;
+    int pendingMode = 0;
+    int currentMode = 0;
+    int warmupBlocks = 1;
+    float fadeGain = 1.0f;
+    static constexpr float fadeStep = 0.5f;
 
+    void registerParameters();
+    void updateCascadeFromParams();
     inline void processBuffer();
     inline void feedAnanlyzer(uint32_t nframes, float* output, float* output1);
 };
@@ -113,7 +123,7 @@ void Engine::registerParameters() {
     param.registerParam("Highcut freq",   "EQ", 110,22000,22000,0.01,   (void*)&ip->highcut,        false,  IS_DOUBLE);
 
     param.registerParam("Smooth",         "IR",  0,   1,  0.3, 0.01,    (void*)&ip->smooth_amount,  false,  IS_DOUBLE);
-    param.registerParam("Dynamics",       "IR", -1,   1,  0.0, 0.01,    (void*)&ip->dynamics_amount,false,  IS_DOUBLE);
+    param.registerParam("Contrast",       "IR", -1,   1,  0.0, 0.01,    (void*)&ip->dynamics_amount,false,  IS_DOUBLE);
     param.registerParam("Tone Bias",      "IR", -1,   1,  0.0, 0.01,    (void*)&ip->tilt_amount,    false,  IS_DOUBLE);
    
     param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
@@ -128,6 +138,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     ana->init(4096, (float)rate);
     vu->init(rate);
     ip->computeIR(rate);
+    tsc.prepare(rate);
     execute.store(false, std::memory_order_release);
 
     xrworker.setThreadName("Worker");
@@ -139,11 +150,42 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     par.set<Engine, &Engine::processBuffer>(this);
 };
 
+void Engine::updateCascadeFromParams() {
+    static const Biquad::Type typeMap[] = {
+        Biquad::Type::LowShelf,
+        Biquad::Type::Peak,
+        Biquad::Type::HighShelf
+    };
+
+    for (int i = 0; i < 12; ++i) {
+        ToneShiftCascade::FilterConfig cfg;
+
+        bool soloed = ip->solo_enabled && (i != ip->solo_band);
+        
+        if (soloed || !ip->bands[i].enabled || ip->bands[i].mute) {
+            cfg.type      = Biquad::Type::Peak;
+            cfg.frequency = (float)ip->bands[i].freq;
+            cfg.q         = 1.0f;
+            cfg.gainDB    = 0.0f;
+        } else {
+            cfg.type      = typeMap[ip->bands[i].type];
+            cfg.frequency = (float)ip->bands[i].freq;
+            cfg.q         = (float)ip->bands[i].Q;
+            cfg.gainDB    = (float)ip->bands[i].gain;
+        }
+        tsc.setFilter(i, cfg);
+    }
+    tsc.setLowCut((float)ip->lowcut, ip->solo_enabled ? false : ip->lowcut_enabled);
+    tsc.setHighCut((float)ip->highcut, ip->solo_enabled ? false : ip->highcut_enabled);
+}
+
 void Engine::do_work_mono() {
     execute.store(true, std::memory_order_release);
 
     if (processIR.load(std::memory_order_acquire)) {
         ip->computeIR(s_rate);
+        // implement update biquads from parameters
+        updateCascadeFromParams();
         processIR.store(false, std::memory_order_release);
         waitForIR.store(true, std::memory_order_release);
     }
@@ -177,7 +219,44 @@ inline void Engine::process(uint32_t nframes, const float* input,
                 const float* input1, float* output, float* output1) {
 
     if(nframes<1) return;
-    conv->process(nframes, input, input1, output, output1);
+    if (output != input)
+        std::memcpy(output, input, nframes * sizeof(float));
+
+    if (output1 != input1)
+        std::memcpy(output1, input1, nframes * sizeof(float));
+
+    if (modeState == ModeState::FadingOut) {
+        fadeGain -= fadeStep;
+        if (fadeGain <= 0.0f) {
+            fadeGain = 0.0f;
+            tsc.reset();
+            conv->reset();
+            warmupBlocks = 1;
+            currentMode = pendingMode;  // switch mode now
+            modeState = ModeState::FadingIn;
+        }
+    } else if (modeState == ModeState::FadingIn) {
+        if (warmupBlocks > 0) {
+            warmupBlocks--;
+        } else {
+            fadeGain += fadeStep;
+            if (fadeGain >= 1.0f) {
+                fadeGain = 1.0f;
+                modeState = ModeState::Running;
+            }
+        }
+    } else if (currentMode != mode) {
+        pendingMode = mode;
+        modeState = ModeState::FadingOut;
+    }
+
+    if (!currentMode) {
+        conv->process(nframes, input, input1, output, output1);
+    } else {
+        tsc.setBypass(conv->bypass);
+        tsc.processBlock(nframes, output, output1);
+    }
+
     vu->process(nframes, output, output1, output, output1);
 
     feedAnanlyzer(nframes, output, output1);

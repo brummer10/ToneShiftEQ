@@ -323,7 +323,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
         }
     }
 
-    *(latency) = engine.conv->getLatency();
+    *(latency) = (int)*(par[83]) ? 0 : engine.conv->getLatency();
 }
 
 void Xtoneshifteq::connect_all__ports(uint32_t port, void* data) {

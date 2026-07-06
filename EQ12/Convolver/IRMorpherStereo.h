@@ -42,6 +42,10 @@ public:
         IrReady.store(true, std::memory_order_release);
     }
 
+    void reset() {
+        convA->reset();
+    }
+
     void setBypass(int bp) {
         bypass = bp;
     }

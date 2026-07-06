@@ -43,6 +43,8 @@ public:
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
 
+    Widget_t* mode = nullptr;
+
     Widget_t* smooth = nullptr;
     Widget_t* dynamics = nullptr;
     Widget_t* tilt = nullptr;
@@ -159,7 +161,7 @@ public:
         Widget_t* laframe = add_my_z_frame(spec,"", 1, 331, width-80, 100);
         laframe->scale.gravity = WESTEAST;
 
-        Widget_t* ph = add_my_button(spec, width-105, 0, 20, 20, "φ");
+        ph = add_my_button(spec, width-105, 0, 20, 20, "φ");
         ph->parent_struct = this;
         ph->func.value_changed_callback = show_phase;
 
@@ -312,6 +314,14 @@ public:
         highcut->func.button_release_callback = set;
 
         #ifndef CLAPPLUG
+        mode = add_my_combobox(laframe,"Mode", 190, 25, 90, 20);
+        mode->scale.gravity = ASPECT;
+        mode->parent_struct = this;
+        combobox_add_entry(mode,"FFT");
+        combobox_add_entry(mode,"Biquad");
+        combobox_set_active_entry(mode, 0);
+        mode->func.value_changed_callback = set_mode;
+        add_tooltip(mode->childlist->childs[0], "Mode");
         #ifndef LV2PLUG
         Widget_t* save = add_xsave_file_button(laframe, 190, 65, 90, 20, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
@@ -327,7 +337,7 @@ public:
         smooth->func.value_changed_callback = set_smooth;
         smooth->func.button_release_callback = set;
 
-        dynamics = add_my_knob(laframe, "Dynamics", "", 660,26,60, 70);
+        dynamics = add_my_knob(laframe, "Contrast", "", 660,26,60, 70);
         set_adjustment(dynamics->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
         dynamics->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(dynamics, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -347,6 +357,9 @@ public:
     void show() {
         widget_show_all(top);
         raise_control_panel(active_panel);
+        #ifndef CLAPPLUG
+        set_controller_mode();
+        #endif
     }
 
     void setSampleRate(const double sr) {
@@ -404,6 +417,7 @@ private:
     Widget_t* spec = nullptr;
     Widget_t* curFreq = nullptr;
     Widget_t* curGain = nullptr;
+    Widget_t* ph = nullptr;
     IConnector* conn = nullptr;
     AudioFile af;
     Vec ir_; // filter
@@ -426,6 +440,10 @@ private:
     bool rebuild_eq_layer = true;
     bool capture_line = false;
     std::atomic<bool> set_leak {false};
+
+    float smooth_s = 0.3f;
+    float dynamic_s = 0.0f;
+    float tilt_s = 0.0f;
 
     const float f_min = 20.0f;
     const float f_max = 20000.0f;
@@ -455,6 +473,40 @@ private:
             self->run = false;
             destroy_widget(self->top, self->top->app);
         }
+    }
+
+    void set_controller_mode() {
+        #ifndef CLAPPLUG
+        int c_mode = conn->getParameterValue(83);
+        if (c_mode) {
+            show_ph = false;
+            smooth_s = adj_get_value(smooth->adj);
+            dynamic_s = adj_get_value(dynamics->adj);
+            tilt_s =  adj_get_value(tilt->adj);
+            adj_set_value(smooth->adj, 0.0);
+            adj_set_value(dynamics->adj, 0.0);
+            adj_set_value(tilt->adj, 0.0);
+            widget_hide(ph);
+            widget_hide(smooth);
+            widget_hide(dynamics);
+            widget_hide(tilt);
+        } else {
+            adj_set_value(smooth->adj, smooth_s);
+            adj_set_value(dynamics->adj, dynamic_s);
+            adj_set_value(tilt->adj, tilt_s);
+            widget_show(ph);
+            widget_show(smooth);
+            widget_show(dynamics);
+            widget_show(tilt);
+        }
+        #endif
+    }
+
+    static void set_mode(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(83, adj_get_value(w->adj));
+        self->set_controller_mode();
     }
 
     static void show_phase(void *w_, void* user_data) {
