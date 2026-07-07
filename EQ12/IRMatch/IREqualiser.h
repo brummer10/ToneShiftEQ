@@ -188,7 +188,7 @@ public:
         double f_min = 2.0 * nyquist / (n - 1);
         double g_dc = 0.5 * (1.0 - std::tanh(slope * log_distance(f_min, freq)));
 
-        for (size_t i = 1; i < n; ++i) {
+        for (size_t i = 0; i < n; ++i) {
             double f = (double)i / (n - 1) * nyquist;
             //if (f < 10.0) continue;
             double x = log_distance(f, freq);

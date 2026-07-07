@@ -200,6 +200,9 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.vug, value);
         break;
     case 83:
+        copyValuesToGui(sw.hf_fade, value);
+        break;
+    case 84:
         copyValuesToGui(sw.mode, value);
         break;
     default:
@@ -241,9 +244,9 @@ void XToneShiftEQ_UI::port_event(LV2UI_Handle handle, uint32_t port, uint32_t bu
 
     if (format == 0) {
         const float value = *(const float*)buffer;
-        if (port == 84) {
+        if (port == 85) {
             adj_set_value(self->sw.vumeterL->adj, power2db(self->sw.vumeterL, value));
-        } else if (port == 85) {
+        } else if (port == 86) {
             adj_set_value(self->sw.vumeterR->adj, power2db(self->sw.vumeterR, value));
         } else {
             self->conn.setParValue(port, value);
@@ -340,7 +343,7 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
     LV2_Atom_Forge_Frame frame;
     LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_object(&self->forge, &frame, 0, self->uris.ir_request);
 
-    self->write_function(self->controller, 91, lv2_atom_total_size(msg),
+    self->write_function(self->controller, 92, lv2_atom_total_size(msg),
                        self->uris.atom_eventTransfer, msg);
 }
 

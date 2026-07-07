@@ -45,6 +45,7 @@ public:
 
     Widget_t* mode = nullptr;
 
+    Widget_t* hf_fade = nullptr;
     Widget_t* smooth = nullptr;
     Widget_t* dynamics = nullptr;
     Widget_t* tilt = nullptr;
@@ -329,7 +330,11 @@ public:
         #endif
         #endif
 
-        smooth = add_my_knob(laframe, "Smooth", "", 590,26,60, 70);
+        hf_fade = add_my_toggle_button(laframe, 545, 26, 60, 20, "HF Fade");
+        hf_fade->parent_struct = this;
+        hf_fade->func.value_changed_callback = set_hf_fade;
+
+        smooth = add_my_knob(laframe, "Smooth", "", 610,26,60, 70);
         set_adjustment(smooth->adj, 0.3, 0.3, 0.0, 1.0, 0.01, CL_CONTINUOS);
         smooth->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(smooth, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -337,7 +342,7 @@ public:
         smooth->func.value_changed_callback = set_smooth;
         smooth->func.button_release_callback = set;
 
-        dynamics = add_my_knob(laframe, "Contrast", "", 660,26,60, 70);
+        dynamics = add_my_knob(laframe, "Contrast", "", 670,26,60, 70);
         set_adjustment(dynamics->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
         dynamics->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(dynamics, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -477,7 +482,7 @@ private:
 
     void set_controller_mode() {
         #ifndef CLAPPLUG
-        int c_mode = conn->getParameterValue(83);
+        int c_mode = conn->getParameterValue(84);
         if (c_mode) {
             show_ph = false;
             smooth_s = adj_get_value(smooth->adj);
@@ -490,6 +495,7 @@ private:
             widget_hide(smooth);
             widget_hide(dynamics);
             widget_hide(tilt);
+            widget_hide(hf_fade);
         } else {
             adj_set_value(smooth->adj, smooth_s);
             adj_set_value(dynamics->adj, dynamic_s);
@@ -498,6 +504,7 @@ private:
             widget_show(smooth);
             widget_show(dynamics);
             widget_show(tilt);
+            widget_show(hf_fade);
         }
         #endif
     }
@@ -505,7 +512,7 @@ private:
     static void set_mode(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        self->sendValueChanged(83, adj_get_value(w->adj));
+        self->sendValueChanged(84, adj_get_value(w->adj));
         self->set_controller_mode();
     }
 
@@ -544,6 +551,12 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(82, adj_get_value(w->adj));
+    }
+
+    static void set_hf_fade(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(83, adj_get_value(w->adj));
     }
 
     static void bp_response(void *w_, void* user_data) {

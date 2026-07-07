@@ -4,8 +4,9 @@
     <img src="https://github.com/brummer10/ToneShiftEQ/blob/main/ToneShiftEQ.png?raw=true" />
 </p>
 
-**ToneShiftEQ** is a modern 12-band minimum-phase parametric convolution equalizer
-designed for precise spectral shaping, mixing, mastering, and corrective audio processing.
+**ToneShiftEQ** is a modern 12-band parametric equalizer featuring both
+a minimum-phase FFT convolution engine and a zero-latency biquad engine.
+It is designed for transparent tone shaping, corrective equalization, mixing and mastering.
 
 ---
 
@@ -15,15 +16,35 @@ designed for precise spectral shaping, mixing, mastering, and corrective audio p
 * Independent enable, mute and solo controls per band
 * Adjustable frequency, gain and Q for every band
 * High-pass and low-pass filters
-* Tilt control for broad spectral balancing
+* FFT/Biquad Mode switch
+* HF Fade smooth high-frequency roll-off
+* Tone Bias control for broad spectral balancing
 * Smooth control for natural filter transitions
-* Dynamics control for adaptive processing
+* Contrast control for adaptive processing
 * Real-time spectrum display with phase overlay
 * Interactive curve drawing with Ctrl + drag
 * Stereo processing
 * Low CPU consumption
 * Real-time safe processing architecture
 * 128 samples latency, host-compensated
+
+---
+
+## Processing Modes
+
+FFT Mode
+
+* Minimum-phase convolution
+* 128 samples latency
+* Supports Smooth, Contrast, Tone Bias, HF Fade and IR export
+* Best suited for mixing and mastering
+
+Biquad Mode
+
+* Cascaded parametric biquad filters
+* Zero latency
+* Low CPU usage
+* Ideal for recording and live monitoring
 
 ---
 
@@ -55,18 +76,16 @@ mastering applications, and creative sound design.
 
 ## Technical Overview
 
-ToneShiftEQ combines parametric filter design with a partitioned convolution engine.
-All 12 band responses are combined into a single minimum-phase impulse response
-of 4096 samples, which is applied to the audio signal using a partitioned
-overlap-add FFT convolution engine (FFTW3).
+ToneShiftEQ provides two interchangeable processing engines.
 
-Filter responses are generated and updated in the background while audio
-processing remains real-time safe. The convolution engine introduces a fixed
-latency of 128 samples, which is reported to the host for automatic compensation.
+The FFT engine generates a minimum-phase impulse response from the current EQ settings
+and processes audio using partitioned FFT convolution.
 
-Minimum-phase processing means the phase response behaves similarly to analog
-equalizers: phase and amplitude are coupled, producing a natural character
-without pre-ringing.
+The Biquad engine implements the same filter configuration as
+a cascade of second-order IIR filters for true zero-latency operation.
+
+Both engines share the same user interface and parameter model,
+allowing instant switching depending on the application.
 
 ---
 
@@ -74,9 +93,9 @@ without pre-ringing.
 
 ToneShiftEQ is available as:
 
-* Stand-alone
-* CLAP
-* LV2
+* Stand-alone application
+* CLAP plugin
+* LV2 plugin
 
 ---
 

@@ -93,7 +93,7 @@ private:
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
     std::atomic<bool> pullPhase {false};
-    float* par[84]; // engine.param.getParamCount() +1
+    float* par[85]; // engine.param.getParamCount() +1
     float* input0;
     float* input1;
     float* output0;
@@ -174,14 +174,14 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0;
-    for (int i = 0; i< 84; i++) {
+    for (int i = 0; i< 85; i++) {
         par[i] = &v;
     }
 }
 
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data) {
-    for (int i = 0; i< 84; i++) {
+    for (int i = 0; i< 85; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -189,31 +189,31 @@ void Xtoneshifteq::connect_(uint32_t port,void* data) {
     }
     switch (port)
     {
-        case 84:
+        case 85:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 85:
+        case 86:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 86:
+        case 87:
             input0 = static_cast<float*>(data);
             break;
-        case 87:
+        case 88:
             input1 = static_cast<float*>(data);
             break;
-        case 88:
+        case 89:
             output0 = static_cast<float*>(data);
             break;
-        case 89:
+        case 90:
             output1 = static_cast<float*>(data);
             break;
-        case 90:
+        case 91:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 91:
+        case 92:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 92:
+        case 93:
             latency = static_cast<float*>(data);
             break;
         default:
@@ -250,7 +250,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
     // check for parameter changes
     for (int i = 0; i< engine.param.getParamCount(); i++) {
         if (engine.param.getParam(i) != (*par[i])) {
-            if (i > 0 && i < 82) { // filter update
+            if (i > 0 && i < 84) { // filter update
                 engine.processIR.store(true, std::memory_order_release);
                 engine.workToDo.store(true, std::memory_order_release);
             }
@@ -323,7 +323,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
         }
     }
 
-    *(latency) = (int)*(par[83]) ? 0 : engine.conv->getLatency();
+    *(latency) = (int)*(par[84]) ? 0 : engine.conv->getLatency();
 }
 
 void Xtoneshifteq::connect_all__ports(uint32_t port, void* data) {

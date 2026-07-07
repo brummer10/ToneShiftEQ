@@ -30,7 +30,7 @@ idpy:interface a lv2:ExtensionData .
     lv2:optionalFeature lv2:hardRTCapable ;
     lv2:optionalFeature idpy:queue_draw ;
     lv2:extensionData idpy:interface ;
-    lv2:minorVersion 3 ;
+    lv2:minorVersion 4 ;
     lv2:microVersion 0 ;
 
 guiext:ui <urn:brummer:toneshifteq_ui> ;
@@ -986,17 +986,28 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     [
         a lv2:InputPort , lv2:ControlPort ;
         lv2:index 83 ;
+        lv2:symbol "hffade" ;
+        lv2:name "HF Fade" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 84 ;
         lv2:symbol "mode" ;
         lv2:name "Mode" ;
         lv2:default 0 ;
         lv2:minimum 0 ;
         lv2:maximum 1 ;
-        lv2:portProperty  pprop:notOnGUI ;
+        lv2:portProperty lv2:toggled ,  pprop:causesArtifacts ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 84 ;
+        lv2:index 85 ;
         lv2:symbol "meter_l" ;
         lv2:name "METER_L" ;
         lv2:default -70.0 ;
@@ -1006,7 +1017,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 85 ;
+        lv2:index 86 ;
         lv2:symbol "meter_r" ;
         lv2:name "METER_R" ;
         lv2:default -70.0 ;
@@ -1016,28 +1027,28 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 86 ;
+        lv2:index 87 ;
         lv2:symbol "in_l" ;
         lv2:name "Input L" ;
     ] ,
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 87 ;
+        lv2:index 88 ;
         lv2:symbol "in_r" ;
         lv2:name "Input R" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 88 ;
+        lv2:index 89 ;
         lv2:symbol "out_l" ;
         lv2:name "Output L" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 89 ;
+        lv2:index 90 ;
         lv2:symbol "out_r" ;
         lv2:name "Output R" ;
     ] ,
@@ -1046,7 +1057,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         a lv2:OutputPort , atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 90 ;
+        lv2:index 91 ;
         lv2:symbol "NOTIFY" ;
         lv2:name "NOTIFY";
     ] ,
@@ -1055,7 +1066,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         a lv2:InputPort , atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 91 ;
+        lv2:index 92 ;
         lv2:symbol "CONTROL" ;
         lv2:name "CONTROL";
     ], 
@@ -1063,7 +1074,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     [
       a lv2:OutputPort,
            lv2:ControlPort ;
-      lv2:index 92 ;
+      lv2:index 93 ;
       lv2:designation <http://lv2plug.in/ns/lv2core#latency>;
       lv2:portProperty lv2:reportsLatency, lv2:integer;
       units:unit units:frame;

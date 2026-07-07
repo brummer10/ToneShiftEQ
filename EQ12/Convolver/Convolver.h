@@ -127,13 +127,7 @@ private:
     std::atomic<IRData*> activeIR {nullptr};
     std::atomic<IRData*> pendingIR{nullptr};
 
-    void init(Channel& ch) {
-        ch.fftIn    = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
-        ch.fftOut   = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
-        ch.fftFreq  = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
-        ch.fftAccum = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
-        ch.planFwd  = fftw_plan_dft_r2c_1d(FFT_SIZE, ch.fftIn,    ch.fftFreq,  FFTW_ESTIMATE);
-        ch.planInv  = fftw_plan_dft_c2r_1d(FFT_SIZE, ch.fftAccum, ch.fftOut,   FFTW_ESTIMATE);
+    void resetChannel(Channel& ch) {
         ch.dryDelay.fill(0.0f);
         ch.dryIdx = 0;
         ch.inFifo.fill(0.0f);
@@ -147,18 +141,14 @@ private:
                 b = {0.0, 0.0};
     }
 
-    void resetChannel(Channel& ch) {
-        ch.dryDelay.fill(0.0f);
-        ch.dryIdx = 0;
-        ch.inFifo.fill(0.0f);
-        ch.inFill = 0;
-        ch.outFifo.fill(0.0f);
-        ch.outRead = ch.outWrite = ch.available = 0;
-        ch.overlap.fill(0.0);
-        ch.historyPos = 0;
-        for (auto& s : ch.Xhistory)
-            for (auto& b : s)
-                b = {0.0, 0.0};
+    void init(Channel& ch) {
+        ch.fftIn    = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
+        ch.fftOut   = (double*)      fftw_malloc(sizeof(double)       * FFT_SIZE);
+        ch.fftFreq  = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
+        ch.fftAccum = (fftw_complex*)fftw_malloc(sizeof(fftw_complex) * NUM_BINS);
+        ch.planFwd  = fftw_plan_dft_r2c_1d(FFT_SIZE, ch.fftIn,    ch.fftFreq,  FFTW_ESTIMATE);
+        ch.planInv  = fftw_plan_dft_c2r_1d(FFT_SIZE, ch.fftAccum, ch.fftOut,   FFTW_ESTIMATE);
+        resetChannel(ch);
     }
 
     void destroy(Channel& ch) {

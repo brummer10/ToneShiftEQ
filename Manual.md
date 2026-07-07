@@ -2,7 +2,7 @@
 
 ## Introduction
 
-ToneShiftEQ is a 12-band minimum-phase parametric convolution equalizer designed
+ToneShiftEQ is a 12-band equalizer designed
 for precision tone shaping, corrective processing, mixing, and mastering.
 It combines interactive spectrum visualization with flexible filter controls
 to provide transparent and musically natural equalization.
@@ -10,11 +10,19 @@ to provide transparent and musically natural equalization.
 The interface is designed around direct visual interaction,
 allowing adjustments either through dedicated controls or directly inside the spectrum display.
 
+ToneShiftEQ provides two processing modes.
+
+The default FFT mode uses minimum-phase parametric convolution
+and introduces a fixed latency of 128 samples,
+which is automatically reported to the host for delay compensation.
+
+The Biquad mode uses cascaded biquad filters and operates with zero latency.
+
 ---
 
 # Main Interface Overview
 
-The ToneShiftEQ interface consists of four main sections:
+The interface is divided into four main sections:
 
 * Spectrum Display
 * Band Control Panel
@@ -26,6 +34,9 @@ The ToneShiftEQ interface consists of four main sections:
 # Spectrum Display
 
 The spectrum display is the main editing area.
+
+Each enabled EQ band is represented by an interactive control point
+that can be adjusted directly inside the display.
 
 It provides:
 
@@ -68,7 +79,7 @@ Hover over a band point and use the mouse wheel:
 * Scroll up → narrower band
 * Scroll down → wider band
 
-### Draw gain changes
+### Quick Gain Editing
 
 Hold:
 
@@ -76,7 +87,7 @@ Ctrl + Left Mouse Button
 
 Drag vertically across the spectrum area.
 
-ToneShiftEQ automatically selects the nearest band and adjusts its gain.
+ToneShiftEQ automatically selects the nearest EQ band and adjusts its gain while dragging.
 This also functions as a jump-to-position shortcut for individual bands.
 
 ---
@@ -105,9 +116,9 @@ Range:
 
 -48 dB to +24 dB
 
-Positive values increase energy.
+Positive values boost the selected frequency range.
 
-Negative values reduce energy.
+Negative values attenuate the selected frequency range.
 
 ---
 
@@ -207,7 +218,43 @@ Range:
 
 # Additional Controls
 
-## Smooth
+## Mode switch
+
+* FFT - Minimum-phase convolution engine with 128 samples latency
+
+* Biquad - Cascaded parametric biquad filters with zero latency
+
+---
+
+# Choosing a Processing Mode
+
+## FFT Mode
+
+* 128-sample latency
+
+* Supports Smooth, Contrast, Tone Bias and IR export
+
+* Best suited for mixing, mastering and offline processing
+
+## Biquad Mode
+
+* Zero latency
+
+* Traditional parametric EQ behaviour
+
+* Ideal for live monitoring and real-time performance
+
+---
+
+## HF Fade (FFT mode only)
+
+Applies a smooth high-frequency roll-off between 20 kHz and the Nyquist frequency.
+
+This reduces unnecessary ultrasonic energy while preserving the audible frequency range.
+
+---
+
+## Smooth (FFT mode only)
 
 The Smooth control determines how much fine spectral detail is preserved in the generated response.
 
@@ -225,7 +272,8 @@ Higher values:
 
 Smooth does not simply blur the spectrum uniformly.
 ToneShiftEQ uses adaptive logarithmic smoothing,
-meaning the smoothing amount changes across the frequency range to better match human hearing perception.
+meaning the smoothing amount changes across the frequency range
+to better match human hearing.
 
 Typical use cases:
 
@@ -243,9 +291,9 @@ Typical use cases:
 
 ---
 
-## Dynamics
+## Contrast (FFT mode only)
 
-The Dynamics control adjusts spectral contrast by
+The Contrast control adjusts spectral contrast by
 enhancing or reducing local frequency differences relative to the surrounding spectrum.
 
 Positive values:
@@ -269,7 +317,7 @@ Typical use cases:
 Positive settings:
 
 * Add articulation to vocals
-* Increase attack and detail
+* Increase perceived attack and detail
 * Enhance transient perception
 
 Negative settings:
@@ -280,7 +328,7 @@ Negative settings:
 
 ---
 
-## Tone Bias
+## Tone Bias (FFT mode only)
 
 Tone Bias changes how spectral processing is distributed across the frequency range.
 
@@ -291,7 +339,7 @@ Negative values:
 
 Positive values:
 
-* Weight processing toward higher frequencies
+* Places greater emphasis on higher frequencies.
 * Produce a brighter or more open balance
 
 Tone Bias does not directly act as a conventional EQ tilt filter.
@@ -345,8 +393,8 @@ Use:
 
 Save IR
 
-The exported impulse response can be used in compatible convolution engines
-and external processing environments.
+The exported impulse response reproduces the current FFT EQ settings
+and can be loaded into compatible convolution processors.
 
 ---
 

@@ -68,7 +68,7 @@ private:
     int currentMode = 0;
     int warmupBlocks = 1;
     float fadeGain = 1.0f;
-    static constexpr float fadeStep = 0.5f;
+    static constexpr float fadeStep = 0.25f;
 
     void registerParameters();
     void updateCascadeFromParams();
@@ -101,7 +101,7 @@ inline Engine::~Engine(){
 };
 
 void Engine::registerParameters() {
-    //                  name           group    min, max, def, step     value                               isStepped  type
+    //                  name           group    min, max, def, step     value                    isStepped  type
     param.registerParam("Enable",     "Global",  0,   1,   0,    1,     (void*)&conv->bypass,        true,  IS_INT);
 
     for (int i = 0; i < 12; ++i) {
@@ -113,7 +113,7 @@ void Engine::registerParameters() {
         param.registerParam(n + " gain", "EQ", -48.0, 24.0, 0.0, 0.01, (void*)&ip->bands[i].gain, false, IS_DOUBLE);
         param.registerParam(n + " Q", "EQ", defs[i].qMin, 10.0, defs[i].qDef, 0.01, (void*)&ip->bands[i].Q, false, IS_DOUBLE);
     }
-    //                  name           group    min, max, def, step     value                               isStepped  type
+    //                  name           group    min, max, def, step     value                    isStepped  type
     param.registerParam("Solo Band",      "EQ",  0,  11,   0,    1,     (void*)&ip->solo_band,       true,  IS_INT);
     param.registerParam("Solo enabled",   "EQ",  0,   1,   0,    1,     (void*)&ip->solo_enabled,    true,  IS_INT);
 
@@ -128,6 +128,7 @@ void Engine::registerParameters() {
    
     param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
 
+    param.registerParam("HF Fade",        "EQ",  0,   1,   0,    1,     (void*)&ip->hf_fade,         true,  IS_INT);
     param.registerParam("Mode",           "EQ",  0,   1,   0,    1,     (void*)&mode,                true,  IS_INT);
 };
 
@@ -184,7 +185,6 @@ void Engine::do_work_mono() {
 
     if (processIR.load(std::memory_order_acquire)) {
         ip->computeIR(s_rate);
-        // implement update biquads from parameters
         updateCascadeFromParams();
         processIR.store(false, std::memory_order_release);
         waitForIR.store(true, std::memory_order_release);
@@ -232,7 +232,7 @@ inline void Engine::process(uint32_t nframes, const float* input,
             tsc.reset();
             conv->reset();
             warmupBlocks = 1;
-            currentMode = pendingMode;  // switch mode now
+            currentMode = pendingMode;
             modeState = ModeState::FadingIn;
         }
     } else if (modeState == ModeState::FadingIn) {
@@ -255,6 +255,13 @@ inline void Engine::process(uint32_t nframes, const float* input,
     } else {
         tsc.setBypass(conv->bypass);
         tsc.processBlock(nframes, output, output1);
+    }
+
+    if (fadeGain < 1.0f) {
+        for (uint32_t i = 0; i < nframes; ++i) {
+            output[i]  *= fadeGain;
+            output1[i] *= fadeGain;
+        }
     }
 
     vu->process(nframes, output, output1, output, output1);

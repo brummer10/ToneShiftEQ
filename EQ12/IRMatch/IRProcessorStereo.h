@@ -36,6 +36,7 @@ public:
     int solo_enabled = 0;
     int lowcut_enabled = 0;
     int highcut_enabled = 0;
+    int hf_fade = 0;
 
     double lowcut = 19.0;
     double highcut = 22000.0;
@@ -145,6 +146,8 @@ public:
 
         auto buildChannel = [this](const Vec& mag, Vec& phaseOut) {
             Vec synthMag = remap_mag_bins(mag, analysisN, synthesisN);
+            if (hf_fade) applyHighFrequencyFade(synthMag, sampleRate);
+
             CVec Hs = spectrum2fft(synthMag);
             CVec Hmin = fp.mps(Hs);
 
@@ -211,6 +214,8 @@ public:
         solo_enabled = e;
     }
 
+    void setHFfade(int f) { hf_fade = f; }
+
 private:
     FFTProcessor fp;
     IREqualiser eq;
@@ -253,6 +258,20 @@ private:
     bool pendingRebuild = false;
     std::condition_variable cv;
     std::mutex cvMutex;
+
+    void applyHighFrequencyFade(Vec& mag, double sr, double startFreq = 20000.0) {
+        size_t n = mag.size();
+        double nyquist = sr * 0.5;
+
+        for (size_t i = 0; i < n; ++i) {
+            double freq = (double)i / (n - 1) * nyquist;
+            if (freq <= startFreq) continue;
+            double t = (freq - startFreq) / (nyquist - startFreq);
+            t = std::clamp(t, 0.0, 1.0);
+            double fade = 0.5 * (1.0 + cos(M_PI * t));
+            mag[i] += 20.0 * log10(std::max(fade,1e-9));
+        }
+    }
 
     static Vec mergeAverage(const Vec& L, const Vec& R) {
         size_t n = std::min(L.size(), R.size());
