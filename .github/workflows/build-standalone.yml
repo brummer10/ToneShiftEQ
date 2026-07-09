@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          make
+          make standalone
 
       - name: List built artifacts
         shell: bash
