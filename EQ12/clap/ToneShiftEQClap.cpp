@@ -441,7 +441,7 @@ static bool toneshifteq_activate(const struct clap_plugin *plugin,
                              uint32_t                  max_frames_count) {
     toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     plug->r->initEngine(sample_rate, 25, 1);
-    plug->r->engine.param.setParam(83,(int)plug->mode);
+    plug->r->engine.param.setParam(84,(int)plug->mode);
     if(!plug->state.empty()) plug->r->readState(plug->state);
     return true;
 }

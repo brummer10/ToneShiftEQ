@@ -115,13 +115,18 @@ ToneShiftEQ relies on a small set of widely available libraries:
 
 ---
 
-## Build
+## Build all flavours
 
     git clone https://github.com/brummer10/ToneShiftEQ.git
     cd ToneShiftEQ
     git submodule init
     git submodule update
-    make
+    make 
+    sudo make install
+
+## Build as Stand-alone application (jackd)
+
+    make standalone
     sudo make install
 
 ## Build as CLAP plugin

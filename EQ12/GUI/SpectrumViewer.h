@@ -359,12 +359,37 @@ public:
         tilt->func.button_release_callback = set;
     }
 
+    void set_controller_mode() {
+        int c_mode = conn->getParameterValue(84);
+        if (c_mode) {
+            show_ph = false;
+            smooth_s = adj_get_value(smooth->adj);
+            dynamic_s = adj_get_value(dynamics->adj);
+            tilt_s =  adj_get_value(tilt->adj);
+            adj_set_value(smooth->adj, 0.0);
+            adj_set_value(dynamics->adj, 0.0);
+            adj_set_value(tilt->adj, 0.0);
+            widget_hide(ph);
+            widget_hide(smooth);
+            widget_hide(dynamics);
+            widget_hide(tilt);
+            widget_hide(hf_fade);
+        } else {
+            adj_set_value(smooth->adj, smooth_s);
+            adj_set_value(dynamics->adj, dynamic_s);
+            adj_set_value(tilt->adj, tilt_s);
+            widget_show(ph);
+            widget_show(smooth);
+            widget_show(dynamics);
+            widget_show(tilt);
+            widget_show(hf_fade);
+        }
+    }
+
     void show() {
         widget_show_all(top);
         raise_control_panel(active_panel);
-        #ifndef CLAPPLUG
         set_controller_mode();
-        #endif
     }
 
     void setSampleRate(const double sr) {
@@ -478,35 +503,6 @@ private:
             self->run = false;
             destroy_widget(self->top, self->top->app);
         }
-    }
-
-    void set_controller_mode() {
-        #ifndef CLAPPLUG
-        int c_mode = conn->getParameterValue(84);
-        if (c_mode) {
-            show_ph = false;
-            smooth_s = adj_get_value(smooth->adj);
-            dynamic_s = adj_get_value(dynamics->adj);
-            tilt_s =  adj_get_value(tilt->adj);
-            adj_set_value(smooth->adj, 0.0);
-            adj_set_value(dynamics->adj, 0.0);
-            adj_set_value(tilt->adj, 0.0);
-            widget_hide(ph);
-            widget_hide(smooth);
-            widget_hide(dynamics);
-            widget_hide(tilt);
-            widget_hide(hf_fade);
-        } else {
-            adj_set_value(smooth->adj, smooth_s);
-            adj_set_value(dynamics->adj, dynamic_s);
-            adj_set_value(tilt->adj, tilt_s);
-            widget_show(ph);
-            widget_show(smooth);
-            widget_show(dynamics);
-            widget_show(tilt);
-            widget_show(hf_fade);
-        }
-        #endif
     }
 
     static void set_mode(void *w_, void* user_data) {
@@ -806,44 +802,42 @@ private:
         self->match_state = 0;
         self->infoString(x1, y1);
         //std::cout << "x " << x1 << " y " << y1 << std::endl;
-        if(xmotion->state & Button1Mask) {
-            if (self->capture_line) {
-                Metrics_t m;
-                os_get_window_metrics(w, &m);
-                const int width  = m.width;
-                const int height = m.height - (80 * w->app->hdpi);
+        if ((self->capture_line && xmotion->state & Button1Mask) || (xmotion->state & Button3Mask)) {
+            Metrics_t m;
+            os_get_window_metrics(w, &m);
+            const int width  = m.width;
+            const int height = m.height - (80 * w->app->hdpi);
 
-                float target_freq = x_to_freq(x1, self->f_min, self->f_max, width);
-                float target_gain = y_to_db(y1, self->db_min, self->db_max, height);
+            float target_freq = x_to_freq(x1, self->f_min, self->f_max, width);
+            float target_gain = y_to_db(y1, self->db_min, self->db_max, height);
 
-                int band = self->find_band_for_freq(target_freq);
+            int band = self->find_band_for_freq(target_freq);
 
-                target_gain = std::clamp(target_gain, -48.0f, 24.0f);
-                adj_set_value(self->fgain[band]->adj, target_gain);
-                self->sendValueChanged(5 + (6 * band), target_gain);
+            target_gain = std::clamp(target_gain, -48.0f, 24.0f);
+            adj_set_value(self->fgain[band]->adj, target_gain);
+            self->sendValueChanged(5 + (6 * band), target_gain);
 
-                self->rebuild_eq_layer = true;
-                expose_widget(self->spec);
+            self->rebuild_eq_layer = true;
+            expose_widget(self->spec);
 
+            self->mx = x1;
+            self->my = y1;
+        } else if(xmotion->state & Button1Mask) {
+            self->match_state = 1;
+            if (self->band_match) {
+                float v = adj_get_value(self->freq[self->match_band]->adj);
+                float deltaX = (float)x1 - self->mx;
+                v *= std::pow(2.0, deltaX * 0.005);
                 self->mx = x1;
-                self->my = y1;
-            } else {
-                self->match_state = 1;
-                if (self->band_match) {
-                    float v = adj_get_value(self->freq[self->match_band]->adj);
-                    float deltaX = (float)x1 - self->mx;
-                    v *= std::pow(2.0, deltaX * 0.005);
-                    self->mx = x1;
-                    adj_set_value(self->freq[self->match_band]->adj, v);
+                adj_set_value(self->freq[self->match_band]->adj, v);
 
-                    float vg = adj_get_value(self->fgain[self->match_band]->adj);
-                    float deltay = (float)y1 - self->my;
-                    vg += deltay * -0.1;
-                    self->my = y1;
-                    if (std::abs(vg) < 0.2) vg = 0.0;
-                    adj_set_value(self->fgain[self->match_band]->adj, vg);
-                    expose_widget(self->spec);
-                }
+                float vg = adj_get_value(self->fgain[self->match_band]->adj);
+                float deltay = (float)y1 - self->my;
+                vg += deltay * -0.1;
+                self->my = y1;
+                if (std::abs(vg) < 0.2) vg = 0.0;
+                adj_set_value(self->fgain[self->match_band]->adj, vg);
+                expose_widget(self->spec);
             }
         } else {
             self->find_hovered_band(x1, y1);
@@ -1339,7 +1333,9 @@ private:
 
         drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
-        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+        widget_set_font_from_ttf(w, LDVAR_FONT(RobotoCondensedRegular_ttf),
+                                    LDLEN_FONT(RobotoCondensedRegular_ttf));
         cairo_set_font_size(cr, 11);
 
     }

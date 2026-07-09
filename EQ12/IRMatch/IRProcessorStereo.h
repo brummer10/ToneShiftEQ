@@ -375,7 +375,7 @@ private:
         //apply_peak(mag_ir, sampleRate, 1000.0, -24.0, 1.0); // Q 0.0 - 5  
         Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
         mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
-        mag_ir = designer.spectral_dynamics(mag_ir, dynamics_amount_, tilt_amount_, sampleRate);
+        mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
         //mag_ir = designer.adaptive_log_smooth(mag_ir, sampleRate * 0.001);
         //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
         //mag_ir = designer.soften_peaks(mag_ir, 0.2);

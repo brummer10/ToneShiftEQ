@@ -59,27 +59,21 @@ public:
         return out;
     }
 
-    static Vec adaptive_log_smooth(const Vec& mag, double sr) {
-        size_t n = mag.size();
-        Vec out(n);
-        Vec ps = build_prefix_sum(mag);
-        const double nyquist = sr * 0.5;
-        const double scale = (n - 1) / nyquist;
-
-        for (size_t i = 1; i < n; ++i) {
-            double freq = (double)i / (n - 1) * nyquist;
-            double oct = getSmoothing(freq);
-            double half = oct * 0.5;
-            double f1 = freq * std::exp2(-half);
-            double f2 = freq * std::exp2(half);
-            size_t i1 = std::max<size_t>(1, (size_t)(f1 * scale));
-            size_t i2 = std::min<size_t>(n - 1, (size_t)(f2 * scale));
-            double sum = range_sum(ps, i1, i2);
-            double count = (double)(i2 - i1 + 1);
-            out[i] = sum / count;
-        }
-
+    Vec adaptive_log_smooth(const Vec& mag, double sr, double sigmaOct = 0.18) {
+        buildSmoothKernel(mag.size(), sr, sigmaOct);
+        Vec out(mag.size());
         out[0] = mag[0];
+
+        for (size_t i = 1; i < mag.size(); ++i) {
+            const SmoothKernel& k = smoothKernel_[i];
+            double sum = 0.0;
+            const double* src = mag.data() + k.first;
+
+            for (size_t j = 0; j < k.weight.size(); ++j)
+                sum += src[j] * k.weight[j];
+
+            out[i] = sum;
+        }
         return out;
     }
 
@@ -97,12 +91,15 @@ public:
         return out;
     }
 
-    static Vec spectral_dynamics(const Vec& mag, double amount, double tilt, double sr) {
-        Vec smooth = adaptive_log_smooth(mag, sr);
+    static Vec spectral_dynamics(const Vec& mag, Vec& smooth, double amount, double tilt, double sr) {
+        //Vec smooth = adaptive_log_smooth(mag, sr);
         Vec out = mag;
         size_t n = mag.size();
         const double nyquist = sr * 0.5;
-        const double max_boost = 12.0;
+        //const double max_boost = 12.0;
+        double lo = *std::min_element(mag.begin(), mag.end());
+        double hi = *std::max_element(mag.begin(), mag.end());
+        const double max_boost = std::max(12.0, (hi - lo) * 0.6);
 
         for (size_t i = 0; i < mag.size(); ++i) {
             double d = mag[i] - smooth[i];
@@ -174,6 +171,61 @@ public:
     }
 
 private:
+
+    struct SmoothKernel {
+        uint16_t first = 0;
+        std::vector<float> weight;
+    };
+
+    std::vector<SmoothKernel> smoothKernel_;
+    size_t kernelBins_ = 0;
+    double kernelSR_ = 0.0;
+    double kernelSigma_ = 0.0;
+
+    void buildSmoothKernel(size_t bins, double sr, double sigmaOct = 0.18) {
+
+        if (kernelBins_ == bins && kernelSR_ == sr && kernelSigma_ == sigmaOct)
+            return;
+
+        kernelBins_ = bins;
+        kernelSR_ = sr;
+        kernelSigma_ = sigmaOct;
+
+        smoothKernel_.clear();
+        smoothKernel_.resize(bins);
+
+        const double nyquist = sr * 0.5;
+        const double radius = 3.0;
+
+        for (size_t i = 1; i < bins; ++i) {
+            double fi = (double)i / (bins - 1) * nyquist;
+            double fMin = fi * std::exp2(-radius * sigmaOct);
+            double fMax = fi * std::exp2( radius * sigmaOct);
+
+            size_t j1 = std::max<size_t>(1, (size_t)(fMin / nyquist * (bins - 1)));
+            size_t j2 = std::min<size_t>(bins - 1, (size_t)(fMax / nyquist * (bins - 1)));
+
+            SmoothKernel& k = smoothKernel_[i];
+
+            k.first = (uint16_t)j1;
+            k.weight.resize(j2 - j1 + 1);
+
+            double norm = 0.0;
+
+            for (size_t j = j1; j <= j2; ++j) {
+                double fj = (double)j / (bins - 1) * nyquist;
+                double d = std::log2(fj / fi);
+                float w = (float)std::exp(-0.5 * d * d / (sigmaOct * sigmaOct));
+                k.weight[j - j1] = w;
+                norm += w;
+            }
+
+            float inv = 1.0f / (float)norm;
+
+            for (float& w : k.weight)
+                w *= inv;
+        }
+    }
 
     static double hermite(double p0, double p1,
                           double m0, double m1,

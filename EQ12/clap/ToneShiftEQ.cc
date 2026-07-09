@@ -85,6 +85,7 @@ public:
         //engine._notify_ui.store(true, std::memory_order_release);
         getEngineValues();
         widget_show_all(sw.top);
+        sw.set_controller_mode();
         firstLoop = true;
     }
     

@@ -204,6 +204,7 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         break;
     case 84:
         copyValuesToGui(sw.mode, value);
+        sw.set_controller_mode();
         break;
     default:
         break;
@@ -325,7 +326,7 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
     self->sw.top->func.expose_callback = self->sw.draw_window;
     #endif
     self->sw.create();
-    widget_show_all(self->sw.top);
+    self->sw.show();
 
     *widget = (LV2UI_Widget)self->sw.top->widget;
 

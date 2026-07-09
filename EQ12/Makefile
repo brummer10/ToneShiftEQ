@@ -109,7 +109,7 @@ endif
 ifeq ($(TARGET), Linux)
 	# set compile flags
 	GUI_LDFLAGS += -I$(HEADER_DIR) -Wl,-Bstatic -L. $(UI_LIB) \
-	-Wl,-Bdynamic `pkg-config --cflags --libs cairo x11` 
+	-Wl,-Bdynamic `pkg-config --cflags --libs cairo x11` $(FT_LIBS)
 
 	CFLAGS += -Wall -funroll-loops `$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags sndfile fftw3 $(BACKEND) `\
 	-ffast-math -fomit-frame-pointer -fstrength-reduce -fdata-sections \
@@ -134,7 +134,7 @@ else ifeq ($(TARGET), Windows)
 
 	GUI_LDFLAGS += -I$(HEADER_DIR) -static-libgcc -static-libstdc++ \
 	`$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags --libs cairo ` \
-	-L. $(UI_LIB) -lm $(PAWPAW_LFLAGS)
+	-L. $(UI_LIB) -lm $(PAWPAW_LFLAGS) $(FT_LIBS)
 
 	CFLAGS := -Wall -fstack-protector -fvisibility=hidden \
 	-fdata-sections -Wl,--gc-sections -Wl,--exclude-libs,ALL \
@@ -152,10 +152,12 @@ endif
 
 	DEPS = $(NAME)_app.d $(NAME)_lv2.d $(NAME)_clap.d $(NAME).d $(NAME)_ui.d
 
-.PHONY : all 
+.PHONY : all clap lv2 standalone
 
 
-all : check $(NAME)
+all : check standalone clap lv2
+
+standalone: $(NAME)
 	$(QUIET)mkdir -p ../bin
 	$(QUIET)cp ./$(NAME)$(EXE) ../bin
 	@if ! [ -f ../bin/$(NAME)$(EXE) ]; then \
