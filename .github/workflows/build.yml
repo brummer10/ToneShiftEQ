@@ -57,3 +57,22 @@ jobs:
           extraargs: lv2
           lto: false
           pawpaw: true
+
+  windows-clap:
+    strategy:
+      matrix:
+        target: [win64]
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    steps:
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          submodules: recursive
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: ${{ matrix.target }}
+          suffix: -clap
+          extraargs: clap
+          lto: false
+          pawpaw: true

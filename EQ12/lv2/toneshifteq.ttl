@@ -33,6 +33,10 @@ idpy:interface a lv2:ExtensionData .
     lv2:minorVersion 4 ;
     lv2:microVersion 0 ;
 
+rdfs:comment """
+ToneShiftEQ is a modern 12-band parametric equalizer featuring both a minimum-phase FFT convolution engine and a zero-latency biquad engine. 
+""";
+
 guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     lv2:port
@@ -1055,6 +1059,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , atom:AtomPort ;
+        <http://lv2plug.in/ns/ext/resize-port#minimumSize> 8192 ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
         lv2:index 91 ;

@@ -11,7 +11,143 @@
 
 #include <vector>
 #include <cmath>
+#include <cstdint>
 #include <algorithm>
+
+/**
+ * Adaptive logarithmic spectrum smoother.
+ *
+ * Applies a Gaussian smoothing kernel with constant width in octaves.
+ *
+ * Intended for spectral curve processing rather than real-time
+ * audio filtering.
+ *
+ * Thread safety:
+ * The internal kernel cache is not synchronized.
+ * One instance should only be accessed from a single thread.
+ */
+ 
+template<typename Vec>
+class AdaptiveLogSmoother {
+public:
+
+    AdaptiveLogSmoother() = default;
+
+    void prepare(size_t bins, double sampleRate, double sigmaOct = 0.18) {
+        buildSmoothKernel(bins, sampleRate, sigmaOct);
+    }
+
+    void process(const Vec& in, Vec& out) {
+        if (out.size() != in.size())
+            out.resize(in.size());
+
+        out[0] = in[0];
+
+        for (size_t i = 1; i < in.size(); ++i) {
+            const SmoothKernel& k = smoothKernel_[i];
+            const auto* src = in.data() + k.first;
+            double sum = 0.0;
+
+            for (size_t j = 0; j < k.weight.size(); ++j)
+                sum += src[j] * k.weight[j];
+
+            out[i] = sum;
+        }
+    }
+
+    Vec process(const Vec& in) {
+        if (smoothBuffer_.size() != in.size())
+            smoothBuffer_.resize(in.size());
+
+        process(in, smoothBuffer_);
+        return smoothBuffer_;
+    }
+
+    void setMaxKernel(size_t taps) {
+        maxKernel_ = std::max<size_t>(3, taps | 1);
+        reset();
+    }
+
+    void reset() {
+        smoothKernel_.clear();
+        kernelBins_ = 0;
+        kernelSR_ = 0.0;
+        kernelSigma_ = 0.0;
+    }
+
+private:
+
+    struct SmoothKernel {
+        uint16_t first = 0;
+        std::vector<float> weight;
+    };
+
+    std::vector<SmoothKernel> smoothKernel_;
+    mutable Vec smoothBuffer_;
+    size_t maxKernel_ = 257;
+    size_t kernelBins_ = 0;
+    double kernelSR_ = 0.0;
+    double kernelSigma_ = 0.0;
+
+    void buildSmoothKernel(size_t bins, double sr, double sigmaOct) {
+        if (kernelBins_ == bins && kernelSR_ == sr && kernelSigma_ == sigmaOct)
+            return;
+
+        kernelBins_ = bins;
+        kernelSR_ = sr;
+        kernelSigma_ = sigmaOct;
+        smoothKernel_.clear();
+        smoothKernel_.resize(bins);
+
+        const double nyquist = sr * 0.5;
+        const double radius = 3.0;
+
+        for (size_t i = 1; i < bins; ++i) {
+            double fi = (double)i / (bins - 1) * nyquist;
+            double fMin = fi * std::exp2(-radius * sigmaOct);
+            double fMax = fi * std::exp2( radius * sigmaOct);
+            size_t j1 = std::max<size_t>(1, (size_t)(fMin / nyquist * (bins - 1)));
+            size_t j2 = std::min<size_t>(bins - 1, (size_t)(fMax / nyquist * (bins - 1)));
+            size_t count = j2 - j1 + 1;
+
+            if (count > maxKernel_) {
+                size_t center = (j1 + j2) / 2;
+                if (center > maxKernel_ / 2)
+                    j1 = center - maxKernel_ / 2;
+                else
+                    j1 = 1;
+
+                j2 = std::min(j1 + maxKernel_ - 1, bins - 1);
+                if (j2 - j1 + 1 < maxKernel_) {
+                    if (j2 + 1 > maxKernel_)
+                        j1 = j2 - maxKernel_ + 1;
+                    else
+                        j1 = 1;
+                }
+            }
+
+            SmoothKernel& k = smoothKernel_[i];
+
+            k.first = static_cast<uint16_t>(j1);
+            k.weight.resize(j2 - j1 + 1);
+
+            const double centerFreq = std::sqrt(fMin * fMax);
+            double norm = 0.0;
+            for (size_t j = j1; j <= j2; ++j) {
+                double fj = (double)j / (bins - 1) * nyquist;
+                double d = std::log2(fj / centerFreq);
+                float w = (float)std::exp(-0.5 * d * d / (sigmaOct * sigmaOct));
+                k.weight[j - j1] = w;
+                norm += w;
+            }
+
+            float inv = 1.0f / (float)norm;
+
+            for (float& w : k.weight)
+                w *= inv;
+        }
+    }
+};
 
 class IRDesigner {
 public:
@@ -60,21 +196,8 @@ public:
     }
 
     Vec adaptive_log_smooth(const Vec& mag, double sr, double sigmaOct = 0.18) {
-        buildSmoothKernel(mag.size(), sr, sigmaOct);
-        Vec out(mag.size());
-        out[0] = mag[0];
-
-        for (size_t i = 1; i < mag.size(); ++i) {
-            const SmoothKernel& k = smoothKernel_[i];
-            double sum = 0.0;
-            const double* src = mag.data() + k.first;
-
-            for (size_t j = 0; j < k.weight.size(); ++j)
-                sum += src[j] * k.weight[j];
-
-            out[i] = sum;
-        }
-        return out;
+        smoother_.prepare(mag.size(), sr);
+        return smoother_.process(mag);
     }
 
     static Vec soften_peaks(const Vec& mag, double amount) {
@@ -171,61 +294,7 @@ public:
     }
 
 private:
-
-    struct SmoothKernel {
-        uint16_t first = 0;
-        std::vector<float> weight;
-    };
-
-    std::vector<SmoothKernel> smoothKernel_;
-    size_t kernelBins_ = 0;
-    double kernelSR_ = 0.0;
-    double kernelSigma_ = 0.0;
-
-    void buildSmoothKernel(size_t bins, double sr, double sigmaOct = 0.18) {
-
-        if (kernelBins_ == bins && kernelSR_ == sr && kernelSigma_ == sigmaOct)
-            return;
-
-        kernelBins_ = bins;
-        kernelSR_ = sr;
-        kernelSigma_ = sigmaOct;
-
-        smoothKernel_.clear();
-        smoothKernel_.resize(bins);
-
-        const double nyquist = sr * 0.5;
-        const double radius = 3.0;
-
-        for (size_t i = 1; i < bins; ++i) {
-            double fi = (double)i / (bins - 1) * nyquist;
-            double fMin = fi * std::exp2(-radius * sigmaOct);
-            double fMax = fi * std::exp2( radius * sigmaOct);
-
-            size_t j1 = std::max<size_t>(1, (size_t)(fMin / nyquist * (bins - 1)));
-            size_t j2 = std::min<size_t>(bins - 1, (size_t)(fMax / nyquist * (bins - 1)));
-
-            SmoothKernel& k = smoothKernel_[i];
-
-            k.first = (uint16_t)j1;
-            k.weight.resize(j2 - j1 + 1);
-
-            double norm = 0.0;
-
-            for (size_t j = j1; j <= j2; ++j) {
-                double fj = (double)j / (bins - 1) * nyquist;
-                double d = std::log2(fj / fi);
-                float w = (float)std::exp(-0.5 * d * d / (sigmaOct * sigmaOct));
-                k.weight[j - j1] = w;
-                norm += w;
-            }
-
-            float inv = 1.0f / (float)norm;
-
-            for (float& w : k.weight)
-                w *= inv;
-        }
-    }
+    AdaptiveLogSmoother<Vec> smoother_;
 
     static double hermite(double p0, double p1,
                           double m0, double m1,

@@ -837,7 +837,7 @@ private:
                 self->my = y1;
                 if (std::abs(vg) < 0.2) vg = 0.0;
                 adj_set_value(self->fgain[self->match_band]->adj, vg);
-                expose_widget(self->spec);
+                //expose_widget(self->spec);
             }
         } else {
             self->find_hovered_band(x1, y1);
@@ -1056,10 +1056,12 @@ private:
             float dy = my - y;
 
             if (dx*dx + dy*dy < 12*12) {
+                if (match_band != i) {
+                    raise_control_panel(i);
+                }
                 band_match = true;
                 match_band = i;
                 rebuild_eq_layer = true;
-                raise_control_panel(match_band);
                 os_expose_widget(spec);
                 return ;
             } else if (band_match) {
@@ -1204,7 +1206,7 @@ private:
                 major ? t.grid_major_r : t.grid_minor_r,
                 major ? t.grid_major_g : t.grid_minor_g,
                 major ? t.grid_major_b : t.grid_minor_b,
-                major ? 0.5 : 0.25
+                major ? 0.5 : 0.4
             );
 
             cairo_set_line_width(cr, major ? 1.5 : 1.0);
@@ -1215,7 +1217,7 @@ private:
         for (double f : minor_freqs) {
             double x = freq_to_x(f, f_min, f_max, width);
             cairo_set_source_rgba(
-                cr, t.grid_minor_r, t.grid_minor_g, t.grid_minor_b, 0.1 );
+                cr, t.grid_minor_r, t.grid_minor_g, t.grid_minor_b, 0.15 );
 
             cairo_set_line_width(cr, 1.0);
             cairo_move_to(cr, x, 0);
@@ -1232,7 +1234,7 @@ private:
                 major ? t.grid_major_r : t.grid_minor_r,
                 major ? t.grid_major_g : t.grid_minor_g,
                 major ? t.grid_major_b : t.grid_minor_b,
-                major ? 0.6 : 0.25
+                major ? 0.6 : 0.4
             );
 
             cairo_set_line_width(cr, major ? 1.5 : 1.0);

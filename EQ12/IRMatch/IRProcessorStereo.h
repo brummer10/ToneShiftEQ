@@ -400,7 +400,7 @@ private:
                 }
             }
         }
-        //designer.smooth_low_end_hermite(mag_ir, sampleRate);
+        designer.smooth_low_end_hermite(mag_ir, sampleRate);
     }
 
     void processChannel(const Vec& reference, const Vec& source, IRChannelData& out, Vec& mag_ir, bool rebuild) {
