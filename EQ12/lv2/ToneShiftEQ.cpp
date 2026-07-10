@@ -291,7 +291,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
 
     // send phase data
     if (pullPhase.load(std::memory_order_acquire)) {
-        const std::vector<float> phaseData = engine.ip->getIRPhase();
+        const std::vector<float>& phaseData = engine.ip->getIRPhase();
         size_t phaseSize = phaseData.size();
         size_t needed = atom_overhead + phaseSize * sizeof(float);
         if (phaseData.data() != nullptr && phaseSize > 0 && forge.size - forge.offset >= needed) {

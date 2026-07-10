@@ -74,8 +74,8 @@ public:
         mag_.clear();
         for (int i = 0; i<bin; i++) {
             mag_.push_back(data[i]);
-            expose_widget(spec);
         }
+        expose_widget(spec);
     }
 
     void setFilter(const float* data, int bin) {
