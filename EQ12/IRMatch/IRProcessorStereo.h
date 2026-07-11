@@ -373,9 +373,18 @@ private:
         }
         
         //apply_peak(mag_ir, sampleRate, 1000.0, -24.0, 1.0); // Q 0.0 - 5  
-        Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
-        mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
-        mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
+        constexpr double eps = 1e-12;
+
+        const bool needSmooth   = std::abs(smooth_amount_)   > eps;
+        const bool needDynamics = std::abs(dynamics_amount_) > eps;
+        const bool needTilt     = std::abs(tilt_amount_)     > eps;
+
+        if (needSmooth || needDynamics || needTilt) {
+            Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
+            if (needSmooth) mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
+            if (needDynamics || needTilt)
+                mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
+        }
         //mag_ir = designer.adaptive_log_smooth(mag_ir, sampleRate * 0.001);
         //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
         //mag_ir = designer.soften_peaks(mag_ir, 0.2);
@@ -400,7 +409,7 @@ private:
                 }
             }
         }
-        designer.smooth_low_end_hermite(mag_ir, sampleRate);
+        //designer.smooth_low_end_hermite(mag_ir, sampleRate);
     }
 
     void processChannel(const Vec& reference, const Vec& source, IRChannelData& out, Vec& mag_ir, bool rebuild) {

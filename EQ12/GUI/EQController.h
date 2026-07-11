@@ -211,7 +211,7 @@ void draw_my_knob(void *w_, void* user_data) {
     knob_x = grow-1;
     knob_y = grow-1;
     /** get values for the knob **/
-    const int iw = width * 0.15;
+    const int iw = width * 0.1;
 
     const int knobx1 = width* 0.5;
 
@@ -293,7 +293,7 @@ static void setFrameColour(Widget_t* w, cairo_t *cr, int x, int y, int wi, int h
    // Colors *c1 = get_color_scheme(w, PRELIGHT_);
     cairo_pattern_t *pat = cairo_pattern_create_linear (x, y, x, y + h);
     cairo_pattern_add_color_stop_rgba
-        (pat, 0, c->bg[0]*2.5, c->bg[1]*2.5, c->bg[2]*2.5,1.0);
+        (pat, 0, c->bg[0]*3.0, c->bg[1]*3.0, c->bg[2]*3.0,1.0);
     cairo_pattern_add_color_stop_rgba 
         (pat, 1, c->bg[0]*2.1, c->bg[1]*2.1, c->bg[2]*2.1,1.0);
     cairo_set_source(cr, pat);
@@ -487,6 +487,107 @@ Widget_t *add_my_enable_button(Widget_t *parent, int x, int y, int width, int he
     fbutton->scale.gravity = ASPECT;
     fbutton->flags |= NO_PROPAGATE;
     fbutton->func.expose_callback = draw_power_button;
+    return fbutton;
+}
+
+void draw_icon_fft(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = size * 0.16;
+    double x0 = x + pad;
+    double x1 = x + size - pad;
+    double y_top = y + pad;
+    double y_bot = y + size - pad;
+
+    cairo_save(cr);
+
+    cairo_set_line_width(cr, size * 0.035);
+    if (state) cairo_set_line_width(cr, size * 0.065);
+    cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.35);
+    cairo_move_to(cr, x0, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_line_to(cr, x1, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58); 
+    cairo_set_line_width(cr, size * 0.09);
+    if (state) cairo_set_line_width(cr, size * 0.15);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    double y_flat = y_top + (y_bot - y_top) * 0.20;
+    double y_low  = y_top + (y_bot - y_top) * 0.85;
+    double x_break = x0 + (x1 - x0) * 0.62;
+
+    cairo_move_to(cr, x0, y_flat);
+    cairo_line_to(cr, x_break, y_flat);
+    cairo_line_to(cr, x_break + (x1 - x0) * 0.06, y_low);
+    cairo_line_to(cr, x1, y_low);
+    cairo_stroke(cr);
+
+    cairo_restore(cr);
+}
+
+void draw_icon_biquad(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = size * 0.16;
+    double x0 = x + pad;
+    double x1 = x + size - pad;
+    double y_top = y + pad;
+    double y_bot = y + size - pad;
+
+    cairo_save(cr);
+
+    cairo_set_line_width(cr, size * 0.035);
+    if (state) cairo_set_line_width(cr, size * 0.065);
+    cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.35);
+    cairo_move_to(cr, x0, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_line_to(cr, x1, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58); 
+    cairo_set_line_width(cr, size * 0.09);
+    if (state) cairo_set_line_width(cr, size * 0.15);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    double y_flat  = y_top + (y_bot - y_top) * 0.20;
+    double y_low   = y_top + (y_bot - y_top) * 0.85;
+
+    cairo_move_to(cr, x0, y_flat);
+    cairo_curve_to(cr, x0 + (x1 - x0) * 0.35, y_flat,
+            x0 + (x1 - x0) * 0.55, y_low, x1, y_low);
+    cairo_stroke(cr);
+
+    cairo_restore(cr);
+}
+
+
+void draw_mode_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    static int last_state = state;
+    if (state) {
+        draw_icon_biquad(w->crb, 0.0, 0.0, height, w->state);
+        tooltip_set_text(w, "Biquad Mode");
+    } else {
+        draw_icon_fft(w->crb, 0.0, 0.0, height, w->state);
+        tooltip_set_text(w, "FFT convolver Mode");
+    }
+    if (last_state != state) {
+        show_tooltip(w);
+        last_state = state;
+    }
+}
+
+Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_mode_button;
     return fbutton;
 }
 

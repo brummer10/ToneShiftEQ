@@ -72,7 +72,7 @@ static bool params_get_info(const clap_plugin_t* plugin, uint32_t param_index, c
     param_info->max_value = def.max;
     uint32_t flags = CLAP_PARAM_IS_AUTOMATABLE;
     if (def.isStepped) flags |= CLAP_PARAM_IS_STEPPED;
-    if ((int)param_index == 83) flags |= CLAP_PARAM_IS_HIDDEN;
+    if ((int)param_index == 84) flags |= CLAP_PARAM_IS_HIDDEN;
     param_info->flags = flags;
     param_info->cookie = nullptr;
     return true;

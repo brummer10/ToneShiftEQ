@@ -44,6 +44,7 @@ public:
     Widget_t* highcut = nullptr;
 
     Widget_t* mode = nullptr;
+    Widget_t* save = nullptr;
 
     Widget_t* hf_fade = nullptr;
     Widget_t* smooth = nullptr;
@@ -315,16 +316,12 @@ public:
         highcut->func.button_release_callback = set;
 
         #ifndef CLAPPLUG
-        mode = add_my_combobox(laframe,"Mode", 190, 25, 90, 20);
+        mode = add_my_mode_button(laframe, width-105, 0, 20, 20);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
-        combobox_add_entry(mode,"FFT");
-        combobox_add_entry(mode,"Biquad");
-        combobox_set_active_entry(mode, 0);
         mode->func.value_changed_callback = set_mode;
-        add_tooltip(mode->childlist->childs[0], "Mode");
         #ifndef LV2PLUG
-        Widget_t* save = add_xsave_file_button(laframe, 190, 65, 90, 20, "Save IR", " ", ".wav|.WAV");
+        save = add_xsave_file_button(laframe, 545, 65, 60, 20, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
         #endif
@@ -374,6 +371,11 @@ public:
             widget_hide(dynamics);
             widget_hide(tilt);
             widget_hide(hf_fade);
+            #ifndef CLAPPLUG
+            #ifndef LV2PLUG
+            widget_hide(save);
+            #endif
+            #endif
         } else {
             adj_set_value(smooth->adj, smooth_s);
             adj_set_value(dynamics->adj, dynamic_s);
@@ -383,6 +385,11 @@ public:
             widget_show(dynamics);
             widget_show(tilt);
             widget_show(hf_fade);
+            #ifndef CLAPPLUG
+            #ifndef LV2PLUG
+            widget_show(save);
+            #endif
+            #endif
         }
     }
 
@@ -595,7 +602,7 @@ private:
             if (i == a) {
                 active_panel = a;
                 widget_show_all(frame[i]);
-                os_raise_widget(frame[i]);
+                //os_raise_widget(frame[i]);
             }
         }
     }
@@ -818,7 +825,7 @@ private:
             self->sendValueChanged(5 + (6 * band), target_gain);
 
             self->rebuild_eq_layer = true;
-            expose_widget(self->spec);
+            //expose_widget(self->spec);
 
             self->mx = x1;
             self->my = y1;
@@ -854,12 +861,12 @@ private:
                     float vq = adj_get_value(self->fq[self->match_band]->adj);
                     vq *= std::pow(2.0, 0.1);
                     adj_set_value(self->fq[self->match_band]->adj,vq);
-                    expose_widget(self->spec);
+                    // expose_widget(self->spec);
                 } else if(xbutton->button == Button5) {
                     float vq = adj_get_value(self->fq[self->match_band]->adj);
                     vq *= std::pow(2.0, -0.1);
                     adj_set_value(self->fq[self->match_band]->adj,vq);
-                    expose_widget(self->spec);
+                    // expose_widget(self->spec);
                 }
             }
         }
@@ -950,6 +957,28 @@ private:
         case 10: r=0.60; g=0.40; b=0.95; break;
         default: r=0.80; g=0.35; b=0.95; break;
         }
+    }
+
+    inline float hermiteLookup(const Vec& v, float index) {
+        int size = static_cast<int>(v.size());
+        int i1 = std::clamp((int)index, 0, size - 1);
+        int i0 = std::max<int>(i1 - 1, 0);
+        int i2 = std::min<int>(i1 + 1, size - 1);
+        int i3 = std::min<int>(i1 + 2, size - 1);
+
+        float t = index - i1;
+        float p0 = v[i0];
+        float p1 = v[i1];
+        float p2 = v[i2];
+        float p3 = v[i3];
+
+        // Catmull-Rom (Hermite)
+        float c0 = p1;
+        float c1 = 0.5f * (p2 - p0);
+        float c2 = p0 - 2.5f*p1 + 2.0f*p2 - 0.5f*p3;
+        float c3 = 0.5f*(p3 - p0) + 1.5f*(p1 - p2);
+
+        return ((c3*t + c2)*t + c1)*t + c0;
     }
 
     static double mapQ(double q_ui) {
@@ -1180,6 +1209,9 @@ private:
             cairo_destroy(cr);
             return;
         }
+        surface_set_font_from_ttf(cr, LDVAR_FONT(RobotoCondensedRegular_ttf),
+                                      LDLEN_FONT(RobotoCondensedRegular_ttf));
+        cairo_set_font_size(cr, 11);
         cairo_set_source_rgb(cr, t.bg_r, t.bg_g, t.bg_b);
         cairo_rectangle(cr, 0, 0, width, height);
         cairo_fill(cr);
@@ -1336,8 +1368,8 @@ private:
         drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
         //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        widget_set_font_from_ttf(w, LDVAR_FONT(RobotoCondensedRegular_ttf),
-                                    LDLEN_FONT(RobotoCondensedRegular_ttf));
+        surface_set_font_from_ttf(cr, LDVAR_FONT(RobotoCondensedRegular_ttf),
+                                      LDLEN_FONT(RobotoCondensedRegular_ttf));
         cairo_set_font_size(cr, 11);
 
     }
@@ -1365,22 +1397,18 @@ private:
 
         bool started = false;
 
-        float last_x = -1.0f;
-        for (int i = 1; i < bins; ++i) {
-            float freq = (float)i * sample_rate / fft_size;
-            if (freq < f_min || freq > f_max) continue;
-
-            float x = freq_to_x(freq, f_min, f_max, width);
-            float y = db_to_y(mags[i], db_min, db_max, height);
-
+        for (int px = 0; px < width; ++px) {
+            float freq = x_to_freq((float)px, f_min, f_max, (float)width);
+            float bin = freq * fft_size / sample_rate;
+            if (bin < 1.0f) continue;
+            if (bin > bins - 3) break;
+            float mag = hermiteLookup(mags, bin);
+            float y = db_to_y(mag, db_min, db_max, height);
             if (!started) {
-                cairo_move_to(cr, 3, y);
+                cairo_move_to(cr, px, y);
                 started = true;
             } else {
-                if (x > last_x + 0.8f) {
-                    cairo_line_to(cr, x, y);
-                    last_x = x;
-                }
+                cairo_line_to(cr, px, y);
             }
         }
         cairo_stroke_preserve(cr);
