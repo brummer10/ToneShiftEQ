@@ -96,6 +96,7 @@ ToneShiftEQ is available as:
 * Stand-alone application
 * CLAP plugin
 * LV2 plugin
+* VST3 plugin
 
 ---
 
@@ -132,6 +133,11 @@ ToneShiftEQ relies on a small set of widely available libraries:
 ## Build as CLAP plugin
 
     make clap
+    make install
+
+## Build as VST3 plugin
+
+    make vst3
     make install
 
 ## Build as LV2 plugin

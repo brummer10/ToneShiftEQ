@@ -3,7 +3,8 @@
 ## Overview
 
 ToneShiftEQ12 is a high-quality stereo parametric equalizer
-implemented as LV2 and CLAP plugins for Linux.
+implemented as Stand-alone and LV2, CLAP and VST3 plugins for Linux,
+and as CLAP and VST3 plugins for Windows
 It provides two interchangeable processing engines:
 a minimum-phase convolution engine and a cascaded biquad filter engine.
 Both engines share the same graphical interface and parameter set
@@ -105,7 +106,7 @@ Additional global controls:
 
 ## Graphical Interface
 
-The GUI is built on a lightweight custom X11 widget toolkit (xputty) with
+The GUI is built on a lightweight custom X11/HWND widget toolkit (libxputty) with
 Cairo for all 2D rendering, without dependency on Qt, GTK or similar
 frameworks.
 
@@ -160,11 +161,11 @@ fractional scaling.
 
 ## Platform and Format
 
-- **OS**: Linux (native X11)
-- **Formats**: LV2, CLAP
+- **OS**: Linux (native X11), Windows (HWND)
+- **Formats**: LV2, CLAP, VST3
 - **Audio**: Stereo in/out, any sample rate
 - **Latency**: 
         FFT mode: 128 samples (host-compensated)
         Biquad mode: 0 samples
-- **Dependencies**: FFTW3, Cairo, X11
+- **Dependencies**: FFTW3, Cairo, X11(Linux only)
 - **License**: BSD-3-Clause / Open Source

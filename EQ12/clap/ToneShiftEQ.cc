@@ -203,7 +203,7 @@ public:
             std::string::size_type point_it = str.find(".");
             std::string temp_str = str;
             if (point_it != std::string::npos)
-                temp_str.replace(point_it, point_it + 1, point);
+                temp_str.replace(point_it, 1, point);
             return std::stod(temp_str);
         } else return std::stod(str);
     }
