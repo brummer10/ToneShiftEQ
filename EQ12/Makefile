@@ -66,9 +66,11 @@ endif
 	VST3_NAME = Toneshifteq
 	VER = 0.5
 
+ifeq (,$(filter vst3,$(MAKECMDGOALS)))
 ifeq (,$(filter clap,$(MAKECMDGOALS)))
 ifeq (,$(filter lv2,$(MAKECMDGOALS)))
 	BACKEND = jack
+endif
 endif
 endif
 
