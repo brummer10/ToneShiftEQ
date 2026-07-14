@@ -106,7 +106,7 @@ static void sync_params_to_plug(const clap_plugin_t *plugin, const clap_event_he
             case CLAP_EVENT_PARAM_VALUE: {
                 const clap_event_param_value_t *ev = (const clap_event_param_value_t *)hdr;
                 plug->r->param->setParam(ev->param_id, ev->value);
-                if (ev->param_id > 0 && ev->param_id < 82) {
+                if (ev->param_id > 0 && ev->param_id < 83) {
                     plug->r->engine.processIR.store(true, std::memory_order_release);
                     plug->r->engine.workToDo.store(true, std::memory_order_release);
                 }

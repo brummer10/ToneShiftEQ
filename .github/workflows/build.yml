@@ -58,6 +58,25 @@ jobs:
           lto: false
           pawpaw: true
 
+  linux-vst3:
+    strategy:
+      matrix:
+        target: [linux-x86_64]
+    runs-on: ubuntu-22.04
+    permissions:
+        contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: distrho/dpf-makefile-action@v1
+        with:
+          target: ${{ matrix.target }}
+          suffix: -vst3
+          extraargs: vst3
+          lto: false
+          pawpaw: true
+
   windows-clap:
     strategy:
       matrix:
@@ -76,7 +95,7 @@ jobs:
           extraargs: clap
           pawpaw: true
 
-  windows-lv2:
+  windows-vst3:
     strategy:
       matrix:
         target: [win64]
@@ -90,6 +109,6 @@ jobs:
       - uses: distrho/dpf-makefile-action@v1
         with:
           target: ${{ matrix.target }}
-          suffix: -lv2
-          extraargs: lv2
+          suffix: -vst3
+          extraargs: vst3
           pawpaw: true

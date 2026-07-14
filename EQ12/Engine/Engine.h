@@ -140,6 +140,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     vu->init(rate);
     ip->computeIR(rate);
     tsc.prepare(rate);
+    updateCascadeFromParams();
     execute.store(false, std::memory_order_release);
 
     xrworker.setThreadName("Worker");
@@ -171,7 +172,7 @@ void Engine::updateCascadeFromParams() {
         } else {
             cfg.type      = typeMap[ip->bands[i].type];
             cfg.frequency = (float)ip->bands[i].freq;
-            cfg.q         = (float)ip->bands[i].Q;
+            cfg.q         = (float)std::clamp(ip->bands[i].Q, defs[i].qMin, 10.0);
             cfg.gainDB    = (float)ip->bands[i].gain;
         }
         tsc.setFilter(i, cfg);

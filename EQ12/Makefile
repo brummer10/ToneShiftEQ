@@ -63,8 +63,8 @@ endif
 
 	# set bundle name
 	NAME = toneshifteq
-	PLUGNAME = toneshifteq
-	VER = 0.1
+	VST3_NAME = Toneshifteq
+	VER = 0.5
 
 ifeq (,$(filter clap,$(MAKECMDGOALS)))
 ifeq (,$(filter lv2,$(MAKECMDGOALS)))
@@ -78,11 +78,13 @@ endif
 	ifeq ($(user),root)
 	LV2_INSTALL_DIR ?= $(PREFIX)/lib/lv2
 	EXE_INSTALL_DIR ?= $(PREFIX)/bin
-	CLAP_INSTAL_DIR ?= $(PREFIX)/lib/clap
+	CLAP_INSTALL_DIR ?= $(PREFIX)/lib/clap
+	VST3_INSTALL_DIR ?= $(PREFIX)/lib/vst3
 	else 
 	LV2_INSTALL_DIR ?= ~/.lv2
 	EXE_INSTALL_DIR ?= ~/bin
-	CLAP_INSTAL_DIR ?= ~/.clap
+	CLAP_INSTALL_DIR ?= ~/.clap
+	VST3_INSTALL_DIR ?= ~/.vst3
 	endif
 
 	SHARE_DIR ?= $(PREFIX)/share
@@ -106,6 +108,12 @@ endif
 	CLAP_INCLUDE := -I./clap/clap/ -I./clap/
 	CLAP_SOURCES := $(CLAP_DIR)ToneShiftEQClap.cpp
 
+	VST3_DIR := ./vst3/
+	VST3_INCLUDE := -I./vst3/travesty -I./vst3/
+	VST3_SOURCES := $(VST3_DIR)ToneShiftEQVST3.cpp
+	ARCH = `echo $(UNAME_S) | tr A-Z a-z`
+	VST3_BUNDLE := $(VST3_NAME).vst3/Contents/$(UNAME_M)-$(ARCH)/
+
 ifeq ($(TARGET), Linux)
 	# set compile flags
 	GUI_LDFLAGS += -I$(HEADER_DIR) -Wl,-Bstatic -L. $(UI_LIB) \
@@ -128,6 +136,7 @@ ifeq ($(TARGET), Linux)
 		CXXFLAGS += -Wno-unused-private-field
 	endif
 else ifeq ($(TARGET), Windows)
+	VST3_BUNDLE := $(VST3_NAME).vst3/Contents/$(UNAME_M)-win/
 
 	LDFLAGS += $(INCLUDES) -I. -shared -lm $(PAWPAW_LFLAGS) -Wl,--gc-sections \
 	-Wl,--exclude-libs,ALL `$(PKGCONFIG) --libs --libs sndfile fftw3 fftw3f`
@@ -150,12 +159,12 @@ endif
 	# invoke build files
 	OBJECTS = main.cpp
 
-	DEPS = $(NAME)_app.d $(NAME)_lv2.d $(NAME)_clap.d $(NAME).d $(NAME)_ui.d
+	DEPS = $(NAME)_app.d $(NAME)_lv2.d $(NAME)_clap.d $(NAME).d $(NAME)_ui.d $(NAME)_vst3.d
 
-.PHONY : all clap lv2 standalone
+.PHONY : all clap lv2 standalone vst3
 
 
-all : check standalone clap lv2
+all : check standalone clap lv2 vst3
 
 standalone: $(NAME)
 	$(QUIET)mkdir -p ../bin
@@ -176,10 +185,22 @@ lv2: $(NAME).$(LIB_EXT) $(NAME)_ui.$(LIB_EXT)
 	$(QUIET)cp $(LV2_DIR)*.ttl ../bin/$(BUNDLE)
 	$(QUIET)$(TTLUPDATE)
 	$(QUIET)$(TTLUPDATEGUI)
-	$(QUIET)cp ./*.$(LIB_EXT) ../bin/$(BUNDLE)
+	$(QUIET)cp ./$(NAME).$(LIB_EXT) ../bin/$(BUNDLE)
+	$(QUIET)cp ./$(NAME)_ui.$(LIB_EXT) ../bin/$(BUNDLE)
 	@if ! [ -f ../bin/$(BUNDLE)/$(NAME).$(LIB_EXT) ]; then \
 		$(R_ECHO) "Sorry, build fail$(reset)"; \
 	fi
+	@$(B_ECHO) "=================== DONE =======================$(reset)"
+
+vst3: $(VST3_NAME)
+	@$(B_ECHO) "Create $(VST3_BUNDLE) $(reset)"
+	$(QUIET)mkdir -p ../bin/
+	$(QUIET)mkdir -p ../bin/$(VST3_BUNDLE)
+ifeq ($(TARGET), Windows)
+	$(QUIET)cp ./$(VST3_NAME).$(LIB_EXT) ../bin/$(VST3_BUNDLE)/$(VST3_NAME).vst3
+else
+	$(QUIET)cp ./$(VST3_NAME).$(LIB_EXT) ../bin/$(VST3_BUNDLE)
+endif
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
 
 debug : all
@@ -217,10 +238,10 @@ ifneq ("$(wildcard ../bin/$(NAME)$(EXE))","")
 else
 	@$(B_ECHO) "$(NAME)$(EXE) Standalone skipped$(reset)"
 endif
-ifneq ("$(wildcard ../bin/$(PLUGNAME).clap)","")
-	@$(B_ECHO) "Install  $(PLUGNAME).clap to $(DESTDIR)$(CLAP_INSTAL_DIR)/$(reset)"
-	$(QUIET)mkdir -p $(DESTDIR)$(CLAP_INSTAL_DIR)/
-	$(QUIET)cp -r ../bin/$(PLUGNAME).clap $(DESTDIR)$(CLAP_INSTAL_DIR)/$(PLUGNAME).clap
+ifneq ("$(wildcard ../bin/$(NAME).clap)","")
+	@$(B_ECHO) "Install  $(NAME).clap to $(DESTDIR)$(CLAP_INSTALL_DIR)/$(reset)"
+	$(QUIET)mkdir -p $(DESTDIR)$(CLAP_INSTALL_DIR)/
+	$(QUIET)cp -r ../bin/$(NAME).clap $(DESTDIR)$(CLAP_INSTALL_DIR)/$(NAME).clap
 	@$(B_ECHO) ". ., done$(reset)"
 else
 	@$(B_ECHO) "$(NAME).clap Clap skipped$(reset)"
@@ -233,11 +254,20 @@ ifneq ("$(wildcard ../bin/$(BUNDLE))","")
 else
 	@$(B_ECHO) "$(BUNDLE) skipped$(reset)"
 endif
+ifneq ("$(wildcard ../bin/$(VST3_NAME).vst3)","")
+	@$(B_ECHO) "Install $(VST3_NAME).vst3 to $(DESTDIR)$(VST3_INSTALL_DIR)/$(reset)"
+	$(QUIET)mkdir -p $(DESTDIR)$(VST3_INSTALL_DIR)/$(VST3_NAME).vst3
+	$(QUIET)cp -r ../bin/$(VST3_NAME).vst3/* $(DESTDIR)$(VST3_INSTALL_DIR)/$(VST3_NAME).vst3
+	@$(B_ECHO) ". ., done$(reset)"
+else
+	@$(B_ECHO) "$(VST3_NAME).vst3 skipped$(reset)"
+endif
 
 uninstall :
 	$(QUIET)rm -rf $(DESTDIR)$(EXE_INSTALL_DIR)/$(NAME)
 	$(QUIET)rm -rf $(DESTDIR)$(LV2_INSTALL_DIR)/$(BUNDLE)
-	$(QUIET)rm -rf $(DESTDIR)$(CLAP_INSTAL_DIR)/$(PLUGNAME).clap
+	$(QUIET)rm -rf $(DESTDIR)$(CLAP_INSTAL_DIR)/$(NAME).clap
+	$(QUIET)rm -rf $(DESTDIR)$(VST3_INSTAL_DIR)/$(VST3_NAME).vst3
 
 $(NAME) : $(OBJECTS)
 	@$(B_ECHO) "Compiling $(NAME) $(reset)"
@@ -266,6 +296,14 @@ $(NAME).$(LIB_EXT): $(LV2_PLUGIN).cpp
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).$(LIB_EXT)
 endif
+
+$(VST3_NAME): $(VST3_SOURCES)
+	@$(B_ECHO) "Compiling $(VST3_NAME).$(LIB_EXT) $(reset)"
+	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_vst3.d $(CXXFLAGS) $(VST3_INCLUDE) $(VST3_SOURCES) -o $(VST3_NAME).$(LIB_EXT)  $(LDFLAGS) $(GUI_LDFLAGS)
+ifeq (,$(filter yes,$(DEBUG)))
+	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(VST3_NAME).$(LIB_EXT)
+endif
+
 
 doc:
 	#pass

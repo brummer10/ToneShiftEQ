@@ -241,6 +241,8 @@ public:
             if (pos == std::string::npos) break;
         }
         param->controllerChanged.store(true, std::memory_order_release);
+        getEngine()->processIR.store(true, std::memory_order_release);
+        getEngine()->workToDo.store(true, std::memory_order_release);
     }
 
     void saveState(std::string *state) {

@@ -38,6 +38,7 @@ public:
         const float sinw = std::sin(omega);
         const float cosw = std::cos(omega);
 
+        if (q < 0.01f) q = 0.01f;
         const float alpha = sinw / (2.0f * q);
 
         float b0 = 0.0,b1 = 0.0,b2 = 0.0,a0 = 0.0,a1 = 0.0,a2 = 0.0;
@@ -201,6 +202,7 @@ public:
             return;
 
         filters[index].setParameters(cfg.type, cfg.frequency, cfg.q, cfg.gainDB);
+        //std::cout << "Fiter " << index << " type " << (int)cfg.type << " freq " << cfg.frequency << " Q " << cfg.q << " Gain " << cfg.gainDB << std::endl;
     }
 
     void setLowCut(float freq, bool enabled) {

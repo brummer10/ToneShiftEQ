@@ -33,6 +33,36 @@ static float freq_to_x(float freq, float f_min, float f_max, int width) {
     return  x_pad + norm * (width - 2.0f * x_pad);
 }
 
+static float x_to_freq(float x, float f_min, float f_max, int width) {
+    const float x_pad = 3.0f;
+    float norm = (x - x_pad) / (width - 2.0f * x_pad);
+    norm = clampf(norm, 0.0f, 1.0f);
+    return f_min * powf(f_max / f_min, norm);
+}
+
+static float hermite_lookup(const float* v, int size, float index) {
+    int i1 = (int)index;
+    float t = index - i1;
+
+    i1 = std::max(0, std::min(i1, size - 1));
+
+    int i0 = std::max(i1 - 1, 0);
+    int i2 = std::min(i1 + 1, size - 1);
+    int i3 = std::min(i1 + 2, size - 1);
+
+    float p0 = v[i0];
+    float p1 = v[i1];
+    float p2 = v[i2];
+    float p3 = v[i3];
+
+    float c0 = p1;
+    float c1 = 0.5f * (p2 - p0);
+    float c2 = p0 - 2.5f * p1 + 2.0f * p2 - 0.5f * p3;
+    float c3 = 0.5f * (p3 - p0) + 1.5f * (p1 - p2);
+
+    return ((c3 * t + c2) * t + c1) * t + c0;
+}
+
 static void draw_inline(Xtoneshifteq *self , cairo_t* cr) {
 
     const std::vector<float> ir = self->getIRMag();
@@ -90,27 +120,22 @@ static void draw_inline(Xtoneshifteq *self , cairo_t* cr) {
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
     int started = 0;
 
-    for (int i = 1; i < bins; ++i) {
-
-        float freq = (float)i * sample_rate / fft_size;
-
-        if (freq < f_min || freq > f_max)
-            continue;
-
-        float x = freq_to_x(freq, f_min, f_max, width);
-        float db = mags[i] ;
-        float y = db_to_y(db, db_min, db_max, height);
+    for (int px = 3; px < width - 3; ++px) {
+        float freq = x_to_freq((float)px, f_min, f_max, width);
+        float bin = freq * fft_size / sample_rate;
+        if (bin < 1.0f) continue;
+        if (bin > bins - 3) break;
+        float db = hermite_lookup(mags, bins, bin);
+        float y  = db_to_y(db, db_min, db_max, height);
 
         if (!started) {
-            float x0 = freq_to_x(f_min, f_min, f_max, width);
-            float db0 = mags[1] ;
-            float y0 = db_to_y(db0, db_min, db_max, height);
-            cairo_move_to(cr, x0, y0);
+            cairo_move_to(cr, px, y);
             started = 1;
         } else {
-            cairo_line_to(cr, x, y);
+            cairo_line_to(cr, px, y);
         }
     }
+
     cairo_stroke_preserve(cr);
     cairo_pattern_destroy(lpat);
 
@@ -132,25 +157,26 @@ static void draw_inline(Xtoneshifteq *self , cairo_t* cr) {
 
     cairo_set_line_width(cr, 1);
     started = 0;
-    const float* ir_ = ir.data();
-    for (int i = 1; i < 4096; ++i) {
+    const float* ir_curve = ir.data();
+    bins = ir.size();
+    fft_size = bins * 2;
 
-        float freq = (float)i * sample_rate / (4096*2);
-
-        if (freq < f_min || freq > f_max)
-            continue;
-
-        float x = freq_to_x(freq, f_min, f_max, width);
-        float db = ir_[i] ;
-        float y = db_to_y(db, db_min, db_max, height);
+    for (int px = 3; px < width - 3; ++px) {
+        float freq = x_to_freq((float)px, f_min, f_max, width);
+        float bin = freq * fft_size / sample_rate;
+        if (bin < 1.0f) continue;
+        if (bin > bins - 3) break;
+        float db = hermite_lookup(ir_curve, bins, bin);
+        float y  = db_to_y(db, db_min, db_max, height);
 
         if (!started) {
-            cairo_move_to(cr, x, y);
-            started = 1;
+            cairo_move_to(cr, px, y);
+            started = true;
         } else {
-            cairo_line_to(cr, x, y);
+            cairo_line_to(cr, px, y);
         }
     }
+
     cairo_stroke(cr);
 
 }
