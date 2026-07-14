@@ -8,6 +8,7 @@
  */
 
 #include "../clap/ToneShiftEQ.cc"
+#include "PluginDescriptor.h"
 
 #include "travesty/factory.h"
 #include "travesty/view.h"
@@ -30,18 +31,6 @@
 
 
 enum PluginMode { MODE_MASTER = 0, MODE_LIVE = 1 };
-
-static constexpr v3_tuid kMasterUID =
-    V3_ID(0xf56bf8c5, 0xf60047ce, 0xa5a7dd43, 0x1717129a);
-static constexpr v3_tuid kLiveUID =
-    V3_ID(0xc1de8249, 0x99ae4365, 0x85a775bc, 0x91ea8d7e);
-
-static const char* const kVendor = "brummer10";
-static const char* const kURL    = "https://github.com/brummer10/ToneShiftEQ";
-static const char* const kEmail  = "mailto:brummer-@web.de";
-
-// hidden internal parameter that stores which engine mode is active,
-static constexpr int kModeParamIndex = 84;
 
 // ---------------------------------------------------------------------------
 // helper
@@ -144,7 +133,7 @@ struct toneshifteq_processor : v3_audio_processor_cpp {
     static v3_result V3_API setup_processing(void* self, v3_process_setup* setup) {
         toneshifteq_processor* const p = *static_cast<toneshifteq_processor**>(self);
         p->plugin->initEngine(static_cast<uint32_t>(setup->sample_rate), 25, 1);
-        p->plugin->param->setParam(kModeParamIndex, static_cast<double>(p->mode));
+        p->plugin->param->setParam( descriptor.hidenParameter, static_cast<double>(p->mode));
 
         return V3_OK;
     }
@@ -451,7 +440,7 @@ struct toneshifteq_controller : v3_edit_controller_cpp {
 
         uint32_t flags = V3_PARAM_CAN_AUTOMATE;
 
-        if (idx == kModeParamIndex) flags |= V3_PARAM_IS_HIDDEN;
+        if (idx ==  descriptor.hidenParameter) flags |= V3_PARAM_IS_HIDDEN;
         if (c->mode == MODE_LIVE) {
             if (idx == 79 || idx == 80 || idx == 81 || idx == 83) {
                 flags |= V3_PARAM_IS_HIDDEN;
@@ -679,10 +668,16 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
         v1.num_classes      = num_classes;
         v1.get_class_info   = get_class_info;
         v1.create_instance  = create_instance;
+
+        v2.get_class_info_2 = get_class_info_2;
+
+        v3.get_class_info_utf16 = get_class_info_utf16;
+        v3.set_host_context     = set_host_context;
     }
 
     static v3_result V3_API query_interface_factory(void* self, const v3_tuid iid, void** iface) {
-        if (v3_tuid_match(iid, v3_funknown_iid) || v3_tuid_match(iid, v3_plugin_factory_iid)) {
+        if (v3_tuid_match(iid, v3_funknown_iid) || v3_tuid_match(iid, v3_plugin_factory_iid) ||
+            v3_tuid_match(iid, v3_plugin_factory_2_iid) || v3_tuid_match(iid, v3_plugin_factory_3_iid)) {
             *iface = self;
 
             return V3_OK;
@@ -697,9 +692,9 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
 
     static v3_result V3_API get_factory_info(void*, v3_factory_info* info) {
         std::memset(info, 0, sizeof(*info));
-        std::snprintf(info->vendor, sizeof(info->vendor), "%s", kVendor);
-        std::snprintf(info->url, sizeof(info->url), "%s", kURL);
-        std::snprintf(info->email, sizeof(info->email), "%s", kEmail);
+        std::snprintf(info->vendor, sizeof(info->vendor), "%s", descriptor.vendor);
+        std::snprintf(info->url, sizeof(info->url), "%s", descriptor.url);
+        std::snprintf(info->email, sizeof(info->email), "%s", descriptor.email);
         info->flags = 0x10;
 
         return V3_OK;
@@ -710,18 +705,52 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
     static v3_result V3_API get_class_info(void*, int32_t idx, v3_class_info* info) {
         if (idx < 0 || idx > 1) return V3_INVALID_ARG;
         std::memset(info, 0, sizeof(*info));
-        std::memcpy(info->class_id, idx == 0 ? kMasterUID : kLiveUID, sizeof(v3_tuid));
+        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
         info->cardinality = 0x7FFFFFFF;
-        std::snprintf(info->category, sizeof(info->category), "Audio Module Class");
-        std::snprintf(info->name, sizeof(info->name), "%s", idx == 0 ? "ToneShift-EQ12M" : "ToneShift-EQ12L");
+        std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
+        std::snprintf(info->name, sizeof(info->name), "%s", idx == 0 ? descriptor.masterName : descriptor.liveName);
 
         return V3_OK;
     }
 
+    static v3_result V3_API get_class_info_2(void*, int32_t idx, v3_class_info_2* info) {
+        if (idx < 0 || idx > 1) return V3_INVALID_ARG;
+        std::memset(info, 0, sizeof(*info));
+        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
+        info->cardinality = 0x7FFFFFFF;
+        std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
+        std::snprintf(info->name, sizeof(info->name), "%s", idx == 0 ? descriptor.masterName : descriptor.liveName);
+        info->class_flags = 0;
+        std::snprintf(info->sub_categories, sizeof(info->sub_categories), "%s", descriptor.subCategories);
+        std::snprintf(info->vendor, sizeof(info->vendor), "%s", descriptor.vendor);
+        std::snprintf(info->version, sizeof(info->version), "%s", descriptor.version);
+        std::snprintf(info->sdk_version, sizeof(info->sdk_version), "%s", descriptor.sdkVersion);
+
+        return V3_OK;
+    }
+
+    static v3_result V3_API get_class_info_utf16(void*, int32_t idx, v3_class_info_3* info) {
+        if (idx < 0 || idx > 1) return V3_INVALID_ARG;
+        std::memset(info, 0, sizeof(*info));
+        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
+        info->cardinality = 0x7FFFFFFF;
+        std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
+        asciiToUtf16(info->name, idx == 0 ? descriptor.masterName : descriptor.liveName, 64);
+        info->class_flags = 0;
+        std::snprintf(info->sub_categories, sizeof(info->sub_categories), "%s", descriptor.subCategories);
+        asciiToUtf16(info->vendor, descriptor.vendor, 64);
+        asciiToUtf16(info->version, descriptor.version, 64);
+        asciiToUtf16(info->sdk_version, descriptor.sdkVersion, 64);
+
+        return V3_OK;
+    }
+
+    static v3_result V3_API set_host_context(void*, v3_funknown**) { return V3_OK; }
+
     static v3_result V3_API create_instance(void*, const v3_tuid class_id, const v3_tuid iid, void** instance) {
         PluginMode mode;
-        if (v3_tuid_match(class_id, kMasterUID)) mode = MODE_MASTER;
-        else if (v3_tuid_match(class_id, kLiveUID)) mode = MODE_LIVE;
+        if (v3_tuid_match(class_id, descriptor.masterUID)) mode = MODE_MASTER;
+        else if (v3_tuid_match(class_id,  descriptor.liveUID)) mode = MODE_LIVE;
         else return V3_NO_INTERFACE;
 
         if (!v3_tuid_match(iid, v3_component_iid) && !v3_tuid_match(iid, v3_funknown_iid))
