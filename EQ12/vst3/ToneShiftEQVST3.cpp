@@ -133,7 +133,7 @@ struct toneshifteq_processor : v3_audio_processor_cpp {
     static v3_result V3_API setup_processing(void* self, v3_process_setup* setup) {
         toneshifteq_processor* const p = *static_cast<toneshifteq_processor**>(self);
         p->plugin->initEngine(static_cast<uint32_t>(setup->sample_rate), 25, 1);
-        p->plugin->param->setParam( descriptor.hidenParameter, static_cast<double>(p->mode));
+        p->plugin->param->setParam( descriptor.hiddenParameter, static_cast<double>(p->mode));
 
         return V3_OK;
     }
@@ -440,7 +440,7 @@ struct toneshifteq_controller : v3_edit_controller_cpp {
 
         uint32_t flags = V3_PARAM_CAN_AUTOMATE;
 
-        if (idx ==  descriptor.hidenParameter) flags |= V3_PARAM_IS_HIDDEN;
+        if (idx ==  descriptor.hiddenParameter) flags |= V3_PARAM_IS_HIDDEN;
         if (c->mode == MODE_LIVE) {
             if (idx == 79 || idx == 80 || idx == 81 || idx == 83) {
                 flags |= V3_PARAM_IS_HIDDEN;

@@ -11,8 +11,6 @@
 
 #include "base.h"
 
-#include <stdlib.h>
-
 struct PluginDescriptor {
 
     const char* vendor;
@@ -31,10 +29,10 @@ struct PluginDescriptor {
     v3_tuid masterUID;
     v3_tuid liveUID;
 
-    int hidenParameter;
+    int hiddenParameter;
 };
 
-static constexpr PluginDescriptor descriptor = {
+inline constexpr PluginDescriptor descriptor = {
 
     .vendor        = "brummer10",
     .url           = "https://github.com/brummer10/ToneShiftEQ",
@@ -52,5 +50,5 @@ static constexpr PluginDescriptor descriptor = {
     .masterUID      = V3_ID(0xf56bf8c5, 0xf60047ce, 0xa5a7dd43, 0x1717129a),
     .liveUID        = V3_ID(0xc1de8249, 0x99ae4365, 0x85a775bc, 0x91ea8d7e),
 
-    .hidenParameter = 84,
+    .hiddenParameter = 84,
 };

@@ -64,15 +64,7 @@ endif
 	# set bundle name
 	NAME = toneshifteq
 	VST3_NAME = Toneshifteq
-	VER = 0.5
-
-ifeq (,$(filter vst3,$(MAKECMDGOALS)))
-ifeq (,$(filter clap,$(MAKECMDGOALS)))
-ifeq (,$(filter lv2,$(MAKECMDGOALS)))
-	BACKEND = jack
-endif
-endif
-endif
+	VER = 0.5.0
 
 	PREFIX ?= /usr
 	# check if user is root
@@ -121,9 +113,11 @@ ifeq ($(TARGET), Linux)
 	GUI_LDFLAGS += -I$(HEADER_DIR) -Wl,-Bstatic -L. $(UI_LIB) \
 	-Wl,-Bdynamic `pkg-config --cflags --libs cairo x11` $(FT_LIBS)
 
-	CFLAGS += -Wall -funroll-loops `$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags sndfile fftw3 $(BACKEND) `\
+	CFLAGS += -Wall -funroll-loops `$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags sndfile fftw3 `\
 	-ffast-math -fomit-frame-pointer -fstrength-reduce -fdata-sections \
 	-pthread $(SSE_CFLAGS)
+
+	S_CFLAGS = `$(PKGCONFIG) $(PKGCONFIG_FLAGS) --cflags jack `
 
 	CXXFLAGS += -MMD -std=c++17 -fno-math-errno -fno-trapping-math -fPIC -D_OS_UNIX_ -DALVER=\"$(VER)\" $(CFLAGS)
 
@@ -132,6 +126,8 @@ ifeq ($(TARGET), Linux)
 	ifneq ($(MACOS)$(WINDOWS),true)
 		LDFLAGS += -lrt -lc
 	endif
+
+	S_LDFLAGS = `$(PKGCONFIG) $(PKGCONFIG_FLAGS) --libs jack `
 
 	ifneq (,$(findstring clang, $(CXX)))
 		CXXFLAGS := $(filter-out -fstrength-reduce,$(CXXFLAGS))
@@ -169,12 +165,14 @@ endif
 all : check standalone clap lv2 vst3
 
 standalone: $(NAME)
+ifneq ($(TARGET), Windows)
 	$(QUIET)mkdir -p ../bin
 	$(QUIET)cp ./$(NAME)$(EXE) ../bin
 	@if ! [ -f ../bin/$(NAME)$(EXE) ]; then \
 		$(R_ECHO) "Sorry, build fail$(reset)"; \
 	fi
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
+endif
 
 clap: $(NAME).clap
 	$(QUIET)mkdir -p ../bin/
@@ -182,6 +180,7 @@ clap: $(NAME).clap
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
 
 lv2: $(NAME).$(LIB_EXT) $(NAME)_ui.$(LIB_EXT)
+ifneq ($(TARGET), Windows)
 	@$(B_ECHO) "Create $(BUNDLE) $(reset)"
 	$(QUIET)mkdir -p ../bin/$(BUNDLE)
 	$(QUIET)cp $(LV2_DIR)*.ttl ../bin/$(BUNDLE)
@@ -193,6 +192,7 @@ lv2: $(NAME).$(LIB_EXT) $(NAME)_ui.$(LIB_EXT)
 		$(R_ECHO) "Sorry, build fail$(reset)"; \
 	fi
 	@$(B_ECHO) "=================== DONE =======================$(reset)"
+endif
 
 vst3: $(VST3_NAME)
 	@$(B_ECHO) "Create $(VST3_BUNDLE) $(reset)"
@@ -272,10 +272,14 @@ uninstall :
 	$(QUIET)rm -rf $(DESTDIR)$(VST3_INSTAL_DIR)/$(VST3_NAME).vst3
 
 $(NAME) : $(OBJECTS)
+ifeq ($(TARGET), Windows)
+	@$(B_ECHO) "Stand-alone not supported under Windows $(reset)"
+else
 	@$(B_ECHO) "Compiling $(NAME) $(reset)"
-	$(QUIET)$(CXX) -MMD -MF $(NAME)_app.d $(CXXFLAGS) $(OBJECTS) -o $(NAME)$(EXE) $(LDFLAGS)
+	$(QUIET)$(CXX) -MMD -MF $(NAME)_app.d $(CXXFLAGS) $(S_CFLAGS) $(OBJECTS) -o $(NAME)$(EXE) $(LDFLAGS) $(S_LDFLAGS)
 ifneq ($(MAKECMDGOALS),debug)
 	$(QUIET)$(STRIP) -s -x -X -R .note.ABI-tag $(NAME)$(EXE)
+endif
 endif
 
 $(NAME).clap: $(CLAP_SOURCES) $(CLAP_DIR)ToneShiftEQ.cc
@@ -286,17 +290,23 @@ ifeq (,$(filter yes,$(DEBUG)))
 endif
 
 $(NAME)_ui.$(LIB_EXT): $(LV2_GUI).cpp $(UI_LIB)
+ifneq ($(TARGET), Windows)
 	@$(B_ECHO) "Compiling $(NAME)_ui.$(LIB_EXT) $(reset)"
 	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_ui.d $(CXXFLAGS) -I./ $(LV2_INCLUDE) $(LV2_GUI).cpp -L. $(UI_LIB) -o $@ $(LDFLAGS) $(GUI_LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME)_ui.$(LIB_EXT)
 endif
+endif
 
 $(NAME).$(LIB_EXT): $(LV2_PLUGIN).cpp
+ifeq ($(TARGET), Windows)
+	@$(B_ECHO) "LV2 not supported under Windows $(reset)"
+else
 	@$(B_ECHO) "Compiling $(NAME).$(LIB_EXT) $(reset)"
 	$(QUIET)$(CXX) -shared -MMD -MF $(NAME)_lv2.d $(CXXFLAGS) $(LV2_INCLUDE) $(LV2_PLUGIN).cpp -o $(NAME).$(LIB_EXT) $(LDFLAGS)
 ifeq (,$(filter yes,$(DEBUG)))
 	$(QUIET)$(STRIP) -s -x -X -R .comment -R .note.ABI-tag $(NAME).$(LIB_EXT)
+endif
 endif
 
 $(VST3_NAME): $(VST3_SOURCES)
