@@ -30,6 +30,8 @@ public:
     virtual float getMeterL() = 0;
     virtual float getMeterR() = 0;
 
+    virtual float getDynamics(int index) = 0;
+
     virtual bool checkNewData() = 0;
     virtual int getBins() = 0;
     virtual const float* getMagnitudes() = 0;

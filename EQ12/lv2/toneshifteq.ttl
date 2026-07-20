@@ -23,14 +23,15 @@ idpy:interface a lv2:ExtensionData .
    foaf:name "brummer" .
 
 <urn:brummer:toneshifteq>
-    a lv2:Plugin ;
+    a lv2:Plugin ,
+       lv2:EQPlugin ;
     doap:name "ToneShift-EQ12" ;
     doap:maintainer <urn:name#me> ;
     lv2:requiredFeature urid:map ;
     lv2:optionalFeature lv2:hardRTCapable ;
     lv2:optionalFeature idpy:queue_draw ;
     lv2:extensionData idpy:interface ;
-    lv2:minorVersion 5 ;
+    lv2:minorVersion 6 ;
     lv2:microVersion 0 ;
 
 rdfs:comment """
@@ -1010,8 +1011,140 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     ] ,
 
     [
-        a lv2:OutputPort , lv2:ControlPort ;
+        a lv2:InputPort , lv2:ControlPort ;
         lv2:index 85 ;
+        lv2:symbol "threshold1" ;
+        lv2:name "Threshold 1" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 86 ;
+        lv2:symbol "threshold2" ;
+        lv2:name "Threshold 2" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 87 ;
+        lv2:symbol "threshold3" ;
+        lv2:name "Threshold 3" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 88 ;
+        lv2:symbol "threshold4" ;
+        lv2:name "Threshold 4" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 89 ;
+        lv2:symbol "threshold5" ;
+        lv2:name "Threshold 5" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 90 ;
+        lv2:symbol "threshold6" ;
+        lv2:name "Threshold 6" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 91 ;
+        lv2:symbol "threshold7" ;
+        lv2:name "Threshold 7" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 92 ;
+        lv2:symbol "threshold8" ;
+        lv2:name "Threshold 8" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 93 ;
+        lv2:symbol "threshold9" ;
+        lv2:name "Threshold 9" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 94 ;
+        lv2:symbol "threshold10" ;
+        lv2:name "Threshold 10" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 95 ;
+        lv2:symbol "threshold11" ;
+        lv2:name "Threshold 11" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 96 ;
+        lv2:symbol "threshold12" ;
+        lv2:name "Threshold 12" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 0 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 97 ;
         lv2:symbol "meter_l" ;
         lv2:name "METER_L" ;
         lv2:default -70.0 ;
@@ -1021,7 +1154,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 86 ;
+        lv2:index 98 ;
         lv2:symbol "meter_r" ;
         lv2:name "METER_R" ;
         lv2:default -70.0 ;
@@ -1031,28 +1164,28 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 87 ;
+        lv2:index 99 ;
         lv2:symbol "in_l" ;
         lv2:name "Input L" ;
     ] ,
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 88 ;
+        lv2:index 100 ;
         lv2:symbol "in_r" ;
         lv2:name "Input R" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 89 ;
+        lv2:index 101 ;
         lv2:symbol "out_l" ;
         lv2:name "Output L" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 90 ;
+        lv2:index 102 ;
         lv2:symbol "out_r" ;
         lv2:name "Output R" ;
     ] ,
@@ -1062,7 +1195,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         <http://lv2plug.in/ns/ext/resize-port#minimumSize> 8192 ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 91 ;
+        lv2:index 103 ;
         lv2:symbol "NOTIFY" ;
         lv2:name "NOTIFY";
     ] ,
@@ -1071,7 +1204,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         a lv2:InputPort , atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 92 ;
+        lv2:index 104 ;
         lv2:symbol "CONTROL" ;
         lv2:name "CONTROL";
     ], 
@@ -1079,7 +1212,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     [
       a lv2:OutputPort,
            lv2:ControlPort ;
-      lv2:index 93 ;
+      lv2:index 105 ;
       lv2:designation <http://lv2plug.in/ns/lv2core#latency>;
       lv2:portProperty lv2:reportsLatency, lv2:integer;
       units:unit units:frame;
@@ -1087,7 +1220,139 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
       lv2:name "Latency" ;
       lv2:minimum 0 ;
       lv2:maximum 192000 ;
-    ]
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 106 ;
+        lv2:symbol "dyn1" ;
+        lv2:name "Dynamics1" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 107 ;
+        lv2:symbol "dyn2" ;
+        lv2:name "Dynamics2" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 108 ;
+        lv2:symbol "dyn3" ;
+        lv2:name "Dynamics3" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 109 ;
+        lv2:symbol "dyn4" ;
+        lv2:name "Dynamics4" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 110 ;
+        lv2:symbol "dyn5" ;
+        lv2:name "Dynamics5" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 111 ;
+        lv2:symbol "dyn6" ;
+        lv2:name "Dynamics6" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 112 ;
+        lv2:symbol "dyn7" ;
+        lv2:name "Dynamics7" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 113 ;
+        lv2:symbol "dyn8" ;
+        lv2:name "Dynamics8" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 114 ;
+        lv2:symbol "dyn9" ;
+        lv2:name "Dynamics9" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 115 ;
+        lv2:symbol "dyn10" ;
+        lv2:name "Dynamics10" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 116 ;
+        lv2:symbol "dyn11" ;
+        lv2:name "Dynamics11" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 117 ;
+        lv2:symbol "dyn12" ;
+        lv2:name "Dynamics12" ;
+        lv2:default -48.0 ;
+        lv2:minimum -0.0 ;
+        lv2:maximum 0.0 ;
+        lv2:portProperty  pprop:notOnGUI ;        
+    ] 
 
     .
 

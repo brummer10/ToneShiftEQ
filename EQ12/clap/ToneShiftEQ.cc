@@ -194,6 +194,10 @@ public:
 
         copyValuesToGui(sw.vug,        (float)param->getParam(82));
         copyValuesToGui(sw.hf_fade,    (float)param->getParam(83));
+
+        for (int i = 0; i< 12; i++) {
+            copyValuesToGui(sw.threshold[i], (float)param->getParam(85 + i));
+        }
     }
 
 

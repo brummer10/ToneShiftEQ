@@ -16,6 +16,7 @@
 #include <atomic>
 #include <utility>
 
+#include "APOReader.h"
 #include "xwidgets.h"
 #include "widgets.cc"
 #include "AudioFile.h"
@@ -39,6 +40,7 @@ public:
     Widget_t* mute[12];
     Widget_t* prev[12];
     Widget_t* next[12];
+    Widget_t* threshold[12];
 
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
@@ -53,6 +55,7 @@ public:
     Widget_t* vug = nullptr;
     Widget_t* vumeterL = nullptr;
     Widget_t* vumeterR = nullptr;
+    Widget_t* apo_loader = nullptr;
     std::atomic<bool> havePreset {false};
 
     SpectrumViewer(IConnector *conn_) {
@@ -109,11 +112,7 @@ public:
         spec_height = 0;
 
         spec = create_widget(&main, top,0, 0, width-80, height);
-        #ifndef _WIN32
-        XSelectInput(spec->app->dpy, spec->widget,StructureNotifyMask|ExposureMask|KeyPressMask 
-                    |EnterWindowMask|LeaveWindowMask|ButtonReleaseMask|KeyReleaseMask
-                    |ButtonPressMask|Button1MotionMask|PointerMotionMask);
-        #endif
+        os_set_input_mask(spec);
 
         spec->parent_struct = this;
         spec->flags |= NO_PROPAGATE;
@@ -169,7 +168,7 @@ public:
 
         int x = 1;
         for (int i = 0; i<12; i++) {
-            frame[i] = add_my_panel(laframe,"", 285, 0, 250, 99);
+            frame[i] = add_my_panel(laframe,"", 275, 0, 270, 99);
             frame[i]->scale.gravity = NORTCENTER;
             double r,g,bcol;
             get_band_color(i, r, g, bcol);
@@ -182,21 +181,21 @@ public:
             prev[i]->parent_struct = this;
             prev[i]->func.value_changed_callback = prev_response;
 
-            solo[i] = add_my_toggle_button(frame[i], 40, 78, 20, 18, "S");
+            solo[i] = add_my_toggle_button(frame[i], 210, 78, 20, 18, "S");
             solo[i]->data = i;
             solo[i]->flags |= IS_RADIO;
             solo[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             solo[i]->parent_struct = this;
             solo[i]->func.value_changed_callback = solo_response;
 
-            mute[i] = add_my_toggle_button(frame[i], 60, 78, 20, 18, "M");
+            mute[i] = add_my_toggle_button(frame[i], 180, 78, 20, 18, "M");
             mute[i]->data = i;
             mute[i]->flags |= IS_RADIO;
             mute[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             mute[i]->parent_struct = this;
             mute[i]->func.value_changed_callback = mute_response;
 
-            ftype[i] = add_type_combobox(frame[i], "Type", 95, 78, 60, 18);
+            ftype[i] = add_type_combobox(frame[i], "Type", 105, 78, 60, 18);
             ftype[i]->data = i;
             ftype[i]->parent_struct = this;
             combobox_add_entry(ftype[i],"Low Shelf");
@@ -211,7 +210,7 @@ public:
             }
             ftype[i]->func.value_changed_callback = set_ftype;
 
-            fenable[i] = add_my_enable_button(frame[i], 178, 78, 20, 20, "");
+            fenable[i] = add_my_enable_button(frame[i], 45, 78, 20, 20, "");
             fenable[i]->data = i;
             fenable[i]->parent_struct = this;
             fenable[i]->func.value_changed_callback = set_fenable;
@@ -221,13 +220,13 @@ public:
 
             set_widget_color(fenable[i], (Color_state)0, (Color_mod)0, r, g, bcol, 1.0);
 
-            next[i] = add_my_button(frame[i], 220, 78, 20, 18, ">");
+            next[i] = add_my_button(frame[i], 240, 78, 20, 18, ">");
             next[i]->data = i;
             next[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             next[i]->parent_struct = this;
             next[i]->func.value_changed_callback = next_response;
 
-            freq[i] = add_eq_knob(frame[i], "FREQ", "Hz", 37,10,52, 68);
+            freq[i] = add_eq_knob(frame[i], "FREQ", "Hz", 37,10,42, 68);
             set_widget_color(freq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             freq[i]->data = i;
             freq[i]->parent_struct = this;
@@ -258,7 +257,7 @@ public:
             else if (i == 11)
                 set_adjustment(freq[i]->adj, 18000.0,18000.0,10000.0,20000.0,    0.01, CL_LOGARITHMIC);            
 
-            fq[i] = add_eq_knob(frame[i], "Q", "", 161,10, 52, 68);
+            fq[i] = add_eq_knob(frame[i], "Q", "", 141,0, 52, 78);
             set_widget_color(fq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             fq[i]->data = i;
             fq[i]->parent_struct = this;
@@ -289,13 +288,21 @@ public:
             else if (i == 11)    // High Shelf
                 set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
 
-            fgain[i] = add_eq_knob(frame[i], "GAIN", "dB", 90,0,70, 78);
+            fgain[i] = add_eq_knob(frame[i], "GAIN", "dB", 80,0,60, 78);
             set_widget_color(fgain[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
             fgain[i]->data = i;
             fgain[i]->parent_struct = this;
             set_adjustment(fgain[i]->adj, 0.0, 0.0, -48.0, 24.0, 0.1, CL_CONTINUOS);
             fgain[i]->func.value_changed_callback = set_fgain;
             fgain[i]->func.button_release_callback = set;
+
+            threshold[i] = add_eq_knob(frame[i], "THRESHOLD", "dB", 184,10,62, 68);
+            set_widget_color(threshold[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
+            threshold[i]->data = i;
+            threshold[i]->parent_struct = this;
+            set_adjustment(threshold[i]->adj, 0.0, 0.0, -46.0, 0.0, 0.1, CL_CONTINUOS);
+            threshold[i]->func.value_changed_callback = set_threshold;
+
             x += 133;
         }
 
@@ -307,7 +314,7 @@ public:
         lowcut->func.value_changed_callback = set_lowcut;
         lowcut->func.button_release_callback = set;
 
-        highcut = add_my_knob(laframe, "HighCut", "Hz", 120,26,60, 70);
+        highcut = add_my_knob(laframe, "HighCut", "Hz", 100,26,60, 70);
         set_adjustment(highcut->adj, 22000.0, 22000.0, 110.0, 22000.0, 0.01, CL_LOGARITHMIC);
         highcut->flags = USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(highcut, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -315,19 +322,29 @@ public:
         highcut->func.value_changed_callback = set_highcut;
         highcut->func.button_release_callback = set;
 
+        apo_loader = add_my_file_button(laframe, 170, 20, 40, 40, "APO", " ", ".txt");
+        apo_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        apo_loader->parent_struct = this;
+        apo_loader->func.user_callback = apo_load_response;
+
+        Widget_t* apo_save = add_ysave_file_button(laframe, 170, 60, 40, 40, "APO", " ", ".txt");
+        apo_save->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        apo_save->parent_struct = this;
+        apo_save->func.user_callback = apo_save_response;
+
         #ifndef CLAPPLUG
         mode = add_my_mode_button(laframe, width-105, 0, 20, 20);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
         #ifndef LV2PLUG
-        save = add_xsave_file_button(laframe, 545, 65, 60, 20, "Save IR", " ", ".wav|.WAV");
+        save = add_xsave_file_button(laframe, 220, 60, 40, 40, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
         #endif
         #endif
 
-        hf_fade = add_my_toggle_button(laframe, 545, 26, 60, 20, "HF Fade");
+        hf_fade = add_my_fade_button(laframe, 220, 20, 40, 40);
         hf_fade->parent_struct = this;
         hf_fade->func.value_changed_callback = set_hf_fade;
 
@@ -457,6 +474,7 @@ private:
     Widget_t* ph = nullptr;
     IConnector* conn = nullptr;
     AudioFile af;
+    APOReader reader;
     Vec ir_; // filter
     Vec phase_; // phase
     Vec mag_; // spectrum
@@ -476,7 +494,9 @@ private:
     cairo_surface_t *eq_layer = nullptr;
     bool rebuild_eq_layer = true;
     bool capture_line = false;
+    bool dynamic_threshold = false;
     std::atomic<bool> set_leak {false};
+    std::string apo_file;
 
     float smooth_s = 0.3f;
     float dynamic_s = 0.0f;
@@ -494,6 +514,57 @@ private:
             std::string ir_file = *(const char**)user_data;
             std::pair<std::vector<double>, std::vector<double> > ir = self->conn->get_ir();        
             self->af.saveAudioFile(ir_file, ir.first, ir.second, self->sampleRate);
+        }
+    }
+
+    // load a APO EQ config file
+    static void apo_load_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if(user_data !=NULL) {
+            self->apo_file = *(const char**)user_data;
+            if (!self->apo_file.empty() ) {
+                if (self->reader.loadFile(self->apo_file)) {
+                    for (int i = 0; i< 12; i++) {
+                        adj_set_value(self->fenable[i]->adj, (float)self->reader.bands()[i].enabled);
+                        adj_set_value(self->ftype[i]->adj,   (float)self->reader.bands()[i].type);
+                        adj_set_value(self->mute[i]->adj,    0.0f);
+                        adj_set_value(self->freq[i]->adj,    (float)self->reader.bands()[i].freq);
+                        adj_set_value(self->fgain[i]->adj,   (float)self->reader.bands()[i].gain);
+                        adj_set_value(self->fq[i]->adj,      (float)self->reader.bands()[i].Q);
+                    }
+
+                    adj_set_value(self->vug->adj,         (float)self->reader.preampDb());
+
+                    adj_set_value(self->lowcut->adj,      (float)self->reader.lowCut().enabled ?
+                                                                 self->reader.lowCut().freqHz : 19.0);
+                    adj_set_value(self->highcut->adj,     (float)self->reader.highCut().enabled ?
+                                                                 self->reader.highCut().freqHz : 22000.0);
+                }
+                //std::cout << self->apo_file << std::endl;
+            }
+        }
+    }
+
+    // save EQ settings as APO EQ config file
+    static void apo_save_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if (user_data != NULL) {
+            self->apo_file = *(const char**)user_data;
+            if (!self->apo_file.empty()) {
+                std::array<Band, 12> bandsOut;
+                for (int i = 0; i < 12; i++) {
+                    bandsOut[i].enabled = (int)adj_get_value(self->fenable[i]->adj);
+                    bandsOut[i].type    = (Band::Type)(int)adj_get_value(self->ftype[i]->adj);
+                    bandsOut[i].freq    = adj_get_value(self->freq[i]->adj);
+                    bandsOut[i].gain    = adj_get_value(self->fgain[i]->adj);
+                    bandsOut[i].Q       = adj_get_value(self->fq[i]->adj);
+                    bandsOut[i].mute    = (int)adj_get_value(self->mute[i]->adj);
+                }
+                self->reader.saveFile(self->apo_file, bandsOut, adj_get_value(self->lowcut->adj),
+                                adj_get_value(self->highcut->adj), adj_get_value(self->vug->adj));
+            }
         }
     }
 
@@ -547,6 +618,9 @@ private:
         XKeyEvent *key = (XKeyEvent*)key_;
         if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
             self->capture_line = false;
+        }
+        if (key->state & ShiftMask) {
+            self->dynamic_threshold = false;
         }
     }
 
@@ -617,7 +691,7 @@ private:
     static void next_response(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        int r = std::min<int>(12, w->data + 1);
+        int r = std::min<int>(11, w->data + 1);
         self->raise_control_panel(r);
     }
 
@@ -666,11 +740,17 @@ private:
         self->sendValueChanged(1 + (6 * w->data), adj_get_value(w->adj));
     }
 
+    static void set_threshold(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(85 + w->data, adj_get_value(w->adj));
+    }
+
     static void set_lowcut(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         float v = adj_get_value(w->adj);
-        if (v > 20.0f) self->sendValueChanged(75, 1.0f);
+        if (v > 20.0f * 1.02f) self->sendValueChanged(75, 1.0f); // 2% reserve
         else  self->sendValueChanged(75, 0.0f);
         self->sendValueChanged(76, v);
     }
@@ -685,7 +765,7 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         float v = adj_get_value(w->adj);
-        if (v < 20000) self->sendValueChanged(77, 1.0f);
+        if (v < 20000.0f * 0.98f) self->sendValueChanged(77, 1.0f); // 2 % reserve
         else  self->sendValueChanged(77, 0.0f);
         self->sendValueChanged(78, v);
     }
@@ -728,6 +808,8 @@ private:
             if(xbutton->button == Button1) {
                 self->mx = xbutton->x;
                 self->my = xbutton->y;
+            } if(xbutton->state & ShiftMask) {
+                self->dynamic_threshold = true;
             }
         }
     }
@@ -832,18 +914,28 @@ private:
         } else if(xmotion->state & Button1Mask) {
             self->match_state = 1;
             if (self->band_match) {
-                float v = adj_get_value(self->freq[self->match_band]->adj);
-                float deltaX = (float)x1 - self->mx;
-                v *= std::pow(2.0, deltaX * 0.005);
-                self->mx = x1;
-                adj_set_value(self->freq[self->match_band]->adj, v);
+                if (self->dynamic_threshold) {
+                    float vg = adj_get_value(self->threshold[self->match_band]->adj);
+                    float deltay = (float)y1 - self->my;
+                    vg += deltay * -0.1;
+                    self->my = y1;
+                    if (std::abs(vg) < 0.2) vg = 0.0;
+                    adj_set_value(self->threshold[self->match_band]->adj, vg);
+                   
+                } else {
+                    float v = adj_get_value(self->freq[self->match_band]->adj);
+                    float deltaX = (float)x1 - self->mx;
+                    v *= std::pow(2.0, deltaX * 0.005);
+                    self->mx = x1;
+                    adj_set_value(self->freq[self->match_band]->adj, v);
 
-                float vg = adj_get_value(self->fgain[self->match_band]->adj);
-                float deltay = (float)y1 - self->my;
-                vg += deltay * -0.1;
-                self->my = y1;
-                if (std::abs(vg) < 0.2) vg = 0.0;
-                adj_set_value(self->fgain[self->match_band]->adj, vg);
+                    float vg = adj_get_value(self->fgain[self->match_band]->adj);
+                    float deltay = (float)y1 - self->my;
+                    vg += deltay * -0.1;
+                    self->my = y1;
+                    if (std::abs(vg) < 0.2) vg = 0.0;
+                    adj_set_value(self->fgain[self->match_band]->adj, vg);
+                }
                 //expose_widget(self->spec);
             }
         } else {
@@ -1008,7 +1100,7 @@ private:
         return std::exp(log_f);
     }
 
-    static double eval_band_db(IConnector* conn, int i, double f, double sr) {
+    static double eval_band_db(IConnector* conn, bool dy, int i, double f, double sr) {
         if (f < 10.0) return 0.0;
         double freq = conn->getParameterValue(i * 6 + 4);
         double gain = conn->getParameterValue(i * 6 + 5);
@@ -1016,22 +1108,24 @@ private:
         int type = conn->getParameterValue(i * 6 + 2);
         double x = std::log2((f + 1e-9) / (freq + 1e-9));
         double Q = mapQ(q);
+        double dyn = 0.0;
+        if (dy) dyn = conn->getDynamics(i);
 
         switch (type) {
             case 0: { // Band::LowShelf
                 double slope = Q * 2.0;
                 double g = 0.5 * (1.0 - std::tanh(slope * x));
-                return gain * g;
+                return (gain + dyn) * g;
             }
             case 1: { // Band::Peak
                 double sigma = 1.0 / (1.5 * Q + 0.5);
                 double g = std::exp(-0.5 * (x * x) / (sigma * sigma));
-                return gain * g;
+                return (gain + dyn) * g;
             }
             case 2: { // Band::HighShelf
                 double slope = Q * 2.0;
                 double g = 0.5 * (1.0 + std::tanh(slope * x));
-                return gain * g;
+                return (gain + dyn) * g;
             }
         }
         return 0.0;
@@ -1103,7 +1197,7 @@ private:
         band_match = false;
     }
 
-    void draw_band_curves(cairo_t* cr, int width, int height) {
+    void draw_band_curves(cairo_t* cr, bool dyn, int width, int height) {
         const int STEPS = width;
         float y0 = db_to_y(0.0, db_min, db_max, height);
 
@@ -1119,7 +1213,7 @@ private:
             cairo_new_path(cr);
             for (int x = 0; x < STEPS; ++x) {
                 double freq = x_to_freq(x, f_min, f_max, width);
-                double db = eval_band_db(conn, i, freq, sampleRate);
+                double db = eval_band_db(conn, dyn, i, freq, sampleRate);
                 double y = db_to_y(db, db_min, db_max, height);
                 if (fabs(y - y0) < 0.5) continue;
 
@@ -1326,7 +1420,7 @@ private:
         cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         draw_band_points(cr, width, height);
-        draw_band_curves(cr, width, height);
+        draw_band_curves(cr, false, width, height);
         if (show_ph) drawSpectrum(cr, phase_, width, height, 1, sample_rate, 0.945, 0.114, 0.192, "",        height-80);
         drawSpectrum(cr, ir_,    width, height, 2.5, sample_rate, 0.545, 0.914, 0.992, "",      height-80);
         cairo_destroy(cr);
@@ -1365,6 +1459,7 @@ private:
         spec_height = height;
         spec_width = width;
 
+        draw_band_curves(cr, true, width, height);
         drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
         //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);

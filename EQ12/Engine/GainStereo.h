@@ -5,7 +5,16 @@
  *
  * Copyright (C) 2026 brummer <brummer@web.de>
  */
-
+ 
+/****************************************************************
+ * @file GainStereo.h
+ * @brief Stereo gain stage with smoothed gain and peak-hold dB metering.
+ *
+ * Applies exponentially smoothed gain (in dB) to a stereo signal while
+ * tracking per-channel peak level with a hold-and-decay envelope,
+ * exposing the result as smoothed L/R meter readings in dB.
+****************************************************************/
+ 
 #pragma once
 
 #include <cmath>

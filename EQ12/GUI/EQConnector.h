@@ -50,6 +50,10 @@ public:
         
     }
 
+    float getDynamics(int index) {
+        return engine->getDynamics(index);
+    }
+
     // those needs to be done by atom ports in LV2
     float getMeterL() override {
         return engine->vu->getMeterL();

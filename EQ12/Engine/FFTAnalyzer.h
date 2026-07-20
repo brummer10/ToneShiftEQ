@@ -7,13 +7,15 @@
  * Copyright (C) 2025 brummer <brummer@web.de>
  */
 
-
 /****************************************************************
-        FFTAnalyzer.h - frequency analysis 
-
+ * @file FFTAnalyzer.h
+ * @brief Real-time FFT-based spectrum analyzer with smoothed magnitude output.
+ *
+ * Windowed (Hann), overlapping FFT analysis via FFTW using a ring-buffer
+ * fifo and hop-size-driven processing. Produces per-bin magnitude in dB
+ * with asymmetric attack/release smoothing, exposed through a lock-free
+ * double-buffered read/write index for safe access from another thread.
 ****************************************************************/
-
-
 
 #pragma once
 

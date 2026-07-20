@@ -572,10 +572,10 @@ void draw_mode_button(void *w_, void* user_data) {
     static int last_state = state;
     if (state) {
         draw_icon_biquad(w->crb, 0.0, 0.0, height, w->state);
-        tooltip_set_text(w, "Biquad Mode");
+        tooltip_set_my_text(w, "Biquad Mode");
     } else {
         draw_icon_fft(w->crb, 0.0, 0.0, height, w->state);
-        tooltip_set_text(w, "FFT convolver Mode");
+        tooltip_set_my_text(w, "FFT convolver Mode");
     }
     if (last_state != state) {
         show_tooltip(w);
@@ -588,6 +588,88 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
     fbutton->scale.gravity = ASPECT;
     fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
     fbutton->func.expose_callback = draw_mode_button;
+    return fbutton;
+}
+
+void draw_hf_fadeout(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double ac = active ? 0.3 : 0.0;
+    double x0 = x + pad;
+    double x1 = x + size - pad;
+    double y_top = y + pad;
+    double y_bot = y + size - pad;
+    double w = x1 - x0;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+
+    cairo_save(cr);
+
+    cairo_set_line_width(cr, size * 0.035 + ac);
+    cairo_set_source_rgba(cr, 0.5 + ac, 0.5 - ac, 0.5 - ac, 0.35);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke(cr);
+
+    // 0 dB reference line
+    cairo_set_line_width(cr, size * 0.04);
+    if (state) cairo_set_line_width(cr, size * 0.05);
+    cairo_move_to(cr, x0, y_top + h * 0.30);
+    cairo_line_to(cr, x1, y_top + h * 0.30);
+    cairo_stroke(cr);
+
+    // response curve: flat pass-band, then rolls off and visually 
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.55, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.55, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    cairo_move_to(cr, x0, y_top + h * 0.30);
+    cairo_line_to(cr, x0 + w * 0.55, y_top + h * 0.30);
+    cairo_curve_to(cr, x0 + w * 0.72, y_top + h * 0.30,
+                        x0 + w * 0.80, y_top + h * 0.55,
+                        x0 + w * 0.90, y_top + h * 0.80);
+    cairo_curve_to(cr, x0 + w * 0.94, y_top + h * 0.92,
+                        x0 + w * 0.97, y_top + h * 0.97,
+                        x1, y_bot);
+    cairo_stroke(cr);
+    cairo_pattern_destroy(pat);
+
+    cairo_restore(cr);
+}
+
+void draw_fade_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    draw_hf_fadeout(w->crb, 0.0, 0.0, height, w->state, state);
+    tooltip_set_my_text(w, "HF Fade out");
+}
+
+Widget_t *add_my_fade_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_fade_button;
     return fbutton;
 }
 

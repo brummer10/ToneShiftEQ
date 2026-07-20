@@ -93,7 +93,8 @@ private:
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
     std::atomic<bool> pullPhase {false};
-    float* par[85]; // engine.param.getParamCount() +1
+    float* par[97]; // engine.param.getParamCount() +1
+    float* dyn[12]; // engine.param.getDynamics()
     float* input0;
     float* input1;
     float* output0;
@@ -173,15 +174,18 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
     surface = nullptr;
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
-    float v = 0;
-    for (int i = 0; i< 85; i++) {
+    float v = 0.0f;
+    for (int i = 0; i< 97; i++) {
         par[i] = &v;
+    }
+    for (int i = 0; i< 12; i++) {
+        dyn[i] = &v;
     }
 }
 
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data) {
-    for (int i = 0; i< 85; i++) {
+    for (int i = 0; i< 97; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -189,35 +193,41 @@ void Xtoneshifteq::connect_(uint32_t port,void* data) {
     }
     switch (port)
     {
-        case 85:
+        case 97:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 86:
+        case 98:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 87:
+        case 99:
             input0 = static_cast<float*>(data);
             break;
-        case 88:
+        case 100:
             input1 = static_cast<float*>(data);
             break;
-        case 89:
+        case 101:
             output0 = static_cast<float*>(data);
             break;
-        case 90:
+        case 102:
             output1 = static_cast<float*>(data);
             break;
-        case 91:
+        case 103:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 92:
+        case 104:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 93:
+        case 105:
             latency = static_cast<float*>(data);
             break;
         default:
             break;
+    }
+    for (int i = 106; i< 118; i++) {
+        if (i == (int)port) {
+            dyn[i-106] = static_cast<float*>(data);
+            return;
+        }
     }
 }
 
@@ -233,6 +243,7 @@ void Xtoneshifteq::deactivate_f() {
     // delete the internal DSP mem
 }
 
+// FIXME getDynamics(int index)
 void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
     if(n_samples<1) return;
     URIs* uris = &this->uris;
@@ -269,6 +280,10 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
     }
 
     engine.process(n_samples, input0, input1, output0, output1);
+
+    for (int i = 0; i< 12; i++) {
+        (*dyn[i]) = engine.getDynamics(i);
+    }
 
     static constexpr size_t atom_overhead = sizeof(LV2_Atom_Object) + sizeof(LV2_Atom_Property_Body)
                                           + sizeof(LV2_Atom_Vector_Body) + 64; 
