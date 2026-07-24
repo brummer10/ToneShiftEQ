@@ -93,7 +93,7 @@ private:
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
     std::atomic<bool> pullPhase {false};
-    float* par[97]; // engine.param.getParamCount() +1
+    float* par[109]; // engine.param.getParamCount() +1
     float* dyn[12]; // engine.param.getDynamics()
     float* input0;
     float* input1;
@@ -175,7 +175,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0.0f;
-    for (int i = 0; i< 97; i++) {
+    for (int i = 0; i< 109; i++) {
         par[i] = &v;
     }
     for (int i = 0; i< 12; i++) {
@@ -185,7 +185,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
 
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data) {
-    for (int i = 0; i< 97; i++) {
+    for (int i = 0; i< 109; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -193,39 +193,39 @@ void Xtoneshifteq::connect_(uint32_t port,void* data) {
     }
     switch (port)
     {
-        case 97:
+        case 109:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 98:
+        case 110:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 99:
+        case 111:
             input0 = static_cast<float*>(data);
             break;
-        case 100:
+        case 112:
             input1 = static_cast<float*>(data);
             break;
-        case 101:
+        case 113:
             output0 = static_cast<float*>(data);
             break;
-        case 102:
+        case 114:
             output1 = static_cast<float*>(data);
             break;
-        case 103:
+        case 115:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 104:
+        case 116:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 105:
+        case 117:
             latency = static_cast<float*>(data);
             break;
         default:
             break;
     }
-    for (int i = 106; i< 118; i++) {
+    for (int i = 118; i< 130; i++) {
         if (i == (int)port) {
-            dyn[i-106] = static_cast<float*>(data);
+            dyn[i-118] = static_cast<float*>(data);
             return;
         }
     }

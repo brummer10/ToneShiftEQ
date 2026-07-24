@@ -6,6 +6,7 @@
 
 **ToneShiftEQ** is a modern 12-band parametric equalizer featuring both
 a minimum-phase FFT convolution engine and a zero-latency biquad engine.
+Each band can also operate as an independent dynamic equalizer with configurable Threshold and Ratio controls.
 It is designed for transparent tone shaping, corrective equalization, mixing and mastering.
 
 ---
@@ -16,6 +17,7 @@ It is designed for transparent tone shaping, corrective equalization, mixing and
 * Independent enable, mute and solo controls per band
 * Adjustable frequency, gain and Q for every band
 * High-pass and low-pass filters
+* APO EQ profile import/export
 * FFT/Biquad Mode switch
 * HF Fade smooth high-frequency roll-off
 * Tone Bias control for broad spectral balancing
@@ -57,6 +59,16 @@ Hold Ctrl and drag the left mouse button across the spectrum display to draw
 a gain curve directly. ToneShiftEQ automatically selects the nearest band
 for each position.
 
+ToneShiftEQ can also import impulse responses by approximating them with its
+internal 12-band parametric EQ, allowing further manual refinement.
+
+Equalizer APO configuration files can be imported and exported for easy
+exchange with other EQ software.
+
+Each EQ band optionally provides dynamic processing with independent
+Threshold and Ratio controls, enabling frequency-selective compression
+directly within the equalizer.
+
 ---
 
 ## Design Goals
@@ -79,10 +91,14 @@ mastering applications, and creative sound design.
 ToneShiftEQ provides two interchangeable processing engines.
 
 The FFT engine generates a minimum-phase impulse response from the current EQ settings
-and processes audio using partitioned FFT convolution.
+and processes audio using partitioned FFT convolution. It also supports importing
+existing impulse responses by approximating them with the internal EQ model.
 
-The Biquad engine implements the same filter configuration as
-a cascade of second-order IIR filters for true zero-latency operation.
+The Biquad engine implements the same filter configuration as a cascade of
+second-order IIR filters for true zero-latency operation.
+
+Dynamic processing is performed independently for each band, allowing
+frequency-selective compression using configurable Threshold and Ratio controls.
 
 Both engines share the same user interface and parameter model,
 allowing instant switching depending on the application.

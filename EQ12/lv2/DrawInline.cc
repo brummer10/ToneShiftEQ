@@ -63,6 +63,24 @@ static float hermite_lookup(const float* v, int size, float index) {
     return ((c3 * t + c2) * t + c1) * t + c0;
 }
 
+static float bspline_lookup(const float* v, int size, float index) {
+    int i1 = (int)index;
+    float t = index - i1;
+    i1 = std::max(0, std::min(i1, size - 1));
+    int i0 = std::max(i1 - 1, 0);
+    int i2 = std::min(i1 + 1, size - 1);
+    int i3 = std::min(i1 + 2, size - 1);
+    float p0 = v[i0], p1 = v[i1], p2 = v[i2], p3 = v[i3];
+
+    float t2 = t * t, t3 = t2 * t;
+    float b0 = (1 - 3*t + 3*t2 - t3) / 6.0f;
+    float b1 = (4 - 6*t2 + 3*t3) / 6.0f;
+    float b2 = (1 + 3*t + 3*t2 - 3*t3) / 6.0f;
+    float b3 = t3 / 6.0f;
+
+    return p0*b0 + p1*b1 + p2*b2 + p3*b3;
+}
+
 static void draw_inline(Xtoneshifteq *self , cairo_t* cr) {
 
     const std::vector<float> ir = self->getIRMag();
@@ -166,7 +184,7 @@ static void draw_inline(Xtoneshifteq *self , cairo_t* cr) {
         float bin = freq * fft_size / sample_rate;
         if (bin < 1.0f) continue;
         if (bin > bins - 3) break;
-        float db = hermite_lookup(ir_curve, bins, bin);
+        float db = bspline_lookup(ir_curve, bins, bin);
         float y  = db_to_y(db, db_min, db_max, height);
 
         if (!started) {

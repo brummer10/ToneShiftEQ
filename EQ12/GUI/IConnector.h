@@ -38,6 +38,7 @@ public:
     virtual void clearAna() = 0;
 
     virtual bool haveData() = 0;
+    virtual const std::vector<double>& getRef(std::vector<double>& l, std::vector<double>& r, double s) = 0;
     virtual const std::vector<float>& getIR() = 0;
     virtual const std::vector<float>& getPhase() = 0;
     virtual const std::pair<std::vector<double>, std::vector<double> > get_ir() = 0;

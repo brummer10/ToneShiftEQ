@@ -26,7 +26,7 @@
 #include "Band.h"
 
 /****************************************************************
-        APOReader - load a APO based EQ config reverence file
+        APOReader - load a APO based EQ config reference file
 ****************************************************************/
 
 

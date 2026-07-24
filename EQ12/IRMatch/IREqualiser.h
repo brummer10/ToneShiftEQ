@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <cmath>
+#include <complex>
 #include <algorithm>
 
 #include "Band.h"
@@ -19,7 +20,7 @@ class IREqualiser {
 public:
     using Vec  = std::vector<double>;
 
-    Vec buildBandSoloIR(const Band& b, const Vec mag_, double sr, bool haveSource) {
+    Vec buildBandSoloIR(const Band& b, const Vec mag_, double sr) {
         size_t n = mag_.size();
         Vec mag(n, -220.0);
 
@@ -50,7 +51,6 @@ public:
                     } else {
                         mask = 0.0;
                     }
-                   // if (haveSource) db += 12.0;
                     break;
                 }
                 case Band::LowShelf:
@@ -59,7 +59,6 @@ public:
                     if (x < -edgeWidth) mask = 1.0;
                     else if (x < edgeWidth) mask = 1.0 - edge_fade(x, edgeWidth);
                     else mask = 0.0;
-                   // if (haveSource) db += 12.0;
                     break;
                 }
                 case Band::HighShelf:
@@ -68,7 +67,6 @@ public:
                     if (x > edgeWidth) mask = 1.0;
                     else if (x > -edgeWidth) mask = edge_fade(x, edgeWidth);
                     else mask = 0.0;
-                   // if (haveSource) db += 12.0;
                     break;
                 }
             }
@@ -225,44 +223,73 @@ public:
         }
     }
 
-    static void apply_low_rolloff(Vec& mag, double sr, double cutoff, int order = 4) {
-        size_t n = mag.size();
-        double nyquist = sr * 0.5;
-        size_t cut = (size_t)(cutoff / nyquist * (n - 1));
-        cut = std::min(cut, n - 1);
-        double anchor = mag[cut];
-        double anchor_lin = db2lin(anchor);
-        const double norm = std::sqrt(2.0);
-
-        for (size_t i = 0; i <= cut; ++i) {
-            double f = (double)i / (n - 1) * nyquist;
-            if (f < 1.0) f = 1.0;
-            double H = 1.0 / std::sqrt(1.0 + std::pow(cutoff / f, 2.0 * order));
-            H *= norm;
-            double out = anchor_lin * H;
-            mag[i] = db(out);
-        }
+    static void apply_high_rolloff(Vec& mag, double sr, double cutoff, double Q = 0.707) {
+        applyRolloff(mag, sr, cutoff, lowPassCoeffs(cutoff, sr, Q), true);
     }
 
-    static void apply_high_rolloff(Vec& mag, double sr, double cutoff, int order = 4) {
-        size_t n = mag.size();
-        double nyquist = sr * 0.5;
-        size_t cut = (size_t)(cutoff / nyquist * (n - 1));
-        cut = std::min(cut, n - 1);
-        double anchor = mag[cut];
-        double anchor_lin = db2lin(anchor);
-        const double norm = std::sqrt(2.0);
-
-        for (size_t i = cut; i < n; ++i) {
-            double f = (double)i / (n - 1) * nyquist;
-            double H = 1.0 / std::sqrt(1.0 + std::pow(f / cutoff, 2.0 * order));
-            H *= norm;
-            double out = anchor_lin * H;
-            mag[i] = db(out);
-        }
+    static void apply_low_rolloff(Vec& mag, double sr, double cutoff, double Q = 0.707) {
+        applyRolloff(mag, sr, cutoff, highPassCoeffs(cutoff, sr, Q), false);
     }
 
 private:
+    struct BiquadCoeffs { double b0, b1, b2, a1, a2; };
+
+    static BiquadCoeffs lowPassCoeffs(double cutoff, double sr, double Q) {
+        double w0 = 2.0 * M_PI * cutoff / sr;
+        double c0 = std::cos(w0), s0 = std::sin(w0);
+        double alpha = s0 / (2.0 * Q);
+        double a0 = 1.0 + alpha;
+        return {
+            (1.0 - c0) * 0.5 / a0,
+            (1.0 - c0)       / a0,
+            (1.0 - c0) * 0.5 / a0,
+            -2.0 * c0        / a0,
+            (1.0 - alpha)    / a0
+        };
+    }
+
+    static BiquadCoeffs highPassCoeffs(double cutoff, double sr, double Q) {
+        double w0 = 2.0 * M_PI * cutoff / sr;
+        double c0 = std::cos(w0), s0 = std::sin(w0);
+        double alpha = s0 / (2.0 * Q);
+        double a0 = 1.0 + alpha;
+        return {
+             (1.0 + c0) * 0.5 / a0,
+            -(1.0 + c0)       / a0,
+             (1.0 + c0) * 0.5 / a0,
+            -2.0 * c0         / a0,
+             (1.0 - alpha)    / a0
+        };
+    }
+
+    static double biquadMagnitude(const BiquadCoeffs& c, double f, double sr) {
+        double w = 2.0 * M_PI * f / sr;
+        std::complex<double> z = std::polar(1.0, -w);
+        std::complex<double> num = c.b0 + c.b1 * z + c.b2 * z * z;
+        std::complex<double> den = 1.0 + c.a1 * z + c.a2 * z * z;
+        return std::abs(num) / std::max(std::abs(den), EPS);
+    }
+
+    static void applyRolloff(Vec& mag, double sr, double cutoff,
+                              const BiquadCoeffs& coeffs, bool aboveCutoff) {
+        const size_t n = mag.size();
+        const double nyquist = sr * 0.5;
+        const size_t cut = std::min<size_t>((size_t)(cutoff / nyquist * (n - 1)), n - 1);
+
+        const double anchorLin = db2lin(mag[cut]);
+        const double h0 = biquadMagnitude(coeffs, cutoff, sr);
+
+        const size_t begin = aboveCutoff ? cut : 0;
+        const size_t end   = aboveCutoff ? n   : cut + 1;
+
+        for (size_t i = begin; i < end; ++i) {
+            double f = (double)i / (n - 1) * nyquist;
+            if (!aboveCutoff && f < 1.0) f = 1.0; // avoid the DC bin, same guard as the original
+            double h = biquadMagnitude(coeffs, f, sr) / h0;
+            mag[i] = db(anchorLin * h);
+        }
+    }
+
     static constexpr double EPS = 1e-12;
 
     static double db(double x) {

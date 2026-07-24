@@ -67,6 +67,7 @@ private:
     uint32_t                        frames = 0;
     int                             mode = 0;
     float                           dynamicThreshold[SmoothDynamicCascade::NumFilters];
+    int                             dynamicRatio[SmoothDynamicCascade::NumFilters];
 
     enum class ModeState { Running, FadingOut, FadingIn };
     ModeState modeState = ModeState::Running;
@@ -96,14 +97,19 @@ inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana
         conv = conv_;
         ana = ana_;
         vu = vu_;
-        registerParameters();
         
         abuffer = new float[8192];
         memset(abuffer, 0, 8192 * sizeof(float));
 
+        for (int i = 0; i< SmoothDynamicCascade::NumFilters; i++) {
+            dynamicThreshold[i] = 0.0;
+            dynamicRatio[i] = 1;
+        }
+
         for (auto& g : dynGainOffset)
             g.store(0.0f, std::memory_order_relaxed);
 
+        registerParameters();
         xrworker.start();
         par.start();
 };
@@ -150,6 +156,10 @@ void Engine::registerParameters() {
     for (int i = 0; i < SmoothDynamicCascade::NumFilters; ++i) {
         param.registerParam("Threshold" + std::to_string(i + 1), "Compressor",-46.0,0.0, 0.0,0.1, (void*)&dynamicThreshold[i],false,  IS_FLOAT);
     }
+
+    for (int i = 0; i < SmoothDynamicCascade::NumFilters; ++i) {
+        param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&dynamicRatio[i],true,  IS_INT);
+    }
    
 
 };
@@ -167,9 +177,6 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     com.prepare((double)rate);
     tsd.prepare((double)rate);
     updateCascadeFromParams();
-    for (int i = 0; i< 12; i++) {
-        dynamicThreshold[i] = 0.0;
-    }
     execute.store(false, std::memory_order_release);
 
     xrworker.start();
@@ -255,7 +262,7 @@ void Engine::do_work_mono() {
 }
 
 inline void Engine::processDynamic() {
-    static constexpr float ratio     = 3.0f;   // 3:1
+    float ratio     = 3.0f;   // 3:1
 
     for (int i = 0; i < Detector::NumFilters; ++i) {
         if (!dynamicActive[i]) {
@@ -265,6 +272,20 @@ inline void Engine::processDynamic() {
         if (dynamicThreshold[i] > -0.1f) continue;
         float levelDB = tsd.getDB(i);
         float gainReductionDB = 0.0f;
+        switch (dynamicRatio[i]) {
+            case 0: ratio = 2.0f;
+            break;
+            case 1: ratio = 3.0f;
+            break;
+            case 2: ratio = 4.0f;
+            break;
+            case 3: ratio = 5.0f;
+            break;
+            case 4: ratio = 10.0f;
+            break;
+            default : ratio = 3.0f;
+            break;
+        }
 
         if (levelDB > dynamicThreshold[i])
             gainReductionDB = (levelDB - dynamicThreshold[i]) * (1.0f - 1.0f / ratio);

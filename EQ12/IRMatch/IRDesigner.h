@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <algorithm>
 
-/**
+/****************************************************************
  * Adaptive logarithmic spectrum smoother.
  *
  * Applies a Gaussian smoothing kernel with constant width in octaves.
@@ -25,7 +25,7 @@
  * Thread safety:
  * The internal kernel cache is not synchronized.
  * One instance should only be accessed from a single thread.
- */
+****************************************************************/
  
 template<typename Vec>
 class AdaptiveLogSmoother {

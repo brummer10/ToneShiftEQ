@@ -14,6 +14,10 @@
 extern "C" {
 #endif
 
+/****************************************************************
+ *    helpers
+****************************************************************/
+
 static void null_call(void *w_, void *user_data) {
     
 }
@@ -31,7 +35,11 @@ void adjust_eq_font_size(cairo_t* cr, double font_size, int available_width, con
     }
 }
 
-// knob
+
+/****************************************************************
+ *    knob helpers
+****************************************************************/
+
 static void show_label(Widget_t *w, int width, int height) {
     //use_text_color_scheme(w, get_color_state(w));
     cairo_set_source_rgba(w->crb, 0.61, 0.649, 0.583, 1.0);
@@ -93,6 +101,10 @@ void setKnobFrame(Widget_t* w, int x, int y, int wi, int h) {
     cairo_set_source(w->crb, pat);
     cairo_pattern_destroy (pat);
 }
+
+/****************************************************************
+ *    knobs
+****************************************************************/
 
 static void draw_eq_knob(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
@@ -286,8 +298,10 @@ Widget_t* add_my_knob(Widget_t *parent, const char * label, const char* type,
     return wid;
 }
 
+/****************************************************************
+ *    panel helpers
+****************************************************************/
 
-// frame
 static void setFrameColour(Widget_t* w, cairo_t *cr, int x, int y, int wi, int h) {
     Colors *c = get_color_scheme(w, NORMAL_);
    // Colors *c1 = get_color_scheme(w, PRELIGHT_);
@@ -308,6 +322,10 @@ static void roundrec(cairo_t *cr, float x, float y, float width, float height, f
     cairo_close_path(cr);
 }
 
+
+/****************************************************************
+ *    frame panel
+****************************************************************/
 
 static void draw_frame(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
@@ -340,6 +358,10 @@ Widget_t* add_my_frame(Widget_t *parent, const char * label,
 }
 
 
+/****************************************************************
+ *    overlay panel
+****************************************************************/
+
 static void draw_z_frame(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     Metrics_t metrics;
@@ -370,7 +392,11 @@ Widget_t* add_my_z_frame(Widget_t *parent, const char * label,
     return wid;
 }
 
-//panel
+
+/****************************************************************
+ *    EQ controller panel
+****************************************************************/
+
 static void setPanelColour(Widget_t* w, cairo_t *cr, int x, int y, int wi, int h) {
     Colors *c = get_color_scheme(w, NORMAL_);
    // Colors *c1 = get_color_scheme(w, PRELIGHT_);
@@ -391,19 +417,12 @@ static void draw_panel(void *w_, void* user_data) {
     int width_t = metrics.width;
     int height_t = metrics.height;
     cairo_set_line_width(w->crb,2);
+
     cairo_move_to(w->crb, 0, height_t);
-
-    cairo_curve_to(w->crb,
-        0, height_t*0.2,
-        width_t*0.15, 1,
-        width_t*0.5, 1);
-
-    cairo_curve_to(w->crb,
-        width_t*0.85, 1,
-        width_t, height_t*0.2,
-        width_t, height_t);
-
+    cairo_curve_to(w->crb, 0, height_t*0.2, width_t*0.15, 1, width_t*0.5, 1);
+    cairo_curve_to(w->crb, width_t*0.85, 1, width_t, height_t*0.2, width_t, height_t);
     cairo_close_path(w->crb);
+
     cairo_set_source_rgba(w->crb, 0.13,0.13,0.15,1.0);
     cairo_fill_preserve(w->crb);
     setPanelColour(w, w->crb, 5, 5, width_t-10, height_t-10);
@@ -423,7 +442,11 @@ Widget_t* add_my_panel(Widget_t *parent, const char * label,
     return wid;
 }
 
-// power button
+
+/****************************************************************
+ *    power button
+****************************************************************/
+
 void draw_power_button(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
@@ -453,7 +476,6 @@ void draw_power_button(void *w_, void* user_data) {
         cr *= off;
         cg *= off;
         cb *= off;
-        
     }
 
     float alpha = 1.0f;
@@ -489,6 +511,68 @@ Widget_t *add_my_enable_button(Widget_t *parent, int x, int y, int width, int he
     fbutton->func.expose_callback = draw_power_button;
     return fbutton;
 }
+
+/****************************************************************
+ *    quit button
+****************************************************************/
+
+void draw_quit_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int width  = metrics.width-2;
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    double ac = state ? 0.5 : 0.0;
+
+    float offset = 0.0f;
+    if (w->state == 2) offset = 1.0f; // pressed
+
+    const float cx = width * 0.6f + offset;
+    const float cy = height * 0.5f + offset;
+    const float r  = (width < height ? width : height) * 0.35f;
+
+    cairo_set_source_rgba(w->crb, 0.91 , 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (w->state) cairo_set_source_rgba(w->crb, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (state) cairo_set_source_rgba(w->crb, 0.15, 0.52, 0.55, 0.96);
+
+    float start_angle = -M_PI * 0.4;
+    float end_angle   =  M_PI * 1.4;
+
+    cairo_arc(w->crb, cx, cy, r, start_angle, end_angle);
+    cairo_set_line_width(w->crb, 2.2);
+    cairo_stroke(w->crb);
+
+    float line_len = r * 0.9f;
+    cairo_move_to(w->crb, cx, cy - line_len);
+    cairo_line_to(w->crb, cx, cy - r * 0.1f);
+    cairo_set_line_width(w->crb, 2.2);
+    cairo_stroke(w->crb);
+
+    if (state) {
+        cairo_arc(w->crb, cx, cy, r , start_angle, end_angle);
+        cairo_set_line_width(w->crb, 3.0);
+        cairo_stroke(w->crb);
+    }
+
+    cairo_new_path(w->crb);
+}
+
+Widget_t *add_my_quit_button(Widget_t *parent, int x, int y, int width, int height, const char *label) {
+    Widget_t *fbutton = add_button(parent, label, x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE;
+    fbutton->func.expose_callback = draw_quit_button;
+    return fbutton;
+}
+
+/****************************************************************
+ *    mode switch (fft/biquad) button
+****************************************************************/
 
 void draw_icon_fft(cairo_t *cr, double x, double y, double size, int state) {
     double pad = size * 0.16;
@@ -558,7 +642,6 @@ void draw_icon_biquad(cairo_t *cr, double x, double y, double size, int state) {
     cairo_restore(cr);
 }
 
-
 void draw_mode_button(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
@@ -591,28 +674,41 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
     return fbutton;
 }
 
+/****************************************************************
+ *    hf fade button
+****************************************************************/
+
 void draw_hf_fadeout(cairo_t *cr, double x, double y, double size, int state, const int active) {
     double pad = state ? size * 0.1 : size * 0.16;
-    double ac = active ? 0.3 : 0.0;
-    double x0 = x + pad;
-    double x1 = x + size - pad;
-    double y_top = y + pad;
-    double y_bot = y + size - pad;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
     double w = x1 - x0;
     double h = y_bot - y_top;
     double r = state ? size * 0.11 : size * 0.09;
 
+
     cairo_save(cr);
 
     cairo_set_line_width(cr, size * 0.035 + ac);
-    cairo_set_source_rgba(cr, 0.5 + ac, 0.5 - ac, 0.5 - ac, 0.35);
+    cairo_set_source_rgba(cr, 0.91 , 0.949 - ac, 0.838 - ac, 0.35 + ac);
     if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
     cairo_new_sub_path(cr);
     cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
     cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
     cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
     cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
     cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
     cairo_stroke(cr);
 
     // 0 dB reference line
@@ -673,7 +769,99 @@ Widget_t *add_my_fade_button(Widget_t *parent, int x, int y, int width, int heig
     return fbutton;
 }
 
-// combo box
+/****************************************************************
+ *    bypass button
+****************************************************************/
+
+void draw_bypass(cairo_t *cr, double x, double y, double size,
+                                int state, const int active) {
+    double pad = state ? size * 0.10 : size * 0.16;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y0 = y + pad + offset;
+    double y1 = y + size - pad - offset;
+    double w = x1 - x0;
+    double h = y1 - y0;
+    double r = state ? size * 0.11 : size * 0.09;
+
+    cairo_save(cr);
+    // frame
+    cairo_set_line_width(cr, size * 0.035);
+    cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y0 + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y1 - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y1 - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y0 + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    double gap = 0.0;
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+        gap = w * 0.12;
+    }
+    cairo_stroke(cr);
+    // Symbol
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    double cy = y0 + h * 0.40;
+    cairo_set_line_width(cr, size * 0.04);
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58);
+    if (state) cairo_set_source_rgb(cr, 0.91, 0.949, 0.883);
+    cairo_move_to(cr, x0, cy);
+    cairo_line_to(cr, x0 + w * 0.43- gap, cy);
+    cairo_move_to(cr, x1 - w * 0.43 + gap, cy);
+    cairo_line_to(cr, x1, cy);
+    cairo_stroke(cr);
+    cy = y0 + h * 0.60;
+    cairo_move_to(cr, x0, cy);
+    cairo_line_to(cr, x0 + w * 0.43- gap, cy);
+    cairo_move_to(cr, x1 - w * 0.43 + gap, cy);
+    cairo_line_to(cr, x1, cy);
+    cairo_stroke(cr);
+
+    cy = y0 + h * 0.50;
+    cairo_set_line_width(cr, size * 0.05);
+    cairo_set_source_rgba(cr, 0.55, 0.55, 0.58, 0.5);
+    if (active) cairo_set_source_rgb(cr, 0.15, 0.52, 0.55);
+    cairo_move_to(cr, x + size * 0.47, cy + size * 0.15);
+    cairo_line_to(cr, x + size * 0.53, cy - size * 0.15);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+}
+
+void draw_bypass_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    draw_bypass(w->crb, 0.0, 0.0, height, w->state, state);
+    tooltip_set_my_text(w, "Bypass");
+}
+
+Widget_t *add_my_bypass_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_bypass_button;
+    return fbutton;
+}
+
+
+/****************************************************************
+ *    combobox
+****************************************************************/
+
 void draw_combobox_button(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
@@ -868,7 +1056,11 @@ Widget_t* add_type_combobox(Widget_t *p,const char * label,
     return w;
 }
 
-// vu meter
+
+/****************************************************************
+ *    vumeter
+****************************************************************/
+
 float log_meter(float db) {
     if (db < -70.0f) db = -70.0f;
     if (db > 6.0f)   db = 6.0f;
@@ -1040,7 +1232,10 @@ Widget_t* add_my_vmeter(Widget_t *parent, const char * label, bool show_scale,
     return wid;
 }
 
-// slider
+/****************************************************************
+ *    slider
+****************************************************************/
+
 void draw_vslider(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     Metrics_t m;
@@ -1133,6 +1328,10 @@ Widget_t* add_my_vslider(Widget_t *parent, const char * label,
     return wid;
 }
 
+
+/****************************************************************
+ *    value display
+****************************************************************/
 
 void draw_my_valuedisplay(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;

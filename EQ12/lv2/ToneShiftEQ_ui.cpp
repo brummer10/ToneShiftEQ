@@ -241,8 +241,10 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
     // Dynamic Band threshold
     if (port >= 85 && port <= 96) {
         copyValuesToGui(sw.threshold[port - 85], value);
-    } else if  (port >= 106 && port <= 117) {
-        conn.dyn[port - 106] = value;
+    } else if  (port >= 97 && port <= 108) {
+        copyValuesToGui(sw.ratio[port - 97], value);
+    } else if  (port >= 118 && port <= 129) {
+        conn.dyn[port - 118] = value;
     }
 }
 
@@ -252,9 +254,9 @@ void XToneShiftEQ_UI::port_event(LV2UI_Handle handle, uint32_t port, uint32_t bu
 
     if (format == 0) {
         const float value = *(const float*)buffer;
-        if (port == 97) {
+        if (port == 109) {
             adj_set_value(self->sw.vumeterL->adj, power2db(self->sw.vumeterL, value));
-        } else if (port == 98) {
+        } else if (port == 110) {
             adj_set_value(self->sw.vumeterR->adj, power2db(self->sw.vumeterR, value));
         } else {
             self->conn.setParValue(port, value);
@@ -351,7 +353,7 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
     LV2_Atom_Forge_Frame frame;
     LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_object(&self->forge, &frame, 0, self->uris.ir_request);
 
-    self->write_function(self->controller, 104, lv2_atom_total_size(msg),
+    self->write_function(self->controller, 116, lv2_atom_total_size(msg),
                        self->uris.atom_eventTransfer, msg);
 }
 

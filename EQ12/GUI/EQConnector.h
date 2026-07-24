@@ -87,6 +87,10 @@ public:
         return false;
     }
 
+    const std::vector<double>& getRef(std::vector<double>& l, std::vector<double>& r, double s) override {
+        return engine->ip->getIR(l, r, s);
+    }
+
     const std::vector<float>& getIR() override {
         return engine->ip->getIRMag();
     }

@@ -16,6 +16,10 @@ extern "C" {
 #endif
 
 
+/****************************************************************
+ *    helpers
+****************************************************************/
+
 char* utf8crop(char* dst, const char* src, size_t sizeDest ) {
     if( sizeDest ){
         size_t sizeSrc = strlen(src);
@@ -68,157 +72,28 @@ void adjust_font_size(cairo_t* cr, double font_size, int available_width, const 
     }
 }
 
-void draw_label(void *w_, void* user_data) {
-    Widget_t *w = (Widget_t*)w_;
-    if (!w) return;
-    Metrics_t metrics;
-    os_get_window_metrics(w, &metrics);
-    if (!metrics.visible) return;
-    int width = metrics.width;
-    int height = metrics.height;
-    char label[124];
-    memset(label, '\0', sizeof(char)*124);
-    utf8crop_middle(label, w->label, 39);
-    cairo_text_extents_t extents_f;
-    widget_set_scale(w);
-    adjust_font_size(w->crb, w->app->normal_font * w->app->hdpi, width, label);
-    cairo_set_source_rgb(w->crb, 0.91, 0.949, 0.883);
-    cairo_text_extents(w->crb, label, &extents_f);
-    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
-    cairo_text_path (w->crb, label);
-    cairo_fill (w->crb);
-    widget_reset_scale(w);
-}    
-
-
-static void my_fdialog_response(void *w_, void* user_data) {
-    Widget_t *w = (Widget_t*)w_;
-    FileButton *filebutton = (FileButton *)w->private_struct;
-    if(user_data !=NULL) {
-        char *tmp = strdup(*(const char**)user_data);
-        free(filebutton->last_path);
-        filebutton->last_path = NULL;
-        filebutton->last_path = strdup(dirname(tmp));
-        filebutton->path = filebutton->last_path;
-        free(tmp);
-    }
-    w->func.user_callback(w,user_data);
-    filebutton->is_active = false;
-    adj_set_value(w->adj,0.0);
-}
-
-static void my_fbutton_callback(void *w_, void* user_data) {
-    Widget_t *w = (Widget_t*)w_;
-    FileButton *filebutton = (FileButton *)w->private_struct;
-    if (w->flags & HAS_POINTER && adj_get_value(w->adj)){
-        filebutton->is_active = true;
-        if (!filebutton->w) {
-            filebutton->w = open_file_dialog(w,filebutton->path,filebutton->filter);
-            filebutton->w->flags |= HIDE_ON_DELETE;
-            widget_set_title(filebutton->w, _("File Selector - Select APO File"));
-#ifdef _OS_UNIX_
-            Atom wmStateAbove = XInternAtom(w->app->dpy, "_NET_WM_STATE_ABOVE", 1 );
-            Atom wmNetWmState = XInternAtom(w->app->dpy, "_NET_WM_STATE", 1 );
-            XChangeProperty(w->app->dpy, filebutton->w->widget, wmNetWmState, XA_ATOM, 32, 
-                PropModeReplace, (unsigned char *) &wmStateAbove, 1); 
-#elif defined _WIN32
-            os_set_transient_for_hint(w, filebutton->w);
-#endif
-        } else {
-            widget_show_all(filebutton->w);
-        }
-    } else if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
-        if(filebutton->is_active)
-            widget_hide(filebutton->w);
-    }
-}
-
-void draw_i_button(void *w_, void* user_data) {
-    Widget_t *w = (Widget_t*)w_;
-    if (!w) return;
-    Metrics_t metrics;
-    os_get_window_metrics(w, &metrics);
-    if (!metrics.visible) return;
-    int width = metrics.width;
-    int height = metrics.height;
-    float offset = 0.0;
-    float g = 0.0;
-    if(w->state==1 && ! (int)w->adj_y->value) {
-        offset = 2.0;
-    } else if(w->state==1) {
-        offset = 3.0;
-    } else if(w->state==2) {
-        offset = 3.0;
-    } else if(w->state==3) {
-        offset = 2.0;
-    }
-    if(w->adj_y->value) g = -0.5;
-    widget_set_scale(w);
-    cairo_text_extents_t extents_f;
-    adjust_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi, width, w->label);
-    cairo_set_source_rgb(w->crb, 0.91, 0.949 + g, 0.883 + g);
-    cairo_text_extents(w->crb, w->label, &extents_f);
-    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
-    cairo_text_path (w->crb, w->label);
-    cairo_fill (w->crb);
-    widget_reset_scale(w);
+static void null_callback(void *w_, void *user_data) {
     
 }
 
-// shared badge + frequency-curve body
-static void draw_apo_body(cairo_t *cr, double x, double y, double size, int state, const int active) {
-    double pad = state ? size * 0.1 : size * 0.16;
-    double ac = active ? 0.3 : 0.0;
-    double x0 = x + pad;
-    double x1 = x + size - pad;
-    double y_top = y + pad;
-    double y_bot = y + size - pad;
-    double w = x1 - x0;
-    double h = y_bot - y_top;
-    double r = state ? size * 0.11 : size * 0.09;
-
-    cairo_set_line_width(cr, size * 0.035);
-    cairo_set_source_rgba(cr, 0.5 + ac, 0.5 - ac, 0.5 - ac, 0.35);
-    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
-    cairo_new_sub_path(cr);
-    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
-    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
-    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
-    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
-    cairo_close_path(cr);
-    cairo_stroke(cr);
-
-    // frequency-curve foreground element
-    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58);
-    cairo_set_line_width(cr, size * 0.04);
-    if (state) cairo_set_source_rgb(cr, 0.91, 0.949, 0.883);
-    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
-    cairo_move_to(cr, x0 + w * 0.050, y_top + h * 0.694);
-    cairo_curve_to(cr, x0 + w * 0.131, y_top + h * 0.694,
-                        x0 + w * 0.131, y_top + h * 0.306,
-                        x0 + w * 0.221, y_top + h * 0.306);
-    cairo_curve_to(cr, x0 + w * 0.303, y_top + h * 0.306,
-                        x0 + w * 0.303, y_top + h * 0.778,
-                        x0 + w * 0.392, y_top + h * 0.778);
-    cairo_curve_to(cr, x0 + w * 0.473, y_top + h * 0.778,
-                        x0 + w * 0.473, y_top + h * 0.194,
-                        x0 + w * 0.555, y_top + h * 0.194);
-    cairo_curve_to(cr, x0 + w * 0.587, y_top + h * 0.194,
-                        x0 + w * 0.608, y_top + h * 0.222,
-                        x0 + w * 0.620, y_top + h * 0.250);
-    cairo_stroke(cr);
+static void dummy_callback(void *w_, void *button, void *user_data) {
+    
 }
 
-// small stem+chevron arrow badge, overlaid at the top-right corner.
+/****************************************************************
+ *    draw direction arrow
+****************************************************************/
+
 // dir_up != 0 -> points up (Load), dir_up == 0 -> points down (Save)
 static void draw_direction_arrow(cairo_t *cr, double x, double y, double size,
                                   int state, const int active, int dir_up) {
     double pad = state ? size * 0.1 : size * 0.16;
-    double x0 = x + pad;
-    double x1 = x + size - pad;
-    double y_top = y + pad + pad;
-    double y_bot = y + size - pad;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
     double w = x1 - x0;
     double h = y_bot - y_top;
 
@@ -241,6 +116,62 @@ static void draw_direction_arrow(cairo_t *cr, double x, double y, double size,
     cairo_move_to(cr, ax - w * 0.13, y_wing);
     cairo_line_to(cr, ax, y_tip);
     cairo_line_to(cr, ax + w * 0.13, y_wing);
+    cairo_stroke(cr);
+}
+
+/****************************************************************
+ *      draw APO buttons
+****************************************************************/
+
+static void draw_apo_body(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double w = x1 - x0;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+
+    cairo_set_line_width(cr, size * 0.035);
+    cairo_set_source_rgba(cr, 0.91 , 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
+    cairo_stroke(cr);
+
+    // frequency-curve foreground element
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58);
+    cairo_set_line_width(cr, size * 0.04);
+    if (state) cairo_set_source_rgb(cr, 0.91, 0.949, 0.883);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+    cairo_move_to(cr, x0 + w * 0.050, y_top + h * 0.694);
+    cairo_curve_to(cr, x0 + w * 0.131, y_top + h * 0.694,
+                        x0 + w * 0.131, y_top + h * 0.306,
+                        x0 + w * 0.221, y_top + h * 0.306);
+    cairo_curve_to(cr, x0 + w * 0.303, y_top + h * 0.306,
+                        x0 + w * 0.303, y_top + h * 0.778,
+                        x0 + w * 0.392, y_top + h * 0.778);
+    cairo_curve_to(cr, x0 + w * 0.473, y_top + h * 0.778,
+                        x0 + w * 0.473, y_top + h * 0.194,
+                        x0 + w * 0.555, y_top + h * 0.194);
+    cairo_curve_to(cr, x0 + w * 0.587, y_top + h * 0.194,
+                        x0 + w * 0.608, y_top + h * 0.222,
+                        x0 + w * 0.620, y_top + h * 0.250);
     cairo_stroke(cr);
 }
 
@@ -286,52 +217,19 @@ void draw_apo_save_button(void *w_, void* user_data) {
     tooltip_set_my_text(w, "Save as APO EQ config file");
 }
 
-static void my_fbutton_mem_free(void *w_, void* user_data) {
-    Widget_t *w = (Widget_t*)w_;
-    FileButton *filebutton = (FileButton *)w->private_struct;
-    free(filebutton->last_path);
-    filebutton->last_path = NULL;
-    free(filebutton);
-    filebutton = NULL;
-}
+/****************************************************************
+ *      draw IR buttons
+****************************************************************/
 
-Widget_t *add_my_file_button(Widget_t *parent, int x, int y, int width, int height,
-                           const char* label, const char *path, const char *filter) {
-    FileButton *filebutton = (FileButton*)malloc(sizeof(FileButton));
-    filebutton->path = path;
-    filebutton->filter = filter;
-    filebutton->last_path = NULL;
-    filebutton->w = NULL;
-    filebutton->is_active = false;
-    Widget_t *fbutton = add_toggle_button(parent, label, x, y, width, height);
-    fbutton->private_struct = filebutton;
-    fbutton->flags |= HAS_MEM;
-    fbutton->scale.gravity = ASPECT;
-    fbutton->func.mem_free_callback = my_fbutton_mem_free;
-    fbutton->func.value_changed_callback = my_fbutton_callback;
-    fbutton->func.dialog_callback = my_fdialog_response;
-    fbutton->func.expose_callback = draw_apo_load_button;
-    return fbutton;
-}
-
-Widget_t* add_my_label(Widget_t *parent, const char * label,
-                        int x, int y, int width, int height) {
-
-    Widget_t *wid = create_widget(parent->app, parent, x, y, width, height);
-    wid->label = label;
-    wid->scale.gravity = ASPECT;
-    wid->func.expose_callback = draw_label;
-    return wid;
-}
-
-
-void draw_ir_load(cairo_t *cr, double x, double y, double size, int state, const int active) {
+void draw_ir(cairo_t *cr, double x, double y, double size, int state, const int active) {
     double pad = state ? size * 0.1 : size * 0.16;
-    double ac = active ? 0.3 : 0.0;
-    double x0 = x + pad;
-    double x1 = x + size - pad;
-    double y_top = y + pad;
-    double y_bot = y + size - pad;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
     double w = x1 - x0;
     double h = y_bot - y_top;
     double r = state ? size * 0.11 : size * 0.09;
@@ -339,14 +237,20 @@ void draw_ir_load(cairo_t *cr, double x, double y, double size, int state, const
     cairo_save(cr);
 
     cairo_set_line_width(cr, size * 0.035);
-    cairo_set_source_rgba(cr, 0.5 + ac, 0.5 - ac, 0.5- ac, 0.35);
+    cairo_set_source_rgba(cr, 0.91 , 0.949 - ac, 0.838 - ac, 0.35 + ac);
     if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
     cairo_new_sub_path(cr);
     cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
     cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
     cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
     cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
     cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
     cairo_stroke(cr);
 
     // save-tray line (background element)
@@ -376,7 +280,7 @@ void draw_ir_load(cairo_t *cr, double x, double y, double size, int state, const
     cairo_restore(cr);
 }
 
-void draw_ir_button(void *w_, void* user_data) {
+void draw_ir_save_button(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
 
@@ -386,10 +290,125 @@ void draw_ir_button(void *w_, void* user_data) {
 
     const int height = metrics.height;
     const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
-    draw_ir_load(w->crb, 0.0, 0.0, height, w->state, state);
-    draw_direction_arrow(w->crb, 0.0, 0.0, height, w->state, state, /*dir_up=*/0);
+    draw_ir(w->crb, 0.0, 0.0, height, w->state, state);
+    draw_direction_arrow(w->crb, 0.0, 0.0, height, w->state, state, 0);
     tooltip_set_my_text(w, "Save as IR file");
 }
+
+void draw_ir_load_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    draw_ir(w->crb, 0.0, 0.0, height, w->state, state);
+    draw_direction_arrow(w->crb, 0.0, 0.0, height, w->state, state, 1);
+    tooltip_set_my_text(w, "Load IR file");
+}
+
+/****************************************************************
+ *      file load button 
+****************************************************************/
+
+static void my_fdialog_response(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    FileButton *filebutton = (FileButton *)w->private_struct;
+    if(user_data !=NULL) {
+        char *tmp = strdup(*(const char**)user_data);
+        free(filebutton->last_path);
+        filebutton->last_path = NULL;
+        filebutton->last_path = strdup(dirname(tmp));
+        filebutton->path = filebutton->last_path;
+        free(tmp);
+    }
+    w->func.user_callback(w,user_data);
+    filebutton->is_active = false;
+    adj_set_value(w->adj,0.0);
+}
+
+static void my_fbutton_callback(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    FileButton *filebutton = (FileButton *)w->private_struct;
+    if (w->flags & HAS_POINTER && adj_get_value(w->adj)){
+        filebutton->is_active = true;
+        if (!filebutton->w) {
+            filebutton->w = open_file_dialog(w,filebutton->path,filebutton->filter);
+            filebutton->w->flags |= HIDE_ON_DELETE;
+            widget_set_title(filebutton->w, w->label);
+#ifdef _OS_UNIX_
+            Atom wmStateAbove = XInternAtom(w->app->dpy, "_NET_WM_STATE_ABOVE", 1 );
+            Atom wmNetWmState = XInternAtom(w->app->dpy, "_NET_WM_STATE", 1 );
+            XChangeProperty(w->app->dpy, filebutton->w->widget, wmNetWmState, XA_ATOM, 32, 
+                PropModeReplace, (unsigned char *) &wmStateAbove, 1); 
+#elif defined _WIN32
+            os_set_transient_for_hint(w, filebutton->w);
+#endif
+        } else {
+            widget_show_all(filebutton->w);
+        }
+    } else if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
+        if(filebutton->is_active)
+            widget_hide(filebutton->w);
+    }
+}
+
+static void my_fbutton_mem_free(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    FileButton *filebutton = (FileButton *)w->private_struct;
+    free(filebutton->last_path);
+    filebutton->last_path = NULL;
+    free(filebutton);
+    filebutton = NULL;
+}
+
+Widget_t *add_my_file_button(Widget_t *parent, int x, int y, int width, int height,
+                           const char* label, const char *path, const char *filter) {
+    FileButton *filebutton = (FileButton*)malloc(sizeof(FileButton));
+    filebutton->path = path;
+    filebutton->filter = filter;
+    filebutton->last_path = NULL;
+    filebutton->w = NULL;
+    filebutton->is_active = false;
+    Widget_t *fbutton = add_toggle_button(parent, label, x, y, width, height);
+    fbutton->private_struct = filebutton;
+    fbutton->label = "File Selector - Select APO File";
+    fbutton->flags |= HAS_MEM;
+    fbutton->scale.gravity = ASPECT;
+    fbutton->func.mem_free_callback = my_fbutton_mem_free;
+    fbutton->func.value_changed_callback = my_fbutton_callback;
+    fbutton->func.dialog_callback = my_fdialog_response;
+    fbutton->func.expose_callback = draw_apo_load_button;
+    return fbutton;
+}
+
+
+Widget_t *add_my_lfile_button(Widget_t *parent, int x, int y, int width, int height,
+                           const char* label, const char *path, const char *filter) {
+    FileButton *filebutton = (FileButton*)malloc(sizeof(FileButton));
+    filebutton->path = path;
+    filebutton->filter = filter;
+    filebutton->last_path = NULL;
+    filebutton->w = NULL;
+    filebutton->is_active = false;
+    Widget_t *fbutton = add_toggle_button(parent, label, x, y, width, height);
+    fbutton->private_struct = filebutton;
+    fbutton->label = "File Selector - Select IR File";
+    fbutton->flags |= HAS_MEM;
+    fbutton->scale.gravity = ASPECT;
+    fbutton->func.mem_free_callback = my_fbutton_mem_free;
+    fbutton->func.value_changed_callback = my_fbutton_callback;
+    fbutton->func.dialog_callback = my_fdialog_response;
+    fbutton->func.expose_callback = draw_ir_load_button;
+    return fbutton;
+}
+
+/****************************************************************
+ *      file save button 
+****************************************************************/
 
 static void fxdialog_response(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
@@ -446,7 +465,7 @@ Widget_t *add_xsave_file_button(Widget_t *parent, int x, int y, int width, int h
     fbutton->flags |= HAS_MEM;
     fbutton->flags |= NO_PROPAGATE;
     fbutton->scale.gravity = ASPECT;
-    fbutton->func.expose_callback = draw_ir_button;
+    fbutton->func.expose_callback = draw_ir_save_button;
     fbutton->func.mem_free_callback = fxbutton_mem_free;
     fbutton->func.value_changed_callback = fxbutton_callback;
     fbutton->func.dialog_callback = fxdialog_response;
@@ -473,6 +492,42 @@ Widget_t *add_ysave_file_button(Widget_t *parent, int x, int y, int width, int h
     return fbutton;
 }
 
+/****************************************************************
+ *      simple text button 
+****************************************************************/
+
+void draw_i_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+    int width = metrics.width;
+    int height = metrics.height;
+    float offset = 0.0;
+    float g = 0.0;
+    if(w->state==1 && ! (int)w->adj_y->value) {
+        offset = 2.0;
+    } else if(w->state==1) {
+        offset = 3.0;
+    } else if(w->state==2) {
+        offset = 3.0;
+    } else if(w->state==3) {
+        offset = 2.0;
+    }
+    if(w->adj_y->value) g = -0.5;
+    widget_set_scale(w);
+    cairo_text_extents_t extents_f;
+    adjust_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi, width, w->label);
+    cairo_set_source_rgb(w->crb, 0.91, 0.949 + g, 0.883 + g);
+    cairo_text_extents(w->crb, w->label, &extents_f);
+    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
+    cairo_text_path (w->crb, w->label);
+    cairo_fill (w->crb);
+    widget_reset_scale(w);
+    
+}
+
 Widget_t *add_my_button(Widget_t *parent, int x, int y, int width, int height, const char *label) {
     Widget_t *fbutton = add_button(parent, label, x, y, width, height);
     fbutton->scale.gravity = ASPECT;
@@ -489,14 +544,45 @@ Widget_t *add_my_toggle_button(Widget_t *parent, int x, int y, int width, int he
     return fbutton;
 }
 
+/****************************************************************
+ *      label
+****************************************************************/
 
-static void null_callback(void *w_, void *user_data) {
-    
+void draw_label(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+    int width = metrics.width;
+    int height = metrics.height;
+    char label[124];
+    memset(label, '\0', sizeof(char)*124);
+    utf8crop_middle(label, w->label, 39);
+    cairo_text_extents_t extents_f;
+    widget_set_scale(w);
+    adjust_font_size(w->crb, w->app->normal_font * w->app->hdpi, width, label);
+    cairo_set_source_rgb(w->crb, 0.91, 0.949, 0.883);
+    cairo_text_extents(w->crb, label, &extents_f);
+    cairo_move_to (w->crb, (width*0.5)-(extents_f.width/2), height-(extents_f.height/4));
+    cairo_text_path (w->crb, label);
+    cairo_fill (w->crb);
+    widget_reset_scale(w);
+}    
+
+Widget_t* add_my_label(Widget_t *parent, const char * label,
+                        int x, int y, int width, int height) {
+
+    Widget_t *wid = create_widget(parent->app, parent, x, y, width, height);
+    wid->label = label;
+    wid->scale.gravity = ASPECT;
+    wid->func.expose_callback = draw_label;
+    return wid;
 }
 
-static void dummy_callback(void *w_, void *button, void *user_data) {
-    
-}
+/****************************************************************
+ *      combobox
+****************************************************************/
 
 static void draw_my_combobox(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;

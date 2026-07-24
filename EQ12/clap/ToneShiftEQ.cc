@@ -198,6 +198,9 @@ public:
         for (int i = 0; i< 12; i++) {
             copyValuesToGui(sw.threshold[i], (float)param->getParam(85 + i));
         }
+        for (int i = 0; i< 12; i++) {
+            copyValuesToGui(sw.ratio[i], (float)param->getParam(97 + i));
+        }
     }
 
 

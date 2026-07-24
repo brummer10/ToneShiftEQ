@@ -43,7 +43,7 @@ public:
     LV2Connector(LV2UI_Write_Function* write_function_, LV2UI_Controller* controller_) {
         write_function = write_function_;
         controller = controller_;
-        for (int i = 0; i< 97; i++) {
+        for (int i = 0; i< 109; i++) {
             par[i] = 0.0f;
         }
         for (int i = 0; i< 12; i++) {
@@ -55,7 +55,7 @@ public:
 
     // send value changes from GUI to the engine/host
     void sendValueChanged(int index, float value) override {
-        if (index < 97) {
+        if (index < 109) {
             par[index] = value;
         }
         (*write_function)(*controller, index, sizeof(float), 0, &value);
@@ -108,6 +108,10 @@ public:
         return dummy; //suppress warning 
     }
 
+    const std::vector<double>& getRef(std::vector<double>& l, std::vector<double>& r, double s) override {
+        return dummy3; //suppress warning 
+    }
+
     const std::vector<float>& getPhase() override {
         return dummy; //suppress warning 
     }
@@ -117,7 +121,8 @@ public:
     }
 
 private:
-    float par[97]; // engine.param.getParamCount()
+    float par[109]; // engine.param.getParamCount()
     std::vector<float> dummy;
+    std::vector<double> dummy3;
     std::pair<std::vector<double>, std::vector<double> > dummy2;
 };

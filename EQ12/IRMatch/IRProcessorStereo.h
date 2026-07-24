@@ -16,6 +16,7 @@
 #include <thread>
 #include <atomic>
 #include <mutex>
+#include <array>
 #include <condition_variable>
 
 #include "Band.h"
@@ -122,6 +123,125 @@ public:
         synthesisN = next_pow2(irLength * 2);
 
         updateIR(refL_trunc, refR_trunc, srcL_trunc, srcR_trunc, rebuild);
+    }
+
+    Vec& getIR(const Vec& refL, const Vec& refR,
+                   double sampleRate_, size_t irLength_ = 4096,
+                   bool rebuild = false, size_t fftSize = 0) {
+
+        sampleRate = sampleRate_;
+        irLength = irLength_;
+
+        size_t maxAnalysisSize = sampleRate * 4;
+
+        Vec refL_trunc = center_crop(refL, maxAnalysisSize);
+        Vec refR_trunc = center_crop(refR, maxAnalysisSize);
+        Vec ref = mergeAverage(refL,refR);
+
+        size_t maxSize = std::max({ ref.size(), ref.size()});
+
+        analysisN = (fftSize > 0) ? fftSize : next_pow2(maxSize);
+        analysisN = std::max<size_t>(analysisN, irLength * 2);
+        synthesisN = next_pow2(irLength * 2);
+        CVec a(analysisN);
+        for (size_t i = 0; i < ref.size(); ++i)
+            a[i] = ref[i];
+        CVec f1 = fp.fft(a);
+        gui_ref_ = magnitude_db(f1);
+        gui_ref_ = designer.adaptive_log_smooth(gui_ref_, sampleRate);
+
+        double peak = *std::max_element(gui_ref_.begin(), gui_ref_.end());
+        for (auto& v : gui_ref_)  v -= peak;
+
+        return gui_ref_;
+    }
+
+    struct EQSettings {
+        std::array<float, 12> gain;
+        std::array<float, 12> freq;
+        std::array<float, 12> Q;
+        float lowCut = 20.0f;
+        float highCut = 20000.0f;
+    };
+
+    EQSettings extractEQSettings(const Vec& response, double sampleRate) {
+
+        EQSettings eq;
+
+        const double hzToBin = 2.0 * (response.size() - 1) / sampleRate;
+        const double binToHz = sampleRate / (2.0 * (response.size() - 1));
+
+        auto freqToBin = [&](double freq) {
+            return freq * hzToBin;
+        };
+
+        auto sampleAtFreq = [&](double freq) {
+            double pos = freqToBin(freq);
+            if (pos <= 0.0) return response.front();
+            if (pos >= response.size() - 1) return response.back();
+            size_t i0 = static_cast<size_t>(std::floor(pos));
+            size_t i1 = std::min(i0 + 1, response.size() - 1);
+            float t = static_cast<float>(pos - i0);
+            return response[i0] * (1.0f - t) + response[i1] * t;
+        };
+
+        // Band Gains and default Freq and Q
+        for (size_t i = 0; i < 12; ++i) {
+            eq.gain[i] = sampleAtFreq(defs[i].freqDef);
+            eq.freq[i] = defs[i].freqDef;
+            eq.Q[i]    = defs[i].qDef;
+        }
+
+        // Smooth edges for low/high-cut detection
+        Vec smooth(response.size());
+
+        for (size_t i = 0; i < response.size(); ++i) {
+            float sum = 0.0f;
+            int count = 0;
+            for (int k = -2; k <= 2; ++k) {
+                int idx = static_cast<int>(i) + k;
+                if (idx >= 0 && idx < static_cast<int>(response.size())) {
+                    sum += response[idx];
+                    ++count;
+                }
+            }
+            smooth[i] = sum / count;
+        }
+        // jump point
+        const float peak = *std::max_element(smooth.begin(), smooth.end());
+        const float threshold = peak - 3.0f;
+
+        // LowCut
+        size_t lowBegin = std::max<size_t>(1, static_cast<size_t>(freqToBin(20.0)));
+        size_t lowEnd = std::min<size_t>( smooth.size() - 1, static_cast<size_t>(freqToBin(250.0)));
+
+        for (size_t i = lowBegin; i <= lowEnd; ++i) {
+            if (smooth[i] >= threshold) {
+                float denom = smooth[i] - smooth[i-1];
+                if (std::fabs(denom) < 1e-9f) continue;
+                float t = (threshold - smooth[i-1]) / denom;
+                double bin = (i - 1) + t;
+                eq.lowCut = static_cast<float>( bin * binToHz);
+                break;
+            }
+        }
+
+        // HighCut
+        size_t highBegin = std::min<size_t>(smooth.size() - 1, static_cast<size_t>(freqToBin(2000.0)));
+        size_t highEnd = std::min<size_t>(smooth.size() - 1, static_cast<size_t>(freqToBin(20000.0)));
+
+        for (size_t i = highEnd; i > highBegin; --i) {
+            if (smooth[i] >= threshold) {
+                float denom = smooth[i-1] - smooth[i];
+                if (std::fabs(denom) < 1e-9f) continue;
+                float t = (threshold - smooth[i]) / denom;
+                double bin = i - t;
+                eq.highCut = static_cast<float>( bin * binToHz);
+                break;
+            }
+        }
+
+        return eq;
     }
 
     void computeIR(double sampleRate_, size_t irLength_ = 4096,
@@ -396,7 +516,7 @@ private:
 
         if (solo_enabled_) {
             if (localBands[solo_band_].enabled) {
-                mag_ir = eq.buildBandSoloIR(localBands[solo_band_], mag_ir, sampleRate, haveSource);
+                mag_ir = eq.buildBandSoloIR(localBands[solo_band_], mag_ir, sampleRate);
                 mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
             }
         } else {

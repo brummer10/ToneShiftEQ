@@ -69,16 +69,16 @@ void draw_my_tooltip(void *w_, void* user_data) {
     const float radius  = 6.0f;
     float bubble_h = height - tail_h;
 
-    // --- Bubble shape ---
+    // Bubble shape
     tooltip_bubble_path(w->crb, 1, 1, width - 2, bubble_h - 2, radius, 18.0f * w->app->hdpi, tail_h);
     // Fill
-    cairo_set_source_rgba(w->crb, 0.13,0.13,0.15, 0.95);
+    cairo_set_source_rgba(w->crb, 0.08,0.09,0.11, 1.0);
     cairo_fill_preserve(w->crb);
     // Stroke
     cairo_set_line_width(w->crb, 1.2);
     cairo_set_source_rgba(w->crb, 0.65, 0.65, 0.65, 1.0);
     cairo_stroke(w->crb);
-    // --- Text ---
+    // Text
     use_text_color_scheme(w, get_color_state(w));
     cairo_move_to( w->crb, (width - extents.width) * 0.5, (bubble_h + extents.height) * 0.5);
     cairo_text_path (w->crb, w->label);
@@ -94,7 +94,7 @@ Widget_t* create_my_tooltip(Widget_t *parent, int width, int height) {
     os_set_window_attrb(wid);
     os_set_transient_for_hint(parent, wid);
     wid->func.expose_callback = draw_my_tooltip;
-    wid->flags |= IS_TOOLTIP | FAST_REDRAW;
+    wid->flags |= IS_TOOLTIP;
     wid->flags &= ~USE_TRANSPARENCY;
     parent->flags |= HAS_TOOLTIP;
     wid->scale.gravity = NONE;

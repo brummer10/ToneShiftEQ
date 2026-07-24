@@ -136,6 +136,24 @@ High Q values:
 
 ---
 
+### Threshold
+
+Sets the level at which dynamic processing begins for the selected band.
+
+Signals below the threshold are unaffected.
+
+Signals above the threshold are dynamically attenuated according to the selected Ratio.
+
+---
+
+### Ratio
+
+Controls the amount of dynamic gain reduction applied once the threshold is exceeded.
+
+Higher Ratio values produce stronger attenuation.
+
+---
+
 ### Filter Type
 
 Available types:
@@ -385,16 +403,37 @@ Temporarily disables ToneShiftEQ processing for A/B comparison.
 
 ---
 
-# Saving Impulse Responses
+# Import and Export
 
-ToneShiftEQ can export the current EQ curve as a minimum-phase impulse response.
+## Load IR
 
-Use:
+Loads an impulse response and approximates it using the internal 12-band parametric EQ.
 
-Save IR
+This provides a convenient starting point for further manual adjustments.
 
-The exported impulse response reproduces the current FFT EQ settings
-and can be loaded into compatible convolution processors.
+---
+
+## Save IR
+
+Exports the current FFT EQ response as a minimum-phase impulse response.
+
+The exported impulse response can be used in compatible convolution processors.
+
+---
+
+## Load APO
+
+Loads an Equalizer APO configuration file and converts the supported filters into ToneShiftEQ settings.
+
+Unsupported filter types are ignored.
+
+---
+
+## Save APO
+
+Exports the current EQ settings as an Equalizer APO configuration file.
+
+Only filters supported by Equalizer APO are written to the configuration.
 
 ---
 
@@ -412,14 +451,16 @@ and transparent in any DAW that supports latency compensation.
 
 # Recommended Workflow
 
-1. Begin with corrective cuts.
+1. Load an existing IR or APO configuration (optional).
 
-2. Use Low Cut and High Cut where necessary.
+2. Begin with corrective cuts.
 
-3. Adjust broad tonal balance.
+3. Use Low Cut and High Cut where necessary.
 
-4. Apply narrow corrective filters only when required.
+4. Apply Dynamic EQ where resonances require level-dependent control.
 
-5. Compare using Bypass.
+5. Adjust the overall tonal balance.
 
-6. Fine-tune output gain.
+6. Compare using Bypass.
+
+7. Export the result as an IR or APO configuration if desired.

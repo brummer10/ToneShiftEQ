@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "APOReader.h"
+#include "IRtoEQ.h"
 #include "xwidgets.h"
 #include "widgets.cc"
 #include "AudioFile.h"
@@ -41,6 +42,7 @@ public:
     Widget_t* prev[12];
     Widget_t* next[12];
     Widget_t* threshold[12];
+    Widget_t* ratio[12];
 
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
@@ -57,6 +59,8 @@ public:
     Widget_t* vumeterR = nullptr;
     Widget_t* apo_loader = nullptr;
     std::atomic<bool> havePreset {false};
+    std::vector<double> dstL;
+    std::vector<double> dstR;
 
     SpectrumViewer(IConnector *conn_) {
         conn = conn_;
@@ -145,14 +149,9 @@ public:
         curFreq = add_my_label(lframe, "",5,0,60,20);
         curGain = add_my_label(lframe, "",5,20,60,20);
 
-        bp = add_my_toggle_button(lframe, 5, 40, 60, 20, "Bypass");
-        bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
-        bp->parent_struct = this;
-        bp->func.value_changed_callback = bp_response;
-
         #ifndef CLAPPLUG
         #ifndef LV2PLUG
-        Widget_t* quit = add_my_button(lframe, 5, 60, 60, 20, "Quit");
+        Widget_t* quit = add_my_quit_button(lframe, 15, 40, 40, 40, "Quit");
         quit->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         quit->parent_struct = this;
         quit->func.value_changed_callback = quit_response;
@@ -175,20 +174,28 @@ public:
             set_widget_color(frame[i], (Color_state)0, (Color_mod)1, r, g, bcol, 1.0);
            
 
-            prev[i] = add_my_button(frame[i], 10, 78, 20, 18, "<");
+            prev[i] = add_my_button(frame[i], 5, 78, 22, 18, "<");
             prev[i]->data = i;
             prev[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             prev[i]->parent_struct = this;
             prev[i]->func.value_changed_callback = prev_response;
 
-            solo[i] = add_my_toggle_button(frame[i], 210, 78, 20, 18, "S");
+            fenable[i] = add_my_enable_button(frame[i], 32, 78, 20, 20, "");
+            fenable[i]->data = i;
+            fenable[i]->parent_struct = this;
+            fenable[i]->func.value_changed_callback = set_fenable;
+            adj_set_value(fenable[i]->adj, conn->getParameterValue(i * 6 + 1));
+            get_band_color(i, r, g, bcol);
+            set_widget_color(fenable[i], (Color_state)0, (Color_mod)0, r, g, bcol, 1.0);
+
+            solo[i] = add_my_toggle_button(frame[i], 54, 78, 22, 18, "S");
             solo[i]->data = i;
             solo[i]->flags |= IS_RADIO;
             solo[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             solo[i]->parent_struct = this;
             solo[i]->func.value_changed_callback = solo_response;
 
-            mute[i] = add_my_toggle_button(frame[i], 180, 78, 20, 18, "M");
+            mute[i] = add_my_toggle_button(frame[i], 76, 78, 22, 18, "M");
             mute[i]->data = i;
             mute[i]->flags |= IS_RADIO;
             mute[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
@@ -210,17 +217,18 @@ public:
             }
             ftype[i]->func.value_changed_callback = set_ftype;
 
-            fenable[i] = add_my_enable_button(frame[i], 45, 78, 20, 20, "");
-            fenable[i]->data = i;
-            fenable[i]->parent_struct = this;
-            fenable[i]->func.value_changed_callback = set_fenable;
-            adj_set_value(fenable[i]->adj, conn->getParameterValue(i * 6 + 1));
-            
-            get_band_color(i, r, g, bcol);
+            ratio[i] = add_my_combobox(frame[i], "Ratio", 175, 78, 68, 18);
+            ratio[i]->data = i;
+            ratio[i]->parent_struct = this;
+            combobox_add_entry(ratio[i], "Ratio 2/1");
+            combobox_add_entry(ratio[i], "Ratio 3/1");
+            combobox_add_entry(ratio[i], "Ratio 4/1");
+            combobox_add_entry(ratio[i], "Ratio 5/1");
+            combobox_add_entry(ratio[i], "Ratio 10/1");
+            combobox_set_active_entry(ratio[i], 1);
+            ratio[i]->func.value_changed_callback = set_ratio;
 
-            set_widget_color(fenable[i], (Color_state)0, (Color_mod)0, r, g, bcol, 1.0);
-
-            next[i] = add_my_button(frame[i], 240, 78, 20, 18, ">");
+            next[i] = add_my_button(frame[i], 243, 78, 22, 18, ">");
             next[i]->data = i;
             next[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             next[i]->parent_struct = this;
@@ -337,16 +345,26 @@ public:
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
+        #endif
         #ifndef LV2PLUG
+        Widget_t* ir_loader = add_my_lfile_button(laframe, 220, 20, 40, 40, "IR", " ", ".wav|.WAV");
+        ir_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        ir_loader->parent_struct = this;
+        ir_loader->func.user_callback = ref_load_response;
+
         save = add_xsave_file_button(laframe, 220, 60, 40, 40, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
         #endif
-        #endif
 
-        hf_fade = add_my_fade_button(laframe, 220, 20, 40, 40);
+        hf_fade = add_my_fade_button(laframe, 560, 20, 40, 40);
         hf_fade->parent_struct = this;
         hf_fade->func.value_changed_callback = set_hf_fade;
+
+        bp = add_my_bypass_button(laframe, 560, 60, 40, 40);
+        bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        bp->parent_struct = this;
+        bp->func.value_changed_callback = bp_response;
 
         smooth = add_my_knob(laframe, "Smooth", "", 610,26,60, 70);
         set_adjustment(smooth->adj, 0.3, 0.3, 0.0, 1.0, 0.01, CL_CONTINUOS);
@@ -388,11 +406,6 @@ public:
             widget_hide(dynamics);
             widget_hide(tilt);
             widget_hide(hf_fade);
-            #ifndef CLAPPLUG
-            #ifndef LV2PLUG
-            widget_hide(save);
-            #endif
-            #endif
         } else {
             adj_set_value(smooth->adj, smooth_s);
             adj_set_value(dynamics->adj, dynamic_s);
@@ -402,11 +415,6 @@ public:
             widget_show(dynamics);
             widget_show(tilt);
             widget_show(hf_fade);
-            #ifndef CLAPPLUG
-            #ifndef LV2PLUG
-            widget_show(save);
-            #endif
-            #endif
         }
     }
 
@@ -497,6 +505,7 @@ private:
     bool dynamic_threshold = false;
     std::atomic<bool> set_leak {false};
     std::string apo_file;
+    std::string ref_file;
 
     float smooth_s = 0.3f;
     float dynamic_s = 0.0f;
@@ -514,6 +523,35 @@ private:
             std::string ir_file = *(const char**)user_data;
             std::pair<std::vector<double>, std::vector<double> > ir = self->conn->get_ir();        
             self->af.saveAudioFile(ir_file, ir.first, ir.second, self->sampleRate);
+        }
+    }
+
+    static void ref_load_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if(user_data !=NULL) {
+            self->ref_file = *(const char**)user_data;
+            if ( self->af.getAudioFile(self->ref_file, self->sampleRate) ) {
+                self->dstL.clear();
+                self->dstR.clear();
+                self->dstL.assign(self->af.samplesL.begin(), self->af.samplesL.end());
+                self->dstR.assign(self->af.samplesR.begin(), self->af.samplesR.end());
+                const std::vector<double> ref = self->conn->getRef(self->dstL, self->dstR, self->sampleRate);
+                IRtoEQ er;
+                IRtoEQ::EQSettings cfg = er.extractEQSettings(ref,self->sampleRate); 
+                for (int i = 0; i < 12; ++i) {
+                    adj_set_value(self->fenable[i]->adj, (float)cfg.enabled[i]);
+                    //adj_set_value(self->ftype[i]->adj,   (float)cfg.type);
+                    adj_set_value(self->mute[i]->adj,    0.0f);
+                    adj_set_value(self->freq[i]->adj,    (float)cfg.freq[i]);
+                    adj_set_value(self->fgain[i]->adj,   (float)cfg.gain[i]);
+                    adj_set_value(self->fq[i]->adj,      (float)cfg.Q[i]);
+                }
+
+                adj_set_value(self->lowcut->adj,      (float)cfg.lowCut);
+                adj_set_value(self->highcut->adj,     (float)cfg.highCut);
+                
+            }
         }
     }
 
@@ -744,6 +782,12 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(85 + w->data, adj_get_value(w->adj));
+    }
+
+    static void set_ratio(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(97 + w->data, (int) adj_get_value(w->adj));
     }
 
     static void set_lowcut(void *w_, void* user_data) {
