@@ -54,7 +54,7 @@ Left and right channels are processed independently with separate convolution
 state (FFT buffers, overlap-add accumulators, input/output FIFOs and history
 buffers), sharing only the IR data which is read-only during processing.
 
-## Biquad Processing Engine
+### Biquad Processing Engine
 
 The Biquad engine implements the same 12-band parametric equalizer
 using cascaded second-order IIR filters.
@@ -65,6 +65,24 @@ Low Cut and High Cut filters are implemented as dedicated high-pass and low-pass
 Since no convolution is involved, processing is performed sample-by-sample
 with effectively zero latency, making this mode particularly suitable
 for real-time monitoring and live performance.
+
+### Dynamic Equalization
+
+ToneShiftEQ optionally provides frequency-selective dynamic processing.
+
+Each EQ band can operate as an independent spectral compressor with
+its own Threshold and Ratio parameters.
+
+The detector measures the signal level within each filter band and
+computes a dynamic gain value that is applied on top of the static
+EQ gain.
+
+Static EQ parameters remain unchanged while the dynamic gain is
+updated continuously during processing.
+
+This architecture allows transparent suppression of resonances and
+level-dependent tonal balancing without modifying the underlying
+equalizer settings.
 
 ---
 
@@ -93,6 +111,8 @@ Each band provides:
 - **Q** — 0.4 to 10.0 (logarithmic)
 - **Type** — Low Shelf, Peak, High Shelf
 - **Enable / Mute / Solo** — per band
+- **Threshold** — set Threshold for dynamic EQ
+- **Ratio** — set the Ratio for the dynamic EQ
 
 Additional global controls:
 - **Low Cut / High Cut** — configurable high-pass and low-pass filters
@@ -156,6 +176,37 @@ fractional scaling.
 - **EQ Matching** — two audio reference files can be loaded and analyzed to
   derive the EQ curve required to match one spectrum to the other
   - currently disabled
+
+### Impulse Response Import
+
+ToneShiftEQ can approximate existing impulse responses using its
+internal 12-band parametric EQ model.
+
+The imported frequency response is analysed and converted into:
+
+* Band gains
+* Low Cut frequency
+* High Cut frequency
+
+Band center frequencies and Q values use the internal defaults to
+produce a stable approximation suitable for further editing.
+
+The imported EQ is intended as a practical approximation rather than
+an exact reconstruction of the original impulse response.
+
+### Equalizer APO Compatibility
+
+ToneShiftEQ supports importing and exporting Equalizer APO
+configuration files.
+
+Supported filter types are translated into the internal
+12-band EQ representation.
+
+When exporting, only filter types supported by Equalizer APO are
+written to the configuration file.
+
+Dynamic EQ parameters are currently specific to ToneShiftEQ and are
+not part of the Equalizer APO file format.
 
 ---
 
