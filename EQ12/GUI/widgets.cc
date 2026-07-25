@@ -618,6 +618,7 @@ static void draw_my_combobox(void *w_, void* user_data) {
 Widget_t* add_my_combobox(Widget_t *p,const char * label,
                                 int x, int y, int width, int height) {
     Widget_t* w = add_combobox(p, label, x, y, width, height);
+    w->scale.gravity = ASPECT;
     w->func.expose_callback = draw_my_combobox;
     w->childlist->childs[0]->func.expose_callback = null_callback;
     w->childlist->childs[0]->func.button_release_callback = dummy_callback;

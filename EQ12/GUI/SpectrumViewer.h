@@ -1244,20 +1244,72 @@ private:
     void draw_band_curves(cairo_t* cr, bool dyn, int width, int height) {
         const int STEPS = width;
         float y0 = db_to_y(0.0, db_min, db_max, height);
+        const double epsilon_db = 0.5 * (db_max - db_min) / (double)height;
+
+        std::vector<double> freqLUT(STEPS);
+        for (int x = 0; x < STEPS; ++x)
+            freqLUT[x] = x_to_freq(x, f_min, f_max, width);
 
         for (int i = 0; i < 12; ++i) {
             if (!(int)conn->getParameterValue(i * 6 + 1)) continue;
+
+            double bandFreq = conn->getParameterValue(i * 6 + 4);
+            double gain     = conn->getParameterValue(i * 6 + 5);
+            double q        = conn->getParameterValue(i * 6 + 6);
+            int    type     = (int)conn->getParameterValue(i * 6 + 2);
+
+            double d = 0.0;
+            if (dyn) {
+                d = conn->getDynamics(i);
+                if (d == 0.0) continue;
+            }
+
+            double Q       = mapQ(q);
+            double gd       = gain + d;
+            double absGd    = std::fabs(gd);
+            if (absGd <= epsilon_db) continue;
+
+            double slope    = Q * 2.0;
+            double invSig2  = 0.5 / std::pow(1.0 / (1.5*Q + 0.5), 2);
+
+            int xLo = 0, xHi = STEPS - 1;
+            double ratio = std::clamp(epsilon_db / absGd, 1e-9, 0.499);
+
+            if (type == 1) {
+                double xl_max = std::sqrt(std::max<double>(0.0, std::log(1.0 / ratio) / invSig2));
+                double fLo = bandFreq * std::exp2(-xl_max);
+                double fHi = bandFreq * std::exp2( xl_max);
+                xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
+                xHi = std::min<double>(STEPS - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
+            } else if (type == 0) {
+                double xl_hi = std::atanh(1.0 - 2.0 * ratio) / slope;
+                double fHi = bandFreq * std::exp2(xl_hi);
+                xHi = std::min<double>(STEPS - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
+            } else {
+                double xl_lo = -std::atanh(1.0 - 2.0 * ratio) / slope;
+                double fLo = bandFreq * std::exp2(xl_lo);
+                xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
+            }
+
             bool isStarted = false;
-            double startX = 0.0;
-            double stopX = 0.0;
-            double lastX = 0.0;
-            // band color
-            double r,g,bcol;
+            double startX = xLo;
+            double stopX = xLo;
+            double lastX = xLo;
+            double r, g, bcol;
             get_band_color(i, r, g, bcol);
             cairo_new_path(cr);
-            for (int x = 0; x < STEPS; ++x) {
-                double freq = x_to_freq(x, f_min, f_max, width);
-                double db = eval_band_db(conn, dyn, i, freq, sampleRate);
+
+            for (int x = xLo; x <= xHi; ++x) {
+                double f = freqLUT[x];
+                double db = 0.0;
+                if (f >= 10.0) {
+                    double xl = std::log2((f + 1e-9) / (bandFreq + 1e-9));
+                    switch (type) {
+                        case 0: db = gd * 0.5 * (1.0 - std::tanh(slope * xl)); break;
+                        case 2: db = gd * 0.5 * (1.0 + std::tanh(slope * xl)); break;
+                        default: db = gd * std::exp(-invSig2 * xl * xl); break;
+                    }
+                }
                 double y = db_to_y(db, db_min, db_max, height);
                 if (fabs(y - y0) < 0.5) continue;
 
