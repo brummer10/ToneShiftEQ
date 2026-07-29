@@ -140,7 +140,7 @@ inline std::complex<double> response(const Coeffs& c, double freq, double sr) {
 }
 
 inline double responseDB(const Coeffs& c, double freq, double sr) {
-    return 20.0 * std::log10(std::max(std::abs(response(c, freq, sr)), 1e-12));
+    return 20.0 * std::log10(std::max<double>(std::abs(response(c, freq, sr)), 1e-12));
 }
 
 inline std::complex<double> responseAtZ(const Coeffs& c, const std::complex<double>& zInv,
@@ -152,7 +152,7 @@ inline std::complex<double> responseAtZ(const Coeffs& c, const std::complex<doub
 
 inline double responseDbAtZ(const Coeffs& c, const std::complex<double>& zInv,
                                             const std::complex<double>& zInv2) {
-    return 10.0 * std::log10(std::max(std::norm(responseAtZ(c, zInv, zInv2)), 1e-24));
+    return 10.0 * std::log10(std::max<double>(std::norm(responseAtZ(c, zInv, zInv2)), 1e-24));
 }
 
 } // namespace BiquadResponse
