@@ -16,6 +16,8 @@
 #include <atomic>
 #include <utility>
 
+#include "BiquadResponse.h"
+#include "SVFResponse.h"
 #include "APOReader.h"
 #include "IRtoEQ.h"
 #include "xwidgets.h"
@@ -23,8 +25,6 @@
 #include "AudioFile.h"
 #include "EQController.h"
 #include "IConnector.h"
-#include "BiquadResponse.h"
-#include "SVFResponse.h"
 
 class SpectrumViewer {
 public:
