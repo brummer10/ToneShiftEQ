@@ -23,6 +23,8 @@
 #include "AudioFile.h"
 #include "EQController.h"
 #include "IConnector.h"
+#include "BiquadResponse.h"
+#include "SVFResponse.h"
 
 class SpectrumViewer {
 public:
@@ -31,18 +33,18 @@ public:
     int active_panel = 0;
     Widget_t* top = nullptr;
     Widget_t* bp = nullptr;
-    Widget_t* frame[12];
-    Widget_t* ftype[12];
-    Widget_t* fenable[12];
-    Widget_t* freq[12];
-    Widget_t* fq[12];
-    Widget_t* fgain[12];
-    Widget_t* solo[12];
-    Widget_t* mute[12];
-    Widget_t* prev[12];
-    Widget_t* next[12];
-    Widget_t* threshold[12];
-    Widget_t* ratio[12];
+    Widget_t* frame[FilterTypes::NumFilters];
+    Widget_t* ftype[FilterTypes::NumFilters];
+    Widget_t* fenable[FilterTypes::NumFilters];
+    Widget_t* freq[FilterTypes::NumFilters];
+    Widget_t* fq[FilterTypes::NumFilters];
+    Widget_t* fgain[FilterTypes::NumFilters];
+    Widget_t* solo[FilterTypes::NumFilters];
+    Widget_t* mute[FilterTypes::NumFilters];
+    Widget_t* prev[FilterTypes::NumFilters];
+    Widget_t* next[FilterTypes::NumFilters];
+    Widget_t* threshold[FilterTypes::NumFilters];
+    Widget_t* ratio[FilterTypes::NumFilters];
 
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
@@ -120,6 +122,7 @@ public:
 
         spec->parent_struct = this;
         spec->flags |= NO_PROPAGATE;
+        spec->flags &= ~USE_TRANSPARENCY;
         spec->scale.gravity = NORTHWEST;
         spec->func.expose_callback = draw_callback;
         spec->func.key_press_callback = get_key;
@@ -166,7 +169,7 @@ public:
         ph->func.value_changed_callback = show_phase;
 
         int x = 1;
-        for (int i = 0; i<12; i++) {
+        for (int i = 0; i<FilterTypes::NumFilters; i++) {
             frame[i] = add_my_panel(laframe,"", 275, 0, 270, 99);
             frame[i]->scale.gravity = NORTCENTER;
             double r,g,bcol;
@@ -393,19 +396,22 @@ public:
 
     void set_controller_mode() {
         int c_mode = conn->getParameterValue(84);
+        static int o_mode = 0;
         if (c_mode) {
-            show_ph = false;
-            smooth_s = adj_get_value(smooth->adj);
-            dynamic_s = adj_get_value(dynamics->adj);
-            tilt_s =  adj_get_value(tilt->adj);
-            adj_set_value(smooth->adj, 0.0);
-            adj_set_value(dynamics->adj, 0.0);
-            adj_set_value(tilt->adj, 0.0);
-            widget_hide(ph);
-            widget_hide(smooth);
-            widget_hide(dynamics);
-            widget_hide(tilt);
-            widget_hide(hf_fade);
+            if (!o_mode) {
+                show_ph = false;
+                smooth_s = adj_get_value(smooth->adj);
+                dynamic_s = adj_get_value(dynamics->adj);
+                tilt_s =  adj_get_value(tilt->adj);
+                adj_set_value(smooth->adj, 0.0);
+                adj_set_value(dynamics->adj, 0.0);
+                adj_set_value(tilt->adj, 0.0);
+                widget_hide(ph);
+                widget_hide(smooth);
+                widget_hide(dynamics);
+                widget_hide(tilt);
+                widget_hide(hf_fade);
+            }
         } else {
             adj_set_value(smooth->adj, smooth_s);
             adj_set_value(dynamics->adj, dynamic_s);
@@ -416,6 +422,7 @@ public:
             widget_show(tilt);
             widget_show(hf_fade);
         }
+        o_mode = c_mode;
     }
 
     void show() {
@@ -516,6 +523,11 @@ private:
     const float db_min = -72.0f;
     const float db_max = 24.0f;
 
+    struct BandCurveLUTs {
+        std::vector<double> freq;
+        std::vector<std::complex<double>> zInv, zInv2, alpha;
+    };
+
     static void save_response(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
@@ -539,7 +551,7 @@ private:
                 const std::vector<double> ref = self->conn->getRef(self->dstL, self->dstR, self->sampleRate);
                 IRtoEQ er;
                 IRtoEQ::EQSettings cfg = er.extractEQSettings(ref,self->sampleRate); 
-                for (int i = 0; i < 12; ++i) {
+                for (int i = 0; i < FilterTypes::NumFilters; ++i) {
                     adj_set_value(self->fenable[i]->adj, (float)cfg.enabled[i]);
                     //adj_set_value(self->ftype[i]->adj,   (float)cfg.type);
                     adj_set_value(self->mute[i]->adj,    0.0f);
@@ -563,7 +575,7 @@ private:
             self->apo_file = *(const char**)user_data;
             if (!self->apo_file.empty() ) {
                 if (self->reader.loadFile(self->apo_file)) {
-                    for (int i = 0; i< 12; i++) {
+                    for (int i = 0; i< FilterTypes::NumFilters; i++) {
                         adj_set_value(self->fenable[i]->adj, (float)self->reader.bands()[i].enabled);
                         adj_set_value(self->ftype[i]->adj,   (float)self->reader.bands()[i].type);
                         adj_set_value(self->mute[i]->adj,    0.0f);
@@ -591,8 +603,8 @@ private:
         if (user_data != NULL) {
             self->apo_file = *(const char**)user_data;
             if (!self->apo_file.empty()) {
-                std::array<Band, 12> bandsOut;
-                for (int i = 0; i < 12; i++) {
+                std::array<Band, FilterTypes::NumFilters> bandsOut;
+                for (int i = 0; i < FilterTypes::NumFilters; i++) {
                     bandsOut[i].enabled = (int)adj_get_value(self->fenable[i]->adj);
                     bandsOut[i].type    = (Band::Type)(int)adj_get_value(self->ftype[i]->adj);
                     bandsOut[i].freq    = adj_get_value(self->freq[i]->adj);
@@ -681,7 +693,7 @@ private:
     }
 
     void set_radio(Widget_t* w, bool set) {
-         for (int i = 0; i<12; i++) {
+         for (int i = 0; i<FilterTypes::NumFilters; i++) {
             Widget_t *wid = solo[i];
             if (wid != w) {
                 xevfunc store = wid->func.value_changed_callback;
@@ -709,7 +721,7 @@ private:
     }
 
     void raise_control_panel(int a) {
-        for(int i = 0; i < 12; i++) {
+        for(int i = 0; i < FilterTypes::NumFilters; i++) {
             widget_hide(frame[i]);
             if (i == a) {
                 active_panel = a;
@@ -903,22 +915,22 @@ private:
     }
 
     int find_band_for_freq(float target_freq) {
-        static const float band_min[12] = {
+        static const float band_min[FilterTypes::NumFilters] = {
             20.0f, 40.0f, 70.0f, 120.0f, 200.0f, 350.0f,
             650.0f, 1100.0f, 1800.0f, 3500.0f, 6000.0f, 10000.0f
         };
-        static const float band_max[12] = {
+        static const float band_max[FilterTypes::NumFilters] = {
             60.0f, 100.0f, 180.0f, 300.0f, 550.0f, 900.0f,
             1600.0f, 2800.0f, 5000.0f, 9000.0f, 15000.0f, 20000.0f
         };
 
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < FilterTypes::NumFilters; ++i) {
             if (target_freq >= band_min[i] && target_freq <= band_max[i])
                 return i;
         }
         int best = 0;
         float best_dist = 1e9f;
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < FilterTypes::NumFilters; ++i) {
             float center = adj_get_value(freq[i]->adj);
             float dist = std::abs(std::log(target_freq / center));
             if (dist < best_dist) { best_dist = dist; best = i; }
@@ -1215,7 +1227,7 @@ private:
         os_get_window_metrics(spec, &m);
         const int width  = m.width;
         const int height = m.height- (80 * spec->app->hdpi);
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < FilterTypes::NumFilters; ++i) {
             float x = freq_to_x(conn->getParameterValue(i * 6 + 4), f_min, f_max, width);
             float y = db_to_y(conn->getParameterValue(i * 6 + 5), db_min, db_max, height);
 
@@ -1241,16 +1253,184 @@ private:
         band_match = false;
     }
 
+    // draw band curves
+    BandCurveLUTs build_frequency_luts(int width, int steps, int model) {
+        BandCurveLUTs lut;
+        lut.freq.resize(steps);
+        if (model == 1) { lut.zInv.resize(steps); lut.zInv2.resize(steps); }
+        if (model == 2) { lut.alpha.resize(steps); }
+
+        for (int x = 0; x < steps; ++x) {
+            lut.freq[x] = x_to_freq(x, f_min, f_max, width);
+            const double w = 2.0 * M_PI * lut.freq[x] / sampleRate;
+            if (model == 1) {
+                std::complex<double> zInv = std::polar(1.0, -w);
+                lut.zInv[x]  = zInv;
+                lut.zInv2[x] = zInv * zInv;
+            } else if (model == 2) {
+                std::complex<double> z = std::polar(1.0, w);
+                lut.alpha[x] = 2.0 / (z + 1.0);
+            }
+        }
+        return lut;
+    }
+
+    template <typename DbFunc>
+    double findEdgeOctaves(DbFunc dbAt, double epsilon, double startOct, double sign) {
+        double lo = 0.0, hi = startOct;
+        while (std::fabs(dbAt(sign * hi)) > epsilon && hi < 12.0) hi *= 2.0;
+        hi = std::min<double>(hi, 12.0);
+        for (int iter = 0; iter < 20; ++iter) {
+            double mid = 0.5 * (lo + hi);
+            if (std::fabs(dbAt(sign * mid)) > epsilon) lo = mid; else hi = mid;
+        }
+        return sign * hi;
+    }
+
+    struct BandFilterModel {
+        int model = 0, type = 0;
+        double bandFreq = 0, gd = 0, slope = 0, invSig2 = 0;
+        BiquadResponse::Coeffs biquad;
+        SVFResponse::Coeffs    svf;
+
+        double dbAtFreq(double f, double sampleRate) const {
+            switch (model) {
+                case 1:  return BiquadResponse::responseDB(biquad, f, sampleRate);
+                case 2:  return SVFResponse::responseDB(svf, f, sampleRate);
+                default: {
+                    double xl = std::log2((f + 1e-9) / (bandFreq + 1e-9));
+                    if (type == 0) return gd * 0.5 * (1.0 - std::tanh(slope * xl));
+                    if (type == 2) return gd * 0.5 * (1.0 + std::tanh(slope * xl));
+                    return gd * std::exp(-invSig2 * xl * xl);
+                }
+            }
+        }
+
+        double dbAtLUT(int x, double f, const BandCurveLUTs& lut, double sampleRate) const {
+            if (f < 10.0) return 0.0;
+            switch (model) {
+                case 1:  return BiquadResponse::responseDbAtZ(biquad, lut.zInv[x], lut.zInv2[x]);
+                case 2:  return SVFResponse::responseDbAtAlpha(svf, lut.alpha[x]);
+                default: {
+                    double xl = std::log2((f + 1e-9) / (bandFreq + 1e-9));
+                    if (type == 0) return gd * 0.5 * (1.0 - std::tanh(slope * xl));
+                    if (type == 2) return gd * 0.5 * (1.0 + std::tanh(slope * xl));
+                    return gd * std::exp(-invSig2 * xl * xl);
+                }
+            }
+        }
+    };
+
+    BandFilterModel build_band_model(const int model, int type, double bandFreq, double Q, double gd, double sampleRate) {
+        BandFilterModel m;
+        m.model = model;
+        m.type = type;
+        m.bandFreq = bandFreq;
+        m.gd = gd;
+        m.slope   = Q * 2.0;
+        m.invSig2 = 0.5 / std::pow(1.0 / (1.5 * Q + 0.5), 2);
+
+        if (model == 1) {
+            const FilterTypes::Type ftype = type == 0 ? FilterTypes::Type::LowShelf
+                                           : type == 2 ? FilterTypes::Type::HighShelf
+                                                        : FilterTypes::Type::Peak;
+            m.biquad = BiquadResponse::compute(ftype, bandFreq, Q, gd, sampleRate);
+        } else if (model == 2) {
+            m.svf = type == 0 ? SVFResponse::lowShelf(bandFreq, Q, gd, sampleRate)
+                  : type == 2 ? SVFResponse::highShelf(bandFreq, Q, gd, sampleRate)
+                               : SVFResponse::peak(bandFreq, Q, gd, sampleRate);
+        }
+
+        return m;
+    }
+
+    inline void compute_band_x_range(const BandFilterModel& m, double epsilon_db,
+                double sampleRate, int width, int steps, int& xLo, int& xHi) {
+
+        auto dbAt = [&](double xl) {
+            return m.dbAtFreq(m.bandFreq * std::exp2(xl), sampleRate);
+        };
+
+        xLo = 0; xHi = steps - 1;
+        if (m.type == 1) {
+            double fLo = m.bandFreq * std::exp2(findEdgeOctaves(dbAt, epsilon_db, 1.0, -1.0));
+            double fHi = m.bandFreq * std::exp2(findEdgeOctaves(dbAt, epsilon_db, 1.0,  1.0));
+            xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
+            xHi = std::min<double>(steps - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
+        } else if (m.type == 0) {
+            double fHi = m.bandFreq * std::exp2(findEdgeOctaves(dbAt, epsilon_db, 1.0, 1.0));
+            xHi = std::min<double>(steps - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
+        } else {
+            double fLo = m.bandFreq * std::exp2(findEdgeOctaves(dbAt, epsilon_db, 1.0, -1.0));
+            xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
+        }
+    }
+
+    inline void build_band_path(cairo_t* cr, const BandFilterModel& m, const BandCurveLUTs& lut,
+                    int xLo, int xHi, float y0, int height, double& startX, double& stopX) {
+        bool isStarted = false;
+        double lastX = xLo;
+        startX = xLo; stopX = xLo;
+
+        cairo_new_path(cr);
+        for (int x = xLo; x <= xHi; ++x) {
+            double f  = lut.freq[x];
+            double db = m.dbAtLUT(x, f, lut, sampleRate);
+            double y  = db_to_y(db, db_min, db_max, height);
+            if (fabs(y - y0) < 0.5) continue;
+
+            if (!isStarted) {
+                cairo_move_to(cr, x, y);
+                startX = x;
+                lastX = x;
+                isStarted = true;
+            } else if (x > lastX + 2.0) {
+                cairo_line_to(cr, x, y);
+            }
+            stopX = x;
+        }
+    }
+
+    inline void stroke_band_fill_glow_line(cairo_t* cr, double startX, double stopX,
+                                    float y0, double r, double g, double bcol) {
+        cairo_line_to(cr, stopX, y0);
+        cairo_line_to(cr, startX, y0);
+        cairo_close_path(cr);
+
+        cairo_set_source_rgba(cr, r, g, bcol, t.band_fill_alpha);
+        cairo_fill_preserve(cr);
+
+        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+        cairo_pattern_t* glow = cairo_pattern_create_linear(startX, 0, stopX, 0);
+        cairo_pattern_add_color_stop_rgba(glow, 0,   r, g, bcol, t.band_glow_alpha * 0.1);
+        cairo_pattern_add_color_stop_rgba(glow, 0.5, r, g, bcol, t.band_glow_alpha * 0.8);
+        cairo_pattern_add_color_stop_rgba(glow, 1,   r, g, bcol, t.band_glow_alpha * 0.1);
+        for (int k = 0; k < 3; ++k) {
+            cairo_set_line_width(cr, 6.0 + k * 4.0);
+            cairo_set_source(cr, glow);
+            cairo_stroke_preserve(cr);
+        }
+        cairo_pattern_destroy(glow);
+
+        cairo_pattern_t* grad = cairo_pattern_create_linear(startX, 0, stopX, 0);
+        cairo_pattern_add_color_stop_rgba(grad, 0,   r, g, bcol, t.band_line_alpha * 0.1);
+        cairo_pattern_add_color_stop_rgba(grad, 0.5, r, g, bcol, t.band_line_alpha * 1.0);
+        cairo_pattern_add_color_stop_rgba(grad, 1,   r, g, bcol, t.band_line_alpha * 0.1);
+        cairo_set_line_width(cr, 1.5);
+        cairo_set_source(cr, grad);
+        cairo_stroke(cr);
+        cairo_pattern_destroy(grad);
+    }
+
     void draw_band_curves(cairo_t* cr, bool dyn, int width, int height) {
+        const int MODEL = dyn ? 1 : (int)conn->getParameterValue(84); // dynamic is always Biquad
         const int STEPS = width;
-        float y0 = db_to_y(0.0, db_min, db_max, height);
+        const float y0 = db_to_y(0.0, db_min, db_max, height);
         const double epsilon_db = 0.5 * (db_max - db_min) / (double)height;
 
-        std::vector<double> freqLUT(STEPS);
-        for (int x = 0; x < STEPS; ++x)
-            freqLUT[x] = x_to_freq(x, f_min, f_max, width);
+        BandCurveLUTs lut = build_frequency_luts(width, STEPS, MODEL);
 
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < FilterTypes::NumFilters; ++i) {
             if (!(int)conn->getParameterValue(i * 6 + 1)) continue;
 
             double bandFreq = conn->getParameterValue(i * 6 + 4);
@@ -1264,103 +1444,26 @@ private:
                 if (d == 0.0) continue;
             }
 
-            double Q       = mapQ(q);
-            double gd       = gain + d;
-            double absGd    = std::fabs(gd);
-            if (absGd <= epsilon_db) continue;
+            double Q  = mapQ(q);
+            double gd = dyn ? d : gain;
+            if (std::fabs(gd) <= epsilon_db) continue;
 
-            double slope    = Q * 2.0;
-            double invSig2  = 0.5 / std::pow(1.0 / (1.5*Q + 0.5), 2);
+            BandFilterModel model = build_band_model(MODEL, type, bandFreq, Q, gd, sampleRate);
 
-            int xLo = 0, xHi = STEPS - 1;
-            double ratio = std::clamp(epsilon_db / absGd, 1e-9, 0.499);
+            int xLo, xHi;
+            compute_band_x_range(model, epsilon_db, sampleRate, width, STEPS, xLo, xHi);
 
-            if (type == 1) {
-                double xl_max = std::sqrt(std::max<double>(0.0, std::log(1.0 / ratio) / invSig2));
-                double fLo = bandFreq * std::exp2(-xl_max);
-                double fHi = bandFreq * std::exp2( xl_max);
-                xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
-                xHi = std::min<double>(STEPS - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
-            } else if (type == 0) {
-                double xl_hi = std::atanh(1.0 - 2.0 * ratio) / slope;
-                double fHi = bandFreq * std::exp2(xl_hi);
-                xHi = std::min<double>(STEPS - 1, (int)std::ceil(freq_to_x((float)fHi, f_min, f_max, width)) + 1);
-            } else {
-                double xl_lo = -std::atanh(1.0 - 2.0 * ratio) / slope;
-                double fLo = bandFreq * std::exp2(xl_lo);
-                xLo = std::max<double>(0, (int)std::floor(freq_to_x((float)fLo, f_min, f_max, width)) - 1);
-            }
+            double startX, stopX;
+            build_band_path(cr, model, lut, xLo, xHi, y0, height, startX, stopX);
 
-            bool isStarted = false;
-            double startX = xLo;
-            double stopX = xLo;
-            double lastX = xLo;
             double r, g, bcol;
             get_band_color(i, r, g, bcol);
-            cairo_new_path(cr);
-
-            for (int x = xLo; x <= xHi; ++x) {
-                double f = freqLUT[x];
-                double db = 0.0;
-                if (f >= 10.0) {
-                    double xl = std::log2((f + 1e-9) / (bandFreq + 1e-9));
-                    switch (type) {
-                        case 0: db = gd * 0.5 * (1.0 - std::tanh(slope * xl)); break;
-                        case 2: db = gd * 0.5 * (1.0 + std::tanh(slope * xl)); break;
-                        default: db = gd * std::exp(-invSig2 * xl * xl); break;
-                    }
-                }
-                double y = db_to_y(db, db_min, db_max, height);
-                if (fabs(y - y0) < 0.5) continue;
-
-                if (!isStarted) {
-                    cairo_move_to(cr, x, y);
-                    startX = x;
-                    lastX = x;
-                    isStarted = true;
-                } else if (x > lastX + 2.0) {
-                    cairo_line_to(cr, x, y);
-                }
-                stopX = x;
-            }
-
-            // fill
-            cairo_line_to(cr, stopX, y0);
-            cairo_line_to(cr, startX, y0);
-            cairo_close_path(cr);
-
-            cairo_set_source_rgba(cr, r, g, bcol, t.band_fill_alpha);
-            cairo_fill_preserve(cr);
-            // glow
-            cairo_pattern_t* glow = cairo_pattern_create_linear(startX, 0, stopX, 0);
-            cairo_pattern_add_color_stop_rgba(glow, 0, r, g, bcol,t.band_glow_alpha * 0.1);
-            cairo_pattern_add_color_stop_rgba(glow, 0.5, r, g, bcol,t.band_glow_alpha * 0.8);
-            cairo_pattern_add_color_stop_rgba(glow, 1, r, g, bcol,t.band_glow_alpha * 0.1);
-            for (int k = 0; k < 3; ++k) {
-                double width_glow = 6.0 + k * 4.0;
-
-                cairo_set_line_width(cr, width_glow);
-                cairo_set_source(cr, glow);
-                //cairo_set_source_rgba(cr, r, g, bcol, t.band_fill_alpha * 0.5);
-                cairo_stroke_preserve(cr);
-            }
-            cairo_pattern_destroy(glow);
-
-            // line
-            cairo_pattern_t* grad = cairo_pattern_create_linear(startX, 0, stopX, 0);
-            cairo_pattern_add_color_stop_rgba(grad, 0, r, g, bcol,t.band_line_alpha * 0.1);
-            cairo_pattern_add_color_stop_rgba(grad, 0.5, r, g, bcol,t.band_line_alpha * 1);
-            cairo_pattern_add_color_stop_rgba(grad, 1, r, g, bcol,t.band_line_alpha * 0.1);
-            cairo_set_line_width(cr, 1.5);
-            //cairo_set_source_rgba(cr, r, g, bcol, t.band_line_alpha);
-            cairo_set_source(cr, grad);
-            cairo_stroke(cr);
-            cairo_pattern_destroy(grad);
+            stroke_band_fill_glow_line(cr, startX, stopX, y0, r, g, bcol);
         }
     }
 
     void draw_band_points(cairo_t* cr, const int width, const int height) {
-        for(int i = 0; i<12; i++) {
+        for(int i = 0; i<FilterTypes::NumFilters; i++) {
             double r,g,bcol;
             get_band_color(i, r, g, bcol);
             cairo_set_source_rgba(cr, r, g, bcol, 1.0);

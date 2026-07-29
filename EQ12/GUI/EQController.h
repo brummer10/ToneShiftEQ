@@ -642,6 +642,44 @@ void draw_icon_biquad(cairo_t *cr, double x, double y, double size, int state) {
     cairo_restore(cr);
 }
 
+void draw_icon_svf(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = size * 0.16;
+    double x0 = x + pad;
+    double x1 = x + size - pad;
+    double y_top = y + pad;
+    double y_bot = y + size - pad;
+
+    cairo_save(cr);
+    cairo_set_line_width(cr, size * 0.035);
+    if (state) cairo_set_line_width(cr, size * 0.065);
+    cairo_set_source_rgba(cr, 0.5, 0.5, 0.5, 0.35);
+    cairo_move_to(cr, x0, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_line_to(cr, x1, (y_top + y_bot) * 0.5 + (y_bot - y_top) * 0.28);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58);
+    cairo_set_line_width(cr, size * 0.09);
+    if (state) cairo_set_line_width(cr, size * 0.15);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    double y_base = y_top + (y_bot - y_top) * 0.80;
+    double y_peak = y_top + (y_bot - y_top) * 0.08;
+    double x_mid  = x0 + (x1 - x0) * 0.5;
+
+    cairo_move_to(cr, x0, y_base);
+    cairo_curve_to(cr,
+        x0 + (x1 - x0) * 0.16, y_base,
+        x0 + (x1 - x0) * 0.30, y_peak,
+        x_mid, y_peak);
+    cairo_curve_to(cr,
+        x0 + (x1 - x0) * 0.70, y_peak,
+        x0 + (x1 - x0) * 0.84, y_base,
+        x1, y_base);
+    cairo_stroke(cr);
+    cairo_restore(cr);
+}
+
 void draw_mode_button(void *w_, void* user_data) {
     Widget_t *w = (Widget_t*)w_;
     if (!w) return;
@@ -653,9 +691,12 @@ void draw_mode_button(void *w_, void* user_data) {
     const int height = metrics.height;
     const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
     static int last_state = state;
-    if (state) {
+    if (state == 1) {
         draw_icon_biquad(w->crb, 0.0, 0.0, height, w->state);
-        tooltip_set_my_text(w, "Biquad Mode");
+        tooltip_set_my_text(w, "Biquad Filter Mode");
+    } else if (state == 2) {
+        draw_icon_svf(w->crb, 0.0, 0.0, height, w->state);
+        tooltip_set_my_text(w, "State Variable Filter Mode");
     } else {
         draw_icon_fft(w->crb, 0.0, 0.0, height, w->state);
         tooltip_set_my_text(w, "FFT convolver Mode");
@@ -666,11 +707,24 @@ void draw_mode_button(void *w_, void* user_data) {
     }
 }
 
+
+void fbutton_released(void *w_, void* button_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    XButtonEvent *xbutton = (XButtonEvent*)button_;
+    if (w->flags & HAS_POINTER && xbutton->button == Button1) {
+        float v = adj_get_value(w->adj);
+        adj_set_value(w->adj, v>1 ? 0.0f : v + 1.0f);
+    }
+    expose_widget(w);
+}
+
 Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int height) {
-    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    Widget_t *fbutton = add_hslider(parent, "", x, y, width, height);
+    set_adjustment(fbutton->adj, 0.0, 0.0, 0.0, 2.0, 1.0, CL_CONTINUOS);
     fbutton->scale.gravity = ASPECT;
     fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
     fbutton->func.expose_callback = draw_mode_button;
+    fbutton->func.button_release_callback = fbutton_released;
     return fbutton;
 }
 

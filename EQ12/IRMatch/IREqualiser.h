@@ -15,6 +15,13 @@
 #include <algorithm>
 
 #include "Band.h"
+#include "BiquadResponse.h"
+#include "SVFResponse.h"
+
+/****************************************************************
+ * @file IREqualiser.h
+ * @brief Frequency-domain magnitude synthesis for the FFT-mode (minimum-phase IR) parametric EQ.
+****************************************************************/
 
 class IREqualiser {
 public:
@@ -69,6 +76,22 @@ public:
                     else mask = 0.0;
                     break;
                 }
+                case Band::Notch:
+                {
+                    db = eval_notch_db(freq, b.freq, b.Q, sr);
+                    double adb = fabs(db);
+                    const double threshold = 0.5;
+                    const double edge = 0.5;
+
+                    if (adb > threshold + edge) {
+                        mask = 1.0;
+                    } else if (adb > threshold - edge) {
+                        mask = db_edge_fade(adb, threshold, edge);
+                    } else {
+                        mask = 0.0;
+                    }
+                    break;
+                }
             }
             mag[i] = db * mask + (-220.0) * (1.0 - mask);
         }
@@ -118,12 +141,101 @@ public:
                     else remove_mask = 0.0;
                     break;
                 }
+                case Band::Notch:
+                {
+                    db = eval_notch_db(freq, b.freq, b.Q, sr);
+                    double adb = fabs(db);
+
+                    if (adb > threshold + edge)
+                        remove_mask = 1.0;
+                    else if (adb > threshold - edge)
+                        remove_mask = db_edge_fade(adb, threshold, edge);
+                    else
+                        remove_mask = 0.0;
+                    break;
+                }
             }
             double keep = 1.0 - remove_mask;
             mag[i] = mag[i] * keep + (-220.0) * remove_mask;
         }
         mag[0] = mag[1];
         return mag;
+    }
+
+
+    static void apply_all_biquad(Vec& mag, double sr, const Band* bands, size_t count,
+            bool lowCutEnabled, double lowCutFreq, bool highCutEnabled, double highCutFreq) {
+        const size_t n = mag.size();
+        if (!n) return;
+        const double nyquist = sr * 0.5;
+
+        std::vector<BiquadResponse::Coeffs> active;
+        active.reserve(count + 2);
+
+        if (lowCutEnabled)
+            active.push_back(BiquadResponse::compute(FilterTypes::Type::HighPass, lowCutFreq, 1.0, 1.0, sr));
+        if (highCutEnabled)
+            active.push_back(BiquadResponse::compute(FilterTypes::Type::LowPass, highCutFreq, 1.0, 1.0, sr));
+
+        for (size_t bi = 0; bi < count; ++bi) {
+            const Band& b = bands[bi];
+            if (!b.enabled) continue;
+            FilterTypes::Type ftype = b.type == Band::LowShelf  ? FilterTypes::Type::LowShelf
+                                     : b.type == Band::HighShelf ? FilterTypes::Type::HighShelf
+                                     : b.type == Band::Notch ? FilterTypes::Type::Notch
+                                                                   : FilterTypes::Type::Peak;
+            active.push_back(BiquadResponse::compute(ftype, b.freq, mapQ(b.Q), b.gain, sr));
+        }
+        if (active.empty()) return;
+
+        for (size_t i = 0; i < n; ++i) {
+            double f = (double)i / (n - 1) * nyquist;
+            double w = 2.0 * M_PI * f / sr;
+            std::complex<double> zInv  = std::polar(1.0, -w);
+            std::complex<double> zInv2 = zInv * zInv;
+
+            double sumDb = 0.0;
+            for (auto& c : active)
+                sumDb += BiquadResponse::responseDbAtZ(c, zInv, zInv2);
+            mag[i] += sumDb;
+        }
+    }
+
+    static void apply_all_svf(Vec& mag, double sr, const Band* bands, size_t count,
+            bool lowCutEnabled, double lowCutFreq,  bool highCutEnabled, double highCutFreq) {
+        const size_t n = mag.size();
+        if (!n) return;
+        const double nyquist = sr * 0.5;
+
+        std::vector<SVFResponse::Coeffs> active;
+        active.reserve(count + 2);
+
+        if (lowCutEnabled)  active.push_back(SVFResponse::highPass(lowCutFreq, 1.0, sr));
+        if (highCutEnabled) active.push_back(SVFResponse::lowPass(highCutFreq, 1.0, sr));
+
+        for (size_t bi = 0; bi < count; ++bi) {
+            const Band& b = bands[bi];
+            if (!b.enabled) continue;
+            double Q = mapQ(b.Q);
+            active.push_back(
+                b.type == Band::LowShelf  ? SVFResponse::lowShelf(b.freq, Q, b.gain, sr)
+              : b.type == Band::HighShelf ? SVFResponse::highShelf(b.freq, Q, b.gain, sr)
+              : b.type == Band::Notch     ? SVFResponse::notch(b.freq, Q, sr)
+                                            : SVFResponse::peak(b.freq, Q, b.gain, sr));
+        }
+        if (active.empty()) return;
+
+        for (size_t i = 0; i < n; ++i) {
+            double f = (double)i / (n - 1) * nyquist;
+            double w = 2.0 * M_PI * f / sr;
+            std::complex<double> z     = std::polar(1.0, w);
+            std::complex<double> alpha = 2.0 / (z + 1.0);
+
+            double sumDb = 0.0;
+            for (auto& c : active)
+                sumDb += SVFResponse::responseDbAtAlpha(c, alpha);
+            mag[i] += sumDb;
+        }
     }
 
     static double mapQ(double q_ui) {
@@ -223,6 +335,25 @@ public:
         }
     }
 
+    static double eval_notch_db(double freq, double f0, double Q_ui, double sr) {
+        double Q = mapQ(Q_ui);
+        auto c = BiquadResponse::compute(FilterTypes::Type::Notch, f0, Q, 0.0, sr);
+        return BiquadResponse::responseDB(c, freq, sr);
+    }
+
+    static void apply_notch(Vec& mag, double sr, double freq, double Q_ui) {
+        size_t n = mag.size();
+        double nyquist = sr * 0.5;
+        double Q = mapQ(Q_ui);
+        auto c = BiquadResponse::compute(FilterTypes::Type::Notch, freq, Q, 0.0, sr);
+
+        for (size_t i = 1; i < n; ++i) {
+            double f = (double)i / (n - 1) * nyquist;
+            if (f < 10.0) continue;
+            mag[i] += BiquadResponse::responseDB(c, f, sr);
+        }
+    }
+
     static void apply_high_rolloff(Vec& mag, double sr, double cutoff, double Q = 0.707) {
         applyRolloff(mag, sr, cutoff, lowPassCoeffs(cutoff, sr, Q), true);
     }
@@ -284,7 +415,7 @@ private:
 
         for (size_t i = begin; i < end; ++i) {
             double f = (double)i / (n - 1) * nyquist;
-            if (!aboveCutoff && f < 1.0) f = 1.0; // avoid the DC bin, same guard as the original
+            if (!aboveCutoff && f < 1.0) f = 1.0; // avoid the DC bin
             double h = biquadMagnitude(coeffs, f, sr) / h0;
             mag[i] = db(anchorLin * h);
         }

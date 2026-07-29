@@ -26,6 +26,7 @@
 #include "AudioFile.h"
 #include "ParallelThread.h"
 #include "Biquad.h"
+#include "SVF.h"
 #include "BandDetector.h"
 
 
@@ -41,6 +42,7 @@ public:
     SmoothCascade                   tsc;
     SmoothDynamicCascade            com;
     Detector                        tsd;
+    SVFCascade                      svf;
     uint32_t                        s_rate = 48000;
     size_t                          irLength = 4096;          
     std::string                     revfile;
@@ -66,8 +68,8 @@ private:
     float*                          abuffer = nullptr;
     uint32_t                        frames = 0;
     int                             mode = 0;
-    float                           dynamicThreshold[SmoothDynamicCascade::NumFilters];
-    int                             dynamicRatio[SmoothDynamicCascade::NumFilters];
+    float                           dynamicThreshold[NumFilters];
+    int                             dynamicRatio[NumFilters];
 
     enum class ModeState { Running, FadingOut, FadingIn };
     ModeState modeState = ModeState::Running;
@@ -77,10 +79,10 @@ private:
     float fadeGain = 1.0f;
     static constexpr float fadeStep = 0.25f;
 
-    std::array<FilterConfig, Detector::NumFilters> baseFilterConfig {};
-    std::array<bool, Detector::NumFilters> dynamicActive {};
-    std::array<std::atomic<float>, Detector::NumFilters> dynGainOffset {};
-    std::array<float, Detector::NumFilters> smoothedDynGainDB {};
+    std::array<FilterConfig, NumFilters> baseFilterConfig {};
+    std::array<bool, NumFilters> dynamicActive {};
+    std::array<std::atomic<float>, NumFilters> dynGainOffset {};
+    std::array<float, NumFilters> smoothedDynGainDB {};
 
     void registerParameters();
     void updateCascadeFromParams();
@@ -101,7 +103,7 @@ inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana
         abuffer = new float[8192];
         memset(abuffer, 0, 8192 * sizeof(float));
 
-        for (int i = 0; i< SmoothDynamicCascade::NumFilters; i++) {
+        for (int i = 0; i< NumFilters; i++) {
             dynamicThreshold[i] = 0.0;
             dynamicRatio[i] = 1;
         }
@@ -126,10 +128,10 @@ void Engine::registerParameters() {
     //                  name           group    min, max, def, step     value                    isStepped  type
     param.registerParam("Enable",     "Global",  0,   1,   0,    1,     (void*)&conv->bypass,        true,  IS_INT);
 
-    for (int i = 0; i < SmoothCascade::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         std::string n = "Band " + std::to_string(i + 1);
         param.registerParam(n + " enable", "EQ", 0, 1, 1, 1, (void*)&ip->bands[i].enabled, true, IS_INT);
-        param.registerParam(n + " type", "EQ", 0, 2, defs[i].type, 1, (void*)&ip->bands[i].type, true, IS_INT);
+        param.registerParam(n + " type", "EQ", 0, 3, defs[i].type, 1, (void*)&ip->bands[i].type, true, IS_INT);
         param.registerParam(n + " mute", "EQ", 0, 1, 0, 1, (void*)&ip->bands[i].mute, true, IS_INT);
         param.registerParam(n + " freq", "EQ", defs[i].freqMin, defs[i].freqMax, defs[i].freqDef, 0.01, (void*)&ip->bands[i].freq, false, IS_DOUBLE);
         param.registerParam(n + " gain", "EQ", -48.0, 24.0, 0.0, 0.01, (void*)&ip->bands[i].gain, false, IS_DOUBLE);
@@ -151,13 +153,13 @@ void Engine::registerParameters() {
     param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
 
     param.registerParam("HF Fade",        "EQ",  0,   1,   0,    1,     (void*)&ip->hf_fade,         true,  IS_INT);
-    param.registerParam("Mode",           "EQ",  0,   1,   0,    1,     (void*)&mode,                true,  IS_INT);
+    param.registerParam("Mode",           "EQ",  0,   2,   0,    1,     (void*)&mode,                true,  IS_INT);
 
-    for (int i = 0; i < SmoothDynamicCascade::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         param.registerParam("Threshold" + std::to_string(i + 1), "Compressor",-46.0,0.0, 0.0,0.1, (void*)&dynamicThreshold[i],false,  IS_FLOAT);
     }
 
-    for (int i = 0; i < SmoothDynamicCascade::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&dynamicRatio[i],true,  IS_INT);
     }
    
@@ -176,6 +178,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     tsc.prepare((double)rate);
     com.prepare((double)rate);
     tsd.prepare((double)rate);
+    svf.prepare((double)rate);
     updateCascadeFromParams();
     execute.store(false, std::memory_order_release);
 
@@ -201,10 +204,11 @@ void Engine::updateCascadeFromParams() {
     static const Type typeMap[] = {
         Type::LowShelf,
         Type::Peak,
-        Type::HighShelf
+        Type::HighShelf,
+        Type::Notch
     };
 
-    for (int i = 0; i < SmoothCascade::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         FilterConfig cfg;
         Detector::DetectorConfig cfg_d;
 
@@ -237,18 +241,22 @@ void Engine::updateCascadeFromParams() {
         dynamicActive[i]    = !inactive;
 
         tsc.setFilter(i, cfg);
+        svf.setFilter(i, cfg);
         tsd.setDetector(i, cfg_d);
     }
     tsc.setLowCut((float)ip->lowcut, ip->solo_enabled ? false : ip->lowcut_enabled);
     tsc.setHighCut((float)ip->highcut, ip->solo_enabled ? false : ip->highcut_enabled);
+    svf.setLowCut((float)ip->lowcut, ip->solo_enabled ? false : ip->lowcut_enabled);
+    svf.setHighCut((float)ip->highcut, ip->solo_enabled ? false : ip->highcut_enabled);
 }
 
 void Engine::do_work_mono() {
     execute.store(true, std::memory_order_release);
 
     if (processIR.load(std::memory_order_acquire)) {
-        ip->computeIR(s_rate);
         updateCascadeFromParams();
+        ip->MODEL = mode;
+        ip->computeIR(s_rate);
         processIR.store(false, std::memory_order_release);
         waitForIR.store(true, std::memory_order_release);
     }
@@ -264,7 +272,7 @@ void Engine::do_work_mono() {
 inline void Engine::processDynamic() {
     float ratio     = 3.0f;   // 3:1
 
-    for (int i = 0; i < Detector::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         if (!dynamicActive[i]) {
             dynGainOffset[i].store(0.0f, std::memory_order_relaxed);
             continue;
@@ -295,7 +303,7 @@ inline void Engine::processDynamic() {
 }
 
 inline void Engine::applyDynamicGains() {
-    for (int i = 0; i < Detector::NumFilters; ++i) {
+    for (int i = 0; i < NumFilters; ++i) {
         if (!dynamicActive[i]) continue;
         float dynGainDB = dynGainOffset[i].load(std::memory_order_acquire);
         FilterConfig cfg = baseFilterConfig[i];
@@ -337,6 +345,7 @@ inline void Engine::process(uint32_t nframes, const float* input,
         if (fadeGain <= 0.0f) {
             fadeGain = 0.0f;
             tsc.reset();
+            svf.reset();
             com.reset();
             conv->reset();
             for (auto& g : smoothedDynGainDB)
@@ -359,11 +368,18 @@ inline void Engine::process(uint32_t nframes, const float* input,
         pendingMode = mode;
         modeState = ModeState::FadingOut;
     }
-    if (!currentMode) {
-        conv->process(nframes, input, input1, output, output1);
-    } else {
-        tsc.setBypass(conv->bypass);
-        tsc.processBlock(nframes, output, output1);
+    switch (currentMode) {
+        case 0:
+            conv->process(nframes, input, input1, output, output1);
+            break;
+        case 1:
+            tsc.setBypass(conv->bypass);
+            tsc.processBlock(nframes, output, output1);
+            break;
+        case 2:
+            svf.setBypass(conv->bypass);
+            svf.processBlock(nframes, output, output1);
+            break;
     }
 
     tsd.processBlock(nframes, output, output1);

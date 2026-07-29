@@ -128,7 +128,7 @@ private:
 class Detector {
 public:
 
-    static constexpr int NumFilters = 12;
+    static constexpr int NumFilters = FilterTypes::NumFilters;
 
     struct DetectorConfig {
         float frequency;

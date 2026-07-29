@@ -24,6 +24,14 @@
 #include "IREqualiser.h"
 #include "IRDesigner.h"
 
+/****************************************************************
+ * @file IRProcessor.h
+ * @brief FFT-mode parametric EQ engine: 
+ * synthesizes the target magnitude curve, 
+ * builds a minimum-phase impulse response,
+ * and applies it via convolution.
+****************************************************************/
+
 class IRProcessor {
 public:
     using Complex = std::complex<double>;
@@ -38,6 +46,8 @@ public:
     int lowcut_enabled = 0;
     int highcut_enabled = 0;
     int hf_fade = 0;
+
+    int MODEL = 0;
 
     double lowcut = 19.0;
     double highcut = 22000.0;
@@ -154,94 +164,6 @@ public:
         for (auto& v : gui_ref_)  v -= peak;
 
         return gui_ref_;
-    }
-
-    struct EQSettings {
-        std::array<float, 12> gain;
-        std::array<float, 12> freq;
-        std::array<float, 12> Q;
-        float lowCut = 20.0f;
-        float highCut = 20000.0f;
-    };
-
-    EQSettings extractEQSettings(const Vec& response, double sampleRate) {
-
-        EQSettings eq;
-
-        const double hzToBin = 2.0 * (response.size() - 1) / sampleRate;
-        const double binToHz = sampleRate / (2.0 * (response.size() - 1));
-
-        auto freqToBin = [&](double freq) {
-            return freq * hzToBin;
-        };
-
-        auto sampleAtFreq = [&](double freq) {
-            double pos = freqToBin(freq);
-            if (pos <= 0.0) return response.front();
-            if (pos >= response.size() - 1) return response.back();
-            size_t i0 = static_cast<size_t>(std::floor(pos));
-            size_t i1 = std::min(i0 + 1, response.size() - 1);
-            float t = static_cast<float>(pos - i0);
-            return response[i0] * (1.0f - t) + response[i1] * t;
-        };
-
-        // Band Gains and default Freq and Q
-        for (size_t i = 0; i < 12; ++i) {
-            eq.gain[i] = sampleAtFreq(defs[i].freqDef);
-            eq.freq[i] = defs[i].freqDef;
-            eq.Q[i]    = defs[i].qDef;
-        }
-
-        // Smooth edges for low/high-cut detection
-        Vec smooth(response.size());
-
-        for (size_t i = 0; i < response.size(); ++i) {
-            float sum = 0.0f;
-            int count = 0;
-            for (int k = -2; k <= 2; ++k) {
-                int idx = static_cast<int>(i) + k;
-                if (idx >= 0 && idx < static_cast<int>(response.size())) {
-                    sum += response[idx];
-                    ++count;
-                }
-            }
-            smooth[i] = sum / count;
-        }
-        // jump point
-        const float peak = *std::max_element(smooth.begin(), smooth.end());
-        const float threshold = peak - 3.0f;
-
-        // LowCut
-        size_t lowBegin = std::max<size_t>(1, static_cast<size_t>(freqToBin(20.0)));
-        size_t lowEnd = std::min<size_t>( smooth.size() - 1, static_cast<size_t>(freqToBin(250.0)));
-
-        for (size_t i = lowBegin; i <= lowEnd; ++i) {
-            if (smooth[i] >= threshold) {
-                float denom = smooth[i] - smooth[i-1];
-                if (std::fabs(denom) < 1e-9f) continue;
-                float t = (threshold - smooth[i-1]) / denom;
-                double bin = (i - 1) + t;
-                eq.lowCut = static_cast<float>( bin * binToHz);
-                break;
-            }
-        }
-
-        // HighCut
-        size_t highBegin = std::min<size_t>(smooth.size() - 1, static_cast<size_t>(freqToBin(2000.0)));
-        size_t highEnd = std::min<size_t>(smooth.size() - 1, static_cast<size_t>(freqToBin(20000.0)));
-
-        for (size_t i = highEnd; i > highBegin; --i) {
-            if (smooth[i] >= threshold) {
-                float denom = smooth[i-1] - smooth[i];
-                if (std::fabs(denom) < 1e-9f) continue;
-                float t = (threshold - smooth[i]) / denom;
-                double bin = i - t;
-                eq.highCut = static_cast<float>( bin * binToHz);
-                break;
-            }
-        }
-
-        return eq;
     }
 
     void computeIR(double sampleRate_, size_t irLength_ = 4096,
@@ -464,32 +386,27 @@ private:
         int solo_band_ = solo_band;
         int solo_enabled_ = solo_enabled;
 
-        if(lowcut_enabled_) {
-            eq.apply_low_rolloff(mag_ir, sampleRate, lowcut_);
-        }// else if (haveSource || haveReference) {
-         //   eq.apply_low_rolloff(mag_ir, sampleRate, 30.0);
-        //}
-        if(highcut_enabled_) eq.apply_high_rolloff(mag_ir, sampleRate, highcut_);
-
         Band localBands[12];
         std::copy(std::begin(bands), std::end(bands), std::begin(localBands));
 
-        for (auto& b : localBands) {
-            if (b.enabled) {
-                switch (b.type) {
-                    case Band::Peak:
-                        eq.apply_peak(mag_ir, sampleRate, b.freq, b.gain, b.Q);
-                        break;
-
-                    case Band::LowShelf:
-                        eq.apply_low_shelf(mag_ir, sampleRate, b.freq, b.gain, b.Q);
-                        break;
-
-                    case Band::HighShelf:
-                        eq.apply_high_shelf(mag_ir, sampleRate, b.freq, b.gain, b.Q);
-                        break;
+        switch (MODEL) {
+            case 1: eq.apply_all_biquad(mag_ir, sampleRate, localBands, 12,
+                                         lowcut_enabled_, lowcut_, highcut_enabled_, highcut_); break;
+            case 2: eq.apply_all_svf(mag_ir, sampleRate, localBands, 12,
+                                      lowcut_enabled_, lowcut_, highcut_enabled_, highcut_); break;
+            default:
+                if (lowcut_enabled_)  eq.apply_low_rolloff(mag_ir, sampleRate, lowcut_);
+                if (highcut_enabled_) eq.apply_high_rolloff(mag_ir, sampleRate, highcut_);
+                for (auto& b : localBands) {
+                    if (!b.enabled) continue;
+                    switch (b.type) {
+                        case Band::Peak:      eq.apply_peak(mag_ir, sampleRate, b.freq, b.gain, b.Q); break;
+                        case Band::LowShelf:  eq.apply_low_shelf(mag_ir, sampleRate, b.freq, b.gain, b.Q); break;
+                        case Band::HighShelf: eq.apply_high_shelf(mag_ir, sampleRate, b.freq, b.gain, b.Q); break;
+                        case Band::Notch:     eq.apply_notch(mag_ir, sampleRate, b.freq, b.Q); break;
+                    }
                 }
-            }
+                break;
         }
         
         //apply_peak(mag_ir, sampleRate, 1000.0, -24.0, 1.0); // Q 0.0 - 5  

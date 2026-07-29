@@ -261,7 +261,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
     // check for parameter changes
     for (int i = 0; i< engine.param.getParamCount(); i++) {
         if (engine.param.getParam(i) != (*par[i])) {
-            if (i > 0 && i < 84) { // filter update
+            if (i > 0 && i < 85) { // filter update
                 engine.processIR.store(true, std::memory_order_release);
                 engine.workToDo.store(true, std::memory_order_release);
             }

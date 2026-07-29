@@ -16,6 +16,12 @@
 
 #include <fftw3.h>
 
+/****************************************************************
+ * @file FFTProcessor.h
+ * @brief FFTW-based forward/inverse FFT helpers,
+ * plus spectral division and minimum-phase (cepstral) reconstruction.
+ ****************************************************************/
+
 class FFTProcessor {
 public:
     using Complex = std::complex<double>;

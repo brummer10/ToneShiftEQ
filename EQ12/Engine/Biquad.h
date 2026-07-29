@@ -32,8 +32,8 @@
     and a Cascade wrapper (a fixed bank of 12 filters driven by
     a shared FilterConfig, for building parametric EQ chains).
 
-    All variants support Peak, Low Shelf, High Shelf, Low Pass, High Pass
-    and Band Pass.
+    All variants support Peak, Low Shelf, High Shelf, Low Pass, High Pass,
+    Band Pass and Notch.
 
     Which to use: for filters whose parameters change rarely, plain
     Biquad is simplest and cheapest. For filters modulated continuously
@@ -50,25 +50,7 @@
 #include <algorithm>
 #include <cstdint>
 
-class FilterTypes {
-public:
-    enum class Type {
-        Peak,
-        LowShelf,
-        HighShelf,
-        LowPass,
-        HighPass,
-        BandPass
-    };
-
-    struct FilterConfig {
-        Type type;
-        float frequency;
-        float q;
-        float gainDB;
-    };
-
-};
+#include "FilterConfig.h"
 
 /****************************************************************
     Standard RBJ direct-form biquad filter.
@@ -79,8 +61,8 @@ public:
     parameter updates on a filter with non-zero internal state can
     produce audible artifacts from the resulting hard coefficient jumps.
 
-    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass and Band
-    Pass.
+    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass, Band Pass
+    and Notch
 ****************************************************************/
 
 
@@ -184,6 +166,18 @@ public:
                 a2 =  1.0f - alpha;
                 break;
             }
+
+            case Type::Notch:
+            {
+                b0 =  1.0f;
+                b1 = -2.0f * cosw;
+                b2 =  1.0f;
+
+                a0 =  1.0f + alpha;
+                a1 = -2.0f * cosw;
+                a2 =  1.0f - alpha;
+                break;
+            }
         }
 
         // normalize
@@ -254,8 +248,6 @@ private:
 
 class Cascade : public FilterTypes {
 public:
-
-    static constexpr int NumFilters = 12;
 
     void prepare(double sampleRate) {
         for(auto& f : filters)
@@ -339,8 +331,8 @@ private:
     can produce from a hard coefficient jump while its internal state is
     non-zero.
 
-    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass and Band
-    Pass.
+    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass, Band Pass
+    and Notch
 ****************************************************************/
 
 class SmoothBiquad : public FilterTypes {
@@ -439,6 +431,16 @@ public:
                 na1 = -2.0f * cosw;
                 na2 =  1.0f - alpha;
                 break;
+
+            case Type::Notch:
+                nb0 =  1.0f;
+                nb1 = -2.0f * cosw;
+                nb2 =  1.0f;
+
+                na0 =  1.0f + alpha;
+                na1 = -2.0f * cosw;
+                na2 =  1.0f - alpha;
+                break;
         }
 
         tb0 = nb0 / na0;
@@ -530,8 +532,6 @@ private:
 class SmoothCascade : public FilterTypes {
 public:
 
-    static constexpr int NumFilters = 12;
-
     void prepare(double sampleRate) {
         for(auto& f : filters)
             f.prepare(sampleRate);
@@ -621,8 +621,8 @@ private:
     abruptly between calls to setParameters() - useful for filters whose
     parameters are updated frequently, even without additional smoothing.
 
-    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass and Band
-    Pass. Denormals are flushed to zero in the state variables.
+    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass, Band Pass
+    and Notch. Denormals are flushed to zero in the state variables.
 ****************************************************************/
 
 class DynamicBiquad : public FilterTypes {
@@ -732,6 +732,18 @@ public:
                 a2 = 1.0-alpha;
                 break;
             }
+
+            case Type::Notch:
+            {
+                b0 = 1.0;
+                b1 = -2.0*cosw;
+                b2 = 1.0;
+
+                a0 = 1.0+alpha;
+                a1 = -2.0*cosw;
+                a2 = 1.0-alpha;
+                break;
+            }
         }
 
         // RBJ -> normalized
@@ -821,8 +833,6 @@ private:
 class DynamicCascade : public FilterTypes {
 public:
 
-    static constexpr int NumFilters = 12;
-
     void prepare(double sampleRate) {
         for(auto& f : filters)
             f.prepare(sampleRate);
@@ -887,8 +897,8 @@ private:
     conditions - particularly at low frequencies, where hard coefficient
     jumps interact badly with the filter's long ring-down time.
 
-    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass and Band
-    Pass. Denormals are flushed to zero in the state variables.
+    Supports Peak, Low Shelf, High Shelf, Low Pass, High Pass, Band Pass
+    and Notch. Denormals are flushed to zero in the state variables.
 ****************************************************************/
 
 class SmoothDynamicBiquad : public FilterTypes {
@@ -988,6 +998,16 @@ public:
                 a1 = -2.0*cosw;
                 a2 = 1.0-alpha;
                 break;
+
+            case Type::Notch:
+                b0 = 1.0;
+                b1 = -2.0*cosw;
+                b2 = 1.0;
+
+                a0 = 1.0+alpha;
+                a1 = -2.0*cosw;
+                a2 = 1.0-alpha;
+                break;
         }
 
         b0 /= a0; b1 /= a0; b2 /= a0;
@@ -1082,8 +1102,6 @@ private:
 
 class SmoothDynamicCascade : public FilterTypes {
 public:
-
-    static constexpr int NumFilters = 12;
 
     void prepare(double sampleRate) {
         for(auto& f : filters)

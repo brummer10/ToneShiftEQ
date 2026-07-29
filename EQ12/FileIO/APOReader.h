@@ -54,6 +54,7 @@ private:
             case Band::LowShelf:  return "Low Shelf";
             case Band::Peak:      return "Peak";
             case Band::HighShelf: return "High Shelf";
+            case Band::Notch:     return "Notch"; // not supported
         }
         return "?";
     }
@@ -63,6 +64,7 @@ private:
             case Band::LowShelf:  return "LSC";
             case Band::Peak:      return "PK";
             case Band::HighShelf: return "HSC";
+            case Band::Notch:     return "NO"; // not supported
         }
         return "PK";
     }

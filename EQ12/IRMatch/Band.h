@@ -13,7 +13,8 @@ struct Band {
     enum Type {
         LowShelf  = 0,
         Peak      = 1,
-        HighShelf = 2
+        HighShelf = 2,
+        Notch     = 3
     };
 
     int enabled;

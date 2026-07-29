@@ -35,7 +35,7 @@ public:
         engine->param.setParam(index, value);
         engine->param.setParamDirty(index, true);
         engine->param.controllerChanged.store(true, std::memory_order_release);
-        if (index > 0 && index < 84) { // filter update
+        if (index > 0 && index < 85) { // filter update
             engine->processIR.store(true, std::memory_order_release);
             engine->workToDo.store(true, std::memory_order_release);
         }
