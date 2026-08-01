@@ -44,7 +44,7 @@ inline constexpr PluginDescriptor descriptor = {
     .masterName    = "ToneShift-EQ12M",
     .liveName      = "ToneShift-EQ12L",
 
-    .version       = "0.6.0",
+    .version       = "0.7.0",
     .sdkVersion    = "VST 3.7.9",
 
     .masterUID      = V3_ID(0xf56bf8c5, 0xf60047ce, 0xa5a7dd43, 0x1717129a),

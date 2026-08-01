@@ -16,7 +16,7 @@ $(MAKECMDGOALS) recurse: $(SUBDIR)
 check-and-reinit-submodules :
 ifeq (,$(filter $(NOGOAL),$(MAKECMDGOALS)))
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
-	@if git submodule status 2>/dev/null | egrep -q '^[-]|^[+]' ; then \
+	@if git submodule status 2>/dev/null | grep -Eq '^[-]|^[+]' ; then \
 		echo "$(red)INFO: Need to reinitialize git submodules$(reset)"; \
 		git submodule update --init; \
 		echo "$(blue)Done$(reset)"; \

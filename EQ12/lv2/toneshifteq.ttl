@@ -31,7 +31,7 @@ idpy:interface a lv2:ExtensionData .
     lv2:optionalFeature lv2:hardRTCapable ;
     lv2:optionalFeature idpy:queue_draw ;
     lv2:extensionData idpy:interface ;
-    lv2:minorVersion 6 ;
+    lv2:minorVersion 7 ;
     lv2:microVersion 0 ;
 
 rdfs:comment """
