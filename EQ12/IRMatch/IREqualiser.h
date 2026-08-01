@@ -239,15 +239,7 @@ public:
     }
 
     static double mapQ(double q_ui) {
-        // clamp UI range
-        q_ui = std::clamp(q_ui, 0.1, 10.0);
-        // log-space mapping
-        double x = std::log(q_ui);
-        // soften curve
-        double shaped = std::tanh(x * 0.8);
-        // back to linear
-        double q = std::exp(shaped * 1.5);
-        return q;
+        return std::clamp(q_ui, 0.1, 10.0);
     }
 
     static double q_to_sigma(double q) {
