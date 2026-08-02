@@ -1384,7 +1384,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , atom:AtomPort ;
-        <http://lv2plug.in/ns/ext/resize-port#minimumSize> 8192 ;
+        <http://lv2plug.in/ns/ext/resize-port#minimumSize> 16488 ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
         lv2:index 115 ;

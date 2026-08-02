@@ -458,6 +458,10 @@ static void toneshifteq_stop_processing(const struct clap_plugin *plugin) {}
 
 static void toneshifteq_reset(const struct clap_plugin *plugin) {}
 
+static const char* toneshifteq_features[] = {
+    CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_EQUALIZER, NULL
+};
+
 // CLAP plugin descriptor
 static const clap_plugin_descriptor_t toneshifteq_master_descriptor = {
     .clap_version = CLAP_VERSION_INIT,
@@ -469,7 +473,7 @@ static const clap_plugin_descriptor_t toneshifteq_master_descriptor = {
     .support_url = "https://github.com/brummer10/ToneShiftEQ",
     .version = "0.7.0",
     .description = "12 band minum phase EQ (128 samples latency)",
-    .features = (const char *[]){ CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_EQUALIZER, NULL },
+    .features = toneshifteq_features,
 };
 
 // CLAP plugin descriptor
@@ -483,7 +487,7 @@ static const clap_plugin_descriptor_t toneshifteq_live_descriptor = {
     .support_url = "https://github.com/brummer10/ToneShiftEQ",
     .version = "0.7.0",
     .description = "12 band Biquad EQ (0 sampels latency)",
-    .features = (const char *[]){ CLAP_PLUGIN_FEATURE_AUDIO_EFFECT, CLAP_PLUGIN_FEATURE_EQUALIZER, NULL },
+    .features = toneshifteq_features,
 };
 
 // Extensions
