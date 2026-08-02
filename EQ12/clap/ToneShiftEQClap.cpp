@@ -219,12 +219,12 @@ static bool toneshifteq_state_save(const clap_plugin_t *plugin, const clap_ostre
 
 static bool toneshifteq_state_load(const clap_plugin_t *plugin, const clap_istream_t *stream) {
     toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
-    char _state[2048];
-    char *curr = _state;
-    int thisread = stream->read(stream, curr, 2048);
+    char _state[2048] = {0};
+    int thisread = stream->read(stream, _state, sizeof(_state) - 1);
     if (thisread < 0) return false;
-    plug->state  = _state ;
-    if(plug->isInited) plug->r->readState(plug->state);
+    _state[thisread] = '\0';
+    plug->state = _state;
+    if (plug->isInited) plug->r->readState(plug->state);
     return true;
 }
 

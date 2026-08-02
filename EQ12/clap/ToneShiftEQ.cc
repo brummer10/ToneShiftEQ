@@ -118,7 +118,7 @@ public:
         #endif
         if ((host_width != width && host_width != 1) ||
             (host_height != height && host_height != 1)) {
-            os_resize_window(sw.getMain()->.dpy, sw.top, host_width, host_height);
+            os_resize_window(sw.getMain()->dpy, sw.top, host_width, host_height);
         }
         #endif
     }
