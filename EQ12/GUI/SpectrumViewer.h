@@ -131,6 +131,7 @@ public:
         spec->func.leave_callback = mouse_leave_spec;
         spec->func.button_release_callback = mouse_move_spec;
         spec->func.button_press_callback = mouse_set_spec;
+        spec->func.double_click_callback = reset_spec;
         top->parent_struct = this;
         top->func.key_press_callback = get_key;
         top->func.key_release_callback = release_key;
@@ -856,6 +857,16 @@ private:
         self->set_leak.store(true, std::memory_order_release);
     }
 
+    static void reset_spec(void *w_, void* /* xbutton_ */, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        if (w->flags & HAS_POINTER) {
+            if (self->band_match) {
+                adj_set_value(self->fgain[self->match_band]->adj, 0.0);
+            }
+        }
+    }
+
     static void mouse_set_spec(void *w_, void *xbutton_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
@@ -864,6 +875,11 @@ private:
             if(xbutton->button == Button1) {
                 self->mx = xbutton->x;
                 self->my = xbutton->y;
+            } else if(xbutton->button == Button3) {
+                if (self->band_match) {
+                    int v = (int)adj_get_value(self->fenable[self->match_band]->adj);
+                    adj_set_value(self->fenable[self->match_band]->adj, v ? 0.0 : 1.0);
+                }
             } if(xbutton->state & ShiftMask) {
                 self->dynamic_threshold = true;
             }
@@ -947,7 +963,7 @@ private:
         self->match_state = 0;
         self->infoString(x1, y1);
         //std::cout << "x " << x1 << " y " << y1 << std::endl;
-        if ((self->capture_line && xmotion->state & Button1Mask) || (xmotion->state & Button3Mask)) {
+        if ((self->capture_line && xmotion->state & Button1Mask)) {
             Metrics_t m;
             os_get_window_metrics(w, &m);
             const int width  = m.width;
@@ -1132,6 +1148,19 @@ private:
     static double mapQ(double q_ui) {
         return std::clamp(q_ui, 0.1, 10.0);
     }
+
+    static double mapQp(double q_ui) {
+        // clamp UI range
+        q_ui = std::clamp(q_ui, 0.1, 10.0);
+        // log-space mapping
+        double x = std::log(q_ui);
+        // soften curve
+        double shaped = std::tanh(x * 0.8);
+        // back to linear
+        double q = std::exp(shaped * 1.5);
+        return q;
+    }
+
 
     static float y_to_db(float y, float db_min, float db_max, int height) {
         float norm = 1.0f - (y / height);
@@ -1319,8 +1348,8 @@ private:
         m.type = type;
         m.bandFreq = bandFreq;
         m.gd = gd;
-        m.slope   = Q * 2.0;
-        m.invSig2 = 0.5 / std::pow(1.0 / (1.5 * Q + 0.5), 2);
+        m.slope   = mapQp(Q) * 2.0;
+        m.invSig2 = 0.5 / std::pow(1.0 / (1.5 * mapQp(Q) + 0.5), 2);
 
         if (model == 1) {
             const FilterTypes::Type ftype = type == 0 ? FilterTypes::Type::LowShelf
@@ -1458,16 +1487,18 @@ private:
         for(int i = 0; i<FilterTypes::NumFilters; i++) {
             double r,g,bcol;
             get_band_color(i, r, g, bcol);
-            cairo_set_source_rgba(cr, r, g, bcol, 1.0);
 
             int on = conn->getParameterValue(i * 6 + 1);
             float db = db_to_y(conn->getParameterValue(i * 6 + 5), db_min, db_max, height);
             float freq = freq_to_x(conn->getParameterValue(i * 6 + 4), f_min, f_max, width);
+            cairo_set_source_rgba(cr, r, g, bcol, on ? 1.0 : 0.5);
+
+            cairo_set_line_width(cr, 10.0);
+            cairo_move_to(cr, freq, db);
+            cairo_line_to(cr, freq, db);
+            cairo_stroke(cr);
+
             if (on) {
-                cairo_set_line_width(cr, 10.0);
-                cairo_move_to(cr, freq, db);
-                cairo_line_to(cr, freq, db);
-                cairo_stroke(cr);
                 if (band_match && (match_band == i)) {
                     draw_band_ring(cr, freq, db, i, match_state);
                 }

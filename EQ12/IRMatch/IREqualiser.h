@@ -242,6 +242,18 @@ public:
         return std::clamp(q_ui, 0.1, 10.0);
     }
 
+    static double mapQp(double q_ui) {
+        // clamp UI range
+        q_ui = std::clamp(q_ui, 0.1, 10.0);
+        // log-space mapping
+        double x = std::log(q_ui);
+        // soften curve
+        double shaped = std::tanh(x * 0.8);
+        // back to linear
+        double q = std::exp(shaped * 1.5);
+        return q;
+    }
+
     static double q_to_sigma(double q) {
         return 1.0 / (1.5 * q + 0.5);
     }
@@ -251,7 +263,7 @@ public:
     }
 
     static double eval_peak_db(double freq, double f0, double gain, double Q_ui) {
-        double Q = mapQ(Q_ui);
+        double Q = mapQp(Q_ui);
         double sigma = q_to_sigma(Q);
         double x = std::log2((f0 + 1e-9) / (freq + 1e-9));
         double g = std::exp(-0.5 * (x * x) / (sigma * sigma));
@@ -262,7 +274,7 @@ public:
                 double freq, double gain_db, double Q_ui) {
         size_t n = mag.size();
         double nyquist = sr * 0.5;
-        double Q = mapQ(Q_ui);
+        double Q = mapQp(Q_ui);
         double sigma = q_to_sigma(Q);
 
         for (size_t i = 1; i < n; ++i) {
@@ -275,7 +287,7 @@ public:
     }
 
     static double eval_low_shelf(double freq, double f0, double gain, double Q) {
-        double slope = mapQ(Q) * 2.0; // mapQ(Q) * 1.5;
+        double slope = mapQp(Q) * 2.0; // mapQ(Q) * 1.5;
         double x = log_distance(freq, f0);
 
         double g = 0.5 * (1.0 - std::tanh(slope * x));
@@ -286,7 +298,7 @@ public:
                     double freq, double gain_db, double Q) {
         size_t n = mag.size();
         double nyquist = sr * 0.5;
-        double slope = mapQ(Q) * 2.0; //mapQ(Q) * 1.5;
+        double slope = mapQp(Q) * 2.0; //mapQ(Q) * 1.5;
         double f_min = 2.0 * nyquist / (n - 1);
         double g_dc = 0.5 * (1.0 - std::tanh(slope * log_distance(f_min, freq)));
 
@@ -302,7 +314,7 @@ public:
     }
 
     static double eval_high_shelf(double freq, double f0, double gain, double Q) {
-        double slope = mapQ(Q) * 2.0;
+        double slope = mapQp(Q) * 2.0;
         double x = log_distance(freq, f0);
 
         double g = 0.5 * (1.0 + std::tanh(slope * x));
@@ -313,7 +325,7 @@ public:
                     double freq, double gain_db, double Q) {
         size_t n = mag.size();
         double nyquist = sr * 0.5;
-        double slope =  mapQ(Q) * 2.0; //mapQ(Q) * 1.5;
+        double slope =  mapQp(Q) * 2.0; //mapQ(Q) * 1.5;
         double f_max = (n - 2) * nyquist / (n - 1);
         double g_nyq = 0.5 * (1.0 + std::tanh(slope * log_distance(f_max, freq)));
 
