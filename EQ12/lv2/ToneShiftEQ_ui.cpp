@@ -8,64 +8,20 @@
  */
 
 
-#include <lv2/core/lv2.h>
 #include <lv2/ui/ui.h>
-#include <lv2/state/state.h>
-#include <lv2/worker/worker.h>
-#include <lv2/atom/atom.h>
-#include <lv2/options/options.h>
-
-#include <lv2/atom/util.h>
-#include <lv2/atom/forge.h>
-#include <lv2/midi/midi.h>
-#include <lv2/urid/urid.h>
-#include <lv2/patch/patch.h>
 #include <lv2/parameters/parameters.h>
+#include <lv2/instance-access/instance-access.h>
 
 #include <cmath>
 #include <iostream>
 
 #include "LV2Connector.h"
+#include "ToneShiftEQ.h" // instance-access
+
+#define PLUGIN_UI_URI  "urn:brummer:toneshifteq_ui"
 
 #define LV2PLUG  // hide quit button
 #include "SpectrumViewer.h"
-
-
-#define PLUGIN_URI     "urn:brummer:toneshifteq"
-#define PLUGIN_UI_URI  "urn:brummer:toneshifteq_ui"
-
-#define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
-#define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
-#define TONESHIFTEQ_irphase PLUGIN_URI "#irphase"
-#define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
-
-
-typedef struct {
-    LV2_URID atom_Object;
-    LV2_URID atom_Float;
-    LV2_URID atom_Double;
-    LV2_URID atom_Vector;
-    LV2_URID atom_URID;
-    LV2_URID atom_eventTransfer;
-    LV2_URID spectrum_data;
-    LV2_URID ir_data;
-    LV2_URID ir_phase;
-    LV2_URID ir_request;
-} URIs;
-
-static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
-    uris->atom_Object             = map->map(map->handle, LV2_ATOM__Object);
-    uris->atom_Float              = map->map(map->handle, LV2_ATOM__Float);
-    uris->atom_Double             = map->map(map->handle, LV2_ATOM__Double);
-    uris->atom_Vector             = map->map(map->handle, LV2_ATOM__Vector);
-    uris->atom_URID               = map->map(map->handle, LV2_ATOM__URID);
-    uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
-    uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
-    uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
-    uris->ir_phase                = map->map(map->handle, TONESHIFTEQ_irphase);
-    uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
-}
-
 
 class XToneShiftEQ_UI {
 private:
@@ -80,6 +36,7 @@ private:
 
     void* parentXwindow;
     LV2Connector conn;
+    toneshifteq::Xtoneshifteq  *engine;
 
     void copyValuesToGui(Widget_t* wid, float value);
 
@@ -92,6 +49,7 @@ private:
 public:
     SpectrumViewer sw;
     bool check;
+    bool haveAccess;
 
     static LV2UI_Handle instantiate(const LV2UI_Descriptor* descriptor,
             const char* plugin_uri, const char* bundle_path,
@@ -120,6 +78,7 @@ XToneShiftEQ_UI::XToneShiftEQ_UI()
       map(nullptr),
       parentXwindow(nullptr),
       conn(&write_function, &controller),
+      engine(nullptr),
       sw(&conn) {}
 
 XToneShiftEQ_UI::~XToneShiftEQ_UI() {}
@@ -286,6 +245,7 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
     self->controller = controller;
     self->resize = nullptr;
     self->check = true;
+    self->haveAccess = false;
     LV2_Options_Option *opts = NULL;
 
     for (int i = 0; features[i]; ++i) {
@@ -297,6 +257,12 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
             opts = (LV2_Options_Option*)features[i]->data;
         } else if (!strcmp(features[i]->URI, LV2_URID__map)) {
             self->map = (LV2_URID_Map*)features[i]->data;
+        } else if (!strcmp(features[i]->URI, LV2_INSTANCE_ACCESS_URI)) {
+            self->engine = (toneshifteq::Xtoneshifteq *)features[i]->data;
+            if (self->engine) {
+                self->haveAccess = true;
+                self->engine->needTransfer(false);
+            }
         }
     }
 
@@ -360,10 +326,19 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
 // LV2 idle interface to host
 int XToneShiftEQ_UI::idle(LV2UI_Handle handle) {
     XToneShiftEQ_UI* self = static_cast<XToneShiftEQ_UI*>(handle);
-    if (self->check) {
+    if (self->haveAccess) {
+        if (self->engine->irReady()) {
+            self->sw.setFilter(self->engine->getIRMag().data(), 4096);
+            self->sw.setPhase(self->engine->getPhase().data(), 1024);
+        }
+        if (self->engine->hasNewData()) {
+            self->sw.setSpec(self->engine->getMagnitudes(), self->engine->getBins());
+        }
+    } else if (self->check) {
         self->notify_dsp(self);
         self->check = false;
     }
+
     run_embedded(self->sw.getMain());
     return 0;
 }

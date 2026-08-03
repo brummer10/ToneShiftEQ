@@ -30,6 +30,7 @@ idpy:interface a lv2:ExtensionData .
     lv2:requiredFeature urid:map ;
     lv2:optionalFeature lv2:hardRTCapable ;
     lv2:optionalFeature idpy:queue_draw ;
+    lv2:optionalFeature <http://lv2plug.in/ns/ext/instance-access>;
     lv2:extensionData idpy:interface ;
     lv2:minorVersion 7 ;
     lv2:microVersion 0 ;
