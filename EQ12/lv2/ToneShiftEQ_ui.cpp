@@ -202,8 +202,8 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.threshold[port - 85], value);
     } else if  (port >= 97 && port <= 108) {
         copyValuesToGui(sw.ratio[port - 97], value);
-    } else if  (port >= 118 && port <= 129) {
-        conn.dyn[port - 118] = value;
+    } else if  (port >= 120 && port <= 131) {
+        conn.dyn[port - 120] = value;
     }
 }
 
@@ -213,10 +213,14 @@ void XToneShiftEQ_UI::port_event(LV2UI_Handle handle, uint32_t port, uint32_t bu
 
     if (format == 0) {
         const float value = *(const float*)buffer;
-        if (port == 109) {
+        if (port == 111) {
             adj_set_value(self->sw.vumeterL->adj, power2db(self->sw.vumeterL, value));
-        } else if (port == 110) {
+        } else if (port == 112) {
             adj_set_value(self->sw.vumeterR->adj, power2db(self->sw.vumeterR, value));
+        } else if (port == 132) {
+            adj_set_value(self->sw.vuinmeterL->adj, power2db(self->sw.vuinmeterL, value));
+        } else if (port == 133) {
+            adj_set_value(self->sw.vuinmeterR->adj, power2db(self->sw.vuinmeterR, value));
         } else {
             self->conn.setParValue(port, value);
             self->getEngineValues(port, value);
@@ -294,10 +298,10 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
     main_init(self->sw.getMain());
 
     #if defined(_WIN32)
-    self->sw.top  = create_window(self->sw.getMain(), (HWND) self->parentXwindow, 0, 0, 880, 430);
+    self->sw.top  = create_window(self->sw.getMain(), (HWND) self->parentXwindow, 0, 0, 930, 430);
     self->sw.top->func.expose_callback = self->sw.draw_window;
     #else
-    self->sw.top  = create_window(self->sw.getMain(), (Window) self->parentXwindow, 0, 0, 880, 430);
+    self->sw.top  = create_window(self->sw.getMain(), (Window) self->parentXwindow, 0, 0, 930, 430);
     self->sw.top->func.expose_callback = self->sw.draw_window;
     #endif
     self->sw.create();
@@ -306,7 +310,7 @@ LV2UI_Handle XToneShiftEQ_UI::instantiate(const LV2UI_Descriptor* descriptor,
     *widget = (LV2UI_Widget)self->sw.top->widget;
 
     if (self->resize){
-        self->resize->ui_resize(self->resize->handle, 880, 430);
+        self->resize->ui_resize(self->resize->handle, 930, 430);
     }
 
     return (LV2UI_Handle)self;
@@ -319,7 +323,7 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
     LV2_Atom_Forge_Frame frame;
     LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_object(&self->forge, &frame, 0, self->uris.ir_request);
 
-    self->write_function(self->controller, 116, lv2_atom_total_size(msg),
+    self->write_function(self->controller, 118, lv2_atom_total_size(msg),
                        self->uris.atom_eventTransfer, msg);
 }
 

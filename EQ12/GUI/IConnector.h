@@ -30,6 +30,9 @@ public:
     virtual float getMeterL() = 0;
     virtual float getMeterR() = 0;
 
+    virtual float getInMeterL() = 0;
+    virtual float getInMeterR() = 0;
+
     virtual float getDynamics(int index) = 0;
 
     virtual bool checkNewData() = 0;

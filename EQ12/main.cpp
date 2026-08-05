@@ -7,6 +7,7 @@
  */
 
 
+#include <atomic>
 #include <cmath>
 #include <vector>
 #include <signal.h>
@@ -32,6 +33,45 @@
 #include "JackClient.h"
 
 
+void copyValuesToGui(Widget_t* wid, float value) {
+    xevfunc store = wid->func.value_changed_callback;
+    adj_set_value(wid->adj, value);
+    wid->func.value_changed_callback = store;
+}
+
+void getEngineValues(Params* param, SpectrumViewer* sw) {
+    copyValuesToGui(sw->bp,         (float)param->getParam(0));
+    
+    for (int i = 0; i< 12; i++) {
+        copyValuesToGui(sw->fenable[i], (float)param->getParam(i*6 +1));
+        copyValuesToGui(sw->ftype[i],   (float)param->getParam(i*6 +2));
+        copyValuesToGui(sw->mute[i],    (float)param->getParam(i*6 +3));
+        copyValuesToGui(sw->freq[i],    (float)param->getParam(i*6 +4));
+        copyValuesToGui(sw->fgain[i],   (float)param->getParam(i*6 +5));
+        copyValuesToGui(sw->fq[i],      (float)param->getParam(i*6 +6));
+    }
+
+    if (param->getParam(74)) copyValuesToGui(sw->solo[(int)param->getParam(73)], 1.0);
+
+    copyValuesToGui(sw->lowcut,     (float)param->getParam(76));
+    copyValuesToGui(sw->highcut,    (float)param->getParam(78));
+
+    copyValuesToGui(sw->smooth,     (float)param->getParam(79));
+    copyValuesToGui(sw->dynamics,   (float)param->getParam(80));
+    copyValuesToGui(sw->tilt,       (float)param->getParam(81));
+
+    copyValuesToGui(sw->vug,        (float)param->getParam(82));
+    copyValuesToGui(sw->hf_fade,    (float)param->getParam(83));
+
+    for (int i = 0; i< 12; i++) {
+        copyValuesToGui(sw->threshold[i], (float)param->getParam(85 + i));
+    }
+    for (int i = 0; i< 12; i++) {
+        copyValuesToGui(sw->ratio[i], (float)param->getParam(97 + i));
+    }
+    copyValuesToGui(sw->vuing,       (float)param->getParam(109));
+}
+
 int main(int argc, char *argv[]){
 
     AudioFile af;
@@ -39,7 +79,8 @@ int main(int argc, char *argv[]){
     IRProcessor ip;
     IRMorpherStereo conv;
     GainStereo vu;
-    Engine engine(&ip, &conv, &ana, &vu);
+    GainStereo vuin;
+    Engine engine(&ip, &conv, &ana, &vu, &vuin);
     StandaloneConnector conn(&engine);
     SpectrumViewer sw(&conn);
     JackClient jack(&engine, &sw);
@@ -64,6 +105,10 @@ int main(int argc, char *argv[]){
             sw.check_spec();
             os_run_embedded(sw.getMain());
             sw.check_irmatch();
+            if (engine.param.paramChanged.load(std::memory_order_acquire)) {
+                getEngineValues(&engine.param, &sw);
+                engine.param.paramChanged.store(false, std::memory_order_release);
+            }
         }
 
         main_quit(sw.getMain());

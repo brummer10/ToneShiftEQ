@@ -40,11 +40,12 @@ public:
     IRProcessor             ip;
     IRMorpherStereo         conv;
     GainStereo              vu;
+    GainStereo              vuin;
     Engine                  engine;
     StandaloneConnector     conn;
     SpectrumViewer          sw;
 
-    ToneShiftEQ() : ana(), ip(), conv(), vu(), engine(&ip, &conv, &ana, &vu), conn(&engine), sw(&conn) {
+    ToneShiftEQ() : ana(), ip(), conv(), vu(), vuin(), engine(&ip, &conv, &ana, &vu, &vuin), conn(&engine), sw(&conn) {
         title = "ToneShiftEQ";
         firstLoop = true;
         p = 0;
@@ -58,10 +59,10 @@ public:
     void startGui(Window window) {
         main_init(sw.getMain());
         #if defined(_WIN32)
-        sw.top  = create_window(sw.getMain(), (HWND) window, 0, 0, 880, 430);
+        sw.top  = create_window(sw.getMain(), (HWND) window, 0, 0, 930, 430);
         sw.top->func.expose_callback = sw.draw_window;
         #else
-        sw.top  = create_window(sw.getMain(), (Window) window, 0, 0, 880, 430);
+        sw.top  = create_window(sw.getMain(), (Window) window, 0, 0, 930, 430);
         sw.top->func.expose_callback = sw.draw_window;
         #endif
         sw.top->flags |= HIDE_ON_DELETE;
@@ -73,7 +74,7 @@ public:
 
     void startGui() {
         main_init(sw.getMain());
-        sw.top  = create_window(sw.getMain(), os_get_root_window(sw.getMain(), IS_WINDOW), 0, 0, 880, 430);
+        sw.top  = create_window(sw.getMain(), os_get_root_window(sw.getMain(), IS_WINDOW), 0, 0, 930, 430);
         sw.top->func.expose_callback = sw.draw_window;
         sw.top->flags |= HIDE_ON_DELETE;
         sw.create();
@@ -201,6 +202,7 @@ public:
         for (int i = 0; i< 12; i++) {
             copyValuesToGui(sw.ratio[i], (float)param->getParam(97 + i));
         }
+        copyValuesToGui(sw.vuing,       (float)param->getParam(109));
     }
 
 

@@ -201,9 +201,10 @@ struct toneshifteq_processor : v3_audio_processor_cpp {
 
         float* const* in = data->inputs[0].channel_buffers_32;
         float* const* out = data->outputs[0].channel_buffers_32;
+        float* const* sidechain = data->inputs[1].channel_buffers_32;
         if (out[0] != in[0]) std::memcpy(out[0], in[0], data->nframes * sizeof(float));
         if (out[1] != in[1]) std::memcpy(out[1], in[1], data->nframes * sizeof(float));
-        p->plugin->process(static_cast<uint32_t>(data->nframes), in[0], in[1], out[0], out[1]);
+        p->plugin->process(static_cast<uint32_t>(data->nframes), sidechain[0], sidechain[1], out[0], out[1]);
 
         return V3_OK;
     }
@@ -601,19 +602,48 @@ struct toneshifteq_component : v3_component_cpp {
     static v3_result V3_API get_controller_class_id(void*, v3_tuid) { return V3_NOT_IMPLEMENTED; }
     static v3_result V3_API set_io_mode(void*, int32_t) { return V3_OK; }
 
-    static int32_t V3_API get_bus_count(void*, int32_t mediaType, int32_t) { return mediaType == V3_AUDIO ? 1 : 0; }
+    static int32_t V3_API get_bus_count(void*, int32_t mediaType, int32_t direction) { 
+        if (mediaType == V3_AUDIO) {
+            if (direction == V3_INPUT) return 2;
+            return 1;
+        } else return 0;
+    }
 
     static v3_result V3_API get_bus_info(void*, int32_t mediaType, int32_t direction, int32_t idx, v3_bus_info* info) {
-        if (mediaType != V3_AUDIO || idx != 0) return V3_INVALID_ARG;
-        std::memset(info, 0, sizeof(*info));
-        info->media_type = V3_AUDIO;
-        info->direction = direction;
-        info->channel_count = 2;
-        asciiToUtf16(info->bus_name, direction == V3_INPUT ? "Audio Input" : "Audio Output", 128);
-        info->bus_type = V3_MAIN;
-        info->flags = V3_DEFAULT_ACTIVE;
+        if (mediaType != V3_AUDIO) return V3_INVALID_ARG;
+        if (direction == V3_INPUT) {
+            if (idx == 0) {
+                info->media_type = V3_AUDIO;
+                info->direction = V3_INPUT;
+                info->channel_count = 2;
+                asciiToUtf16(info->bus_name, "Audio Input", 128);
+                info->bus_type = V3_MAIN;
+                info->flags = V3_DEFAULT_ACTIVE;
 
-        return V3_OK;
+                return V3_OK;
+            }
+            if (idx == 1) {
+                info->media_type = V3_AUDIO;
+                info->direction = V3_INPUT;
+                info->channel_count = 2;
+                asciiToUtf16(info->bus_name, "Sidechain Input", 128);
+                info->bus_type = V3_AUX;
+                info->flags = 0;
+
+                return V3_OK;
+            }
+        } else if (direction == V3_OUTPUT) {
+            std::memset(info, 0, sizeof(*info));
+            info->media_type = V3_AUDIO;
+            info->direction = V3_OUTPUT;
+            info->channel_count = 2;
+            asciiToUtf16(info->bus_name, "Audio Output", 128);
+            info->bus_type = V3_MAIN;
+            info->flags = V3_DEFAULT_ACTIVE;
+
+            return V3_OK;
+        }
+        return V3_INVALID_ARG;
     }
 
     static v3_result V3_API get_routing_info(void*, v3_routing_info*, v3_routing_info*) { return V3_NOT_IMPLEMENTED; }

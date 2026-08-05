@@ -43,7 +43,7 @@ public:
     LV2Connector(LV2UI_Write_Function* write_function_, LV2UI_Controller* controller_) {
         write_function = write_function_;
         controller = controller_;
-        for (int i = 0; i< 109; i++) {
+        for (int i = 0; i< 111; i++) {
             par[i] = 0.0f;
         }
         for (int i = 0; i< 12; i++) {
@@ -55,7 +55,7 @@ public:
 
     // send value changes from GUI to the engine/host
     void sendValueChanged(int index, float value) override {
-        if (index < 109) {
+        if (index < 111) {
             par[index] = value;
         }
         (*write_function)(*controller, index, sizeof(float), 0, &value);
@@ -81,6 +81,15 @@ public:
     }
 
     float getMeterR() override {
+        return 0;
+    }
+
+    // those needs to be done by atom ports in LV2
+    float getInMeterL() override {
+        return 0;
+    }
+
+    float getInMeterR() override {
         return 0;
     }
 
@@ -121,7 +130,7 @@ public:
     }
 
 private:
-    float par[109]; // engine.param.getParamCount()
+    float par[111]; // engine.param.getParamCount()
     std::vector<float> dummy;
     std::vector<double> dummy3;
     std::pair<std::vector<double>, std::vector<double> > dummy2;

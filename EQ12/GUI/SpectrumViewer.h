@@ -59,6 +59,9 @@ public:
     Widget_t* vug = nullptr;
     Widget_t* vumeterL = nullptr;
     Widget_t* vumeterR = nullptr;
+    Widget_t* vuing = nullptr;
+    Widget_t* vuinmeterL = nullptr;
+    Widget_t* vuinmeterR = nullptr;
     Widget_t* apo_loader = nullptr;
     std::atomic<bool> havePreset {false};
     std::vector<double> dstL;
@@ -104,7 +107,7 @@ public:
         }
     }
 
-    void init(int width = 880, int height = 430) {
+    void init(int width = 930, int height = 430) {
         main_init(&main);
         top = create_window(&main, os_get_root_window(&main, IS_WINDOW), 0, 0, width, height);
         widget_set_title(top, "ToneShift-EQ12");
@@ -113,11 +116,11 @@ public:
         top->func.expose_callback = draw_window;
     }
 
-    void create(int width = 880, int height = 430) {
+    void create(int width = 930, int height = 430) {
         spec_width  = 0;
         spec_height = 0;
 
-        spec = create_widget(&main, top,0, 0, width-80, height);
+        spec = create_widget(&main, top,65, 0, width-130, height);
         os_set_input_mask(spec);
 
         spec->parent_struct = this;
@@ -136,36 +139,55 @@ public:
         top->func.key_press_callback = get_key;
         top->func.key_release_callback = release_key;
 
-        Widget_t* gframe = add_my_frame(top,"", width-79, 0, 78, height-82);
+        Widget_t* ginframe = add_my_frame(top,"", 1, 0, 64, height-82);
+        ginframe->scale.gravity = EASTNORTH;
+        vuinmeterL = add_my_left_vmeter(ginframe, "Meter", true, 3, 5, 10, height-88);
+        vuinmeterL->scale.gravity = WESTSOUTH;
+        vuinmeterR = add_my_vmeter(ginframe, "Meter", false, 28, 5, 10, height-88);
+        vuinmeterR->scale.gravity = WESTSOUTH;
+        vuing = add_my_vslider(ginframe, "Gain", 40, 6, 20, height-90);
+        vuing->scale.gravity = WESTSOUTH;
+        vuing->parent_struct = this;
+        set_adjustment(vuing->adj,0.0, 0.0, -46.0, 12.0, 0.1, CL_CONTINUOS);
+        vuing->func.value_changed_callback = set_ingain;
+
+        Widget_t* linframe = add_my_frame(top,"", 1, 350, 64, 80);
+        linframe->scale.gravity = EASTWEST;
+
+        Widget_t* side =  add_my_input_button(linframe, 16, 2, 40, 40);
+        side->parent_struct = this;
+        side->func.value_changed_callback = set_side;
+
+        Widget_t* gframe = add_my_frame(top,"", width-65, 0, 64, height-82);
         gframe->scale.gravity = WESTSOUTH;
-        vumeterL = add_my_vmeter(gframe, "Meter", false, 35, 5, 10, height-88);
+        vumeterL = add_my_vmeter(gframe, "Meter", false, 25, 5, 10, height-88);
         vumeterL->scale.gravity = WESTSOUTH;
-        vumeterR = add_my_vmeter(gframe, "Meter", true, 45, 5, 10, height-88);
+        vumeterR = add_my_vmeter(gframe, "Meter", true, 35, 5, 10, height-88);
         vumeterR->scale.gravity = WESTSOUTH;
-        vug = add_my_vslider(gframe, "Gain", 8, 6, 20, height-90);
+        vug = add_my_vslider(gframe, "Gain", 3, 6, 20, height-90);
         vug->scale.gravity = WESTSOUTH;
         vug->parent_struct = this;
         set_adjustment(vug->adj,0.0, 0.0, -46.0, 12.0, 0.1, CL_CONTINUOS);
         vug->func.value_changed_callback = set_gain;
 
-        Widget_t* lframe = add_my_frame(top,"", width-79, 350, 78, 80);
+        Widget_t* lframe = add_my_frame(top,"", width-65, 350, 64, 80);
         lframe->scale.gravity = SOUTHWEST;
-        curFreq = add_my_label(lframe, "",5,0,60,20);
-        curGain = add_my_label(lframe, "",5,20,60,20);
+        curFreq = add_my_label(lframe, "",3,0,60,20);
+        curGain = add_my_label(lframe, "",3,20,60,20);
 
         #ifndef CLAPPLUG
         #ifndef LV2PLUG
-        Widget_t* quit = add_my_quit_button(lframe, 15, 40, 40, 40, "Quit");
+        Widget_t* quit = add_my_quit_button(lframe, 10, 40, 40, 40, "Quit");
         quit->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         quit->parent_struct = this;
         quit->func.value_changed_callback = quit_response;
         #endif
         #endif
 
-        Widget_t* laframe = add_my_z_frame(spec,"", 1, 331, width-80, 100);
+        Widget_t* laframe = add_my_z_frame(spec,"", 0, 331, width-130, 100);
         laframe->scale.gravity = WESTEAST;
 
-        ph = add_my_button(spec, width-105, 0, 20, 20, "φ");
+        ph = add_my_button(spec, width-160, 0, 20, 20, "φ");
         ph->parent_struct = this;
         ph->func.value_changed_callback = show_phase;
 
@@ -345,7 +367,7 @@ public:
         apo_save->func.user_callback = apo_save_response;
 
         #ifndef CLAPPLUG
-        mode = add_my_mode_button(laframe, width-105, 0, 20, 20);
+        mode = add_my_mode_button(laframe, width-160, 0, 20, 20);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
@@ -452,6 +474,8 @@ public:
     void check_spec() {
         adj_set_value(vumeterL->adj, power2db(vumeterL, conn->getMeterL()));
         adj_set_value(vumeterR->adj, power2db(vumeterR, conn->getMeterR()));
+        adj_set_value(vuinmeterL->adj, power2db(vuinmeterL, conn->getInMeterL()));
+        adj_set_value(vuinmeterR->adj, power2db(vuinmeterR, conn->getInMeterR()));
         if (conn->checkNewData()) {
             bin = conn->getBins();
             mag_.clear();
@@ -509,7 +533,6 @@ private:
     int spec_height = 0;
     cairo_surface_t *eq_layer = nullptr;
     bool rebuild_eq_layer = true;
-    bool capture_line = false;
     bool dynamic_threshold = false;
     std::atomic<bool> set_leak {false};
     std::string apo_file;
@@ -653,13 +676,14 @@ private:
     }
 
     static void get_key(void *w_, void *key_, void *user_data) {
+        /*
         Widget_t *w = (Widget_t*)w_;
         if (!w) return;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         XKeyEvent *key = (XKeyEvent*)key_;
         if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
-            self->capture_line = true;
         }
+        */
     }
 
     static void release_key(void *w_, void *key_, void *user_data) {
@@ -667,9 +691,6 @@ private:
         if (!w) return;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         XKeyEvent *key = (XKeyEvent*)key_;
-        if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
-            self->capture_line = false;
-        }
         if (key->state & ShiftMask) {
             self->dynamic_threshold = false;
         }
@@ -679,6 +700,18 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(82, adj_get_value(w->adj));
+    }
+
+    static void set_ingain(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(109, adj_get_value(w->adj));
+    }
+
+    static void set_side(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(110, adj_get_value(w->adj));
     }
 
     static void set_hf_fade(void *w_, void* user_data) {
@@ -963,7 +996,7 @@ private:
         self->match_state = 0;
         self->infoString(x1, y1);
         //std::cout << "x " << x1 << " y " << y1 << std::endl;
-        if ((self->capture_line && xmotion->state & Button1Mask)) {
+        if ((xmotion->state & (Button1Mask | ControlMask)) == (Button1Mask | ControlMask)) {
             Metrics_t m;
             os_get_window_metrics(w, &m);
             const int width  = m.width;

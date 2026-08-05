@@ -63,6 +63,15 @@ public:
         return engine->vu->getMeterR();
     }
 
+    // those needs to be done by atom ports in LV2
+    float getInMeterL() override {
+        return engine->vuin->getMeterL();
+    }
+
+    float getInMeterR() override {
+        return engine->vuin->getMeterR();
+    }
+
     bool checkNewData() override {
         return engine->ana->hasNewData();
     }

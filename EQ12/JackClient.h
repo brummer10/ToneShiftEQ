@@ -41,6 +41,12 @@ public:
         in_port1 = jack_port_register(
             client, "in_1", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
 
+        side_port = jack_port_register(
+            client, "side_0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+
+        side_port1 = jack_port_register(
+            client, "side_1", JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+
         out_port = jack_port_register(
             client, "out_0", JACK_DEFAULT_AUDIO_TYPE, JackPortIsOutput, 0);
 
@@ -89,6 +95,22 @@ public:
             in_port1 = nullptr;
         }
 
+        if (side_port) {
+            if (jack_port_connected(side_port)) {
+                jack_port_disconnect(client, side_port);
+            }
+            jack_port_unregister(client, side_port);
+            side_port = nullptr;
+        }
+
+        if (side_port1) {
+            if (jack_port_connected(side_port1)) {
+                jack_port_disconnect(client, side_port1);
+            }
+            jack_port_unregister(client, side_port1);
+            side_port1 = nullptr;
+        }
+
         if (out_port) {
             if (jack_port_connected(out_port)) {
                 jack_port_disconnect(client, out_port);
@@ -115,6 +137,8 @@ private:
     jack_client_t* client   = nullptr;
     jack_port_t* in_port    = nullptr;
     jack_port_t* in_port1   = nullptr;
+    jack_port_t* side_port  = nullptr;
+    jack_port_t* side_port1 = nullptr;
     jack_port_t* out_port   = nullptr;
     jack_port_t* out_port1  = nullptr;
     bool runProcess         = false;
@@ -162,6 +186,12 @@ private:
         float* input1 = static_cast<float*>(
             jack_port_get_buffer(self->in_port1, nframes));
 
+        float* sideput = static_cast<float*>(
+            jack_port_get_buffer(self->side_port, nframes));
+
+        float* sideput1 = static_cast<float*>(
+            jack_port_get_buffer(self->side_port1, nframes));
+
         float* output = static_cast<float*>(
             jack_port_get_buffer(self->out_port, nframes));
 
@@ -174,7 +204,7 @@ private:
         if (output1 != input1)
             memcpy(output1, input1, nframes * sizeof(float));
 
-        self->engine->process(nframes, input, input1, output, output1);
+        self->engine->process(nframes, sideput, sideput1, output, output1);
 
         return 0;
     }

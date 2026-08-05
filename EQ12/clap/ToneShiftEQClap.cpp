@@ -15,7 +15,7 @@
 
 typedef struct toneshifteq_plugin_t toneshifteq_plugin_t;
 
-#define WINDOW_WIDTH  880
+#define WINDOW_WIDTH  930
 #define WINDOW_HEIGHT 430
 
 #if defined(_WIN32)
@@ -168,11 +168,22 @@ const clap_plugin_params_t toneshifteq_params = {
  */
 
 static uint32_t audio_ports_count(const clap_plugin_t*, bool is_input) {
-    if (is_input) return 2; // 2 input
-    else return 2; // and 2 output
+    if (is_input) return 2; // 2 input & sidechain
+    else return 1; // and 2 output
 }
 
 static bool audio_ports_get(const clap_plugin_t*, uint32_t index, bool is_input, clap_audio_port_info_t *info) {
+
+    if (is_input && index == 1) {
+        info->id = index;
+        snprintf(info->name, sizeof(info->name), "%s", "Sidechain");
+        info->channel_count = 2;
+        info->port_type = CLAP_PORT_STEREO;
+        info->flags = 0;
+        info->in_place_pair = CLAP_INVALID_ID;
+        return true;
+    }
+
     if (index > 0) return false;
     info->id = index;
     snprintf(info->name, sizeof(info->name), "%s", is_input ? "Input" : "Output");
@@ -396,6 +407,10 @@ static clap_process_status toneshifteq_process(const clap_plugin_t *plugin, cons
     float *input1 = process->audio_inputs[0].data32[1]; // Right input channel
     float *left_output = process->audio_outputs[0].data32[0]; // Left channel of stereo output
     float *right_output = process->audio_outputs[0].data32[1]; // Right channel of stereo output
+
+    float *sidechain = process->audio_inputs[1].data32[0]; // Left sidechain channel
+    float *sidechain1 = process->audio_inputs[1].data32[1]; // Right sidechain channel
+
     uint32_t nframes = process->frames_count;
     const uint32_t nev = process->in_events->size(process->in_events);
     uint32_t ev_index = 0;
@@ -430,7 +445,7 @@ static clap_process_status toneshifteq_process(const clap_plugin_t *plugin, cons
     if(right_output != input1)
         memcpy(right_output, input1, nframes*sizeof(float));
     
-    plug->r->process(nframes, input, input1, left_output, right_output);
+    plug->r->process(nframes, sidechain, sidechain1, left_output, right_output);
     return CLAP_PROCESS_CONTINUE;
 }
 
@@ -471,7 +486,7 @@ static const clap_plugin_descriptor_t toneshifteq_master_descriptor = {
     .url = "https://github.com/brummer10/ToneShiftEQ",
     .manual_url = "https://github.com/brummer10/ToneShiftEQ",
     .support_url = "https://github.com/brummer10/ToneShiftEQ",
-    .version = "0.7.0",
+    .version = "0.8.0",
     .description = "12 band minum phase EQ (128 samples latency)",
     .features = toneshifteq_features,
 };
@@ -485,7 +500,7 @@ static const clap_plugin_descriptor_t toneshifteq_live_descriptor = {
     .url = "https://github.com/brummer10/ToneShiftEQ",
     .manual_url = "https://github.com/brummer10/ToneShiftEQ",
     .support_url = "https://github.com/brummer10/ToneShiftEQ",
-    .version = "0.7.1",
+    .version = "0.8.0",
     .description = "12 band Biquad EQ (0 sampels latency)",
     .features = toneshifteq_features,
 };

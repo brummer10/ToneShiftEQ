@@ -30,7 +30,7 @@ public:
     GainStereo() {}
     ~GainStereo() {}
 
-    inline void clear_state() {
+    inline void clearState() {
         for (int ch = 0; ch < 2; ++ch) {
             for (int i = 0; i < 2; ++i) {
                 fRec3[ch][i] = 0.0;
@@ -65,7 +65,7 @@ public:
         powerR = 20.0 * log10(0.0000003);
         meterL = -130.0f;
         meterR = -130.0f;
-        clear_state();
+        clearState();
     }
 
     void process(int count, const float* inputL, const float* inputR,

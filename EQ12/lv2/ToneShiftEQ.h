@@ -85,6 +85,7 @@ private:
     IRProcessor             ip;
     IRMorpherStereo         conv;
     GainStereo              vu;
+    GainStereo              vuin;
     Engine                  engine;
     
     const LV2_Atom_Sequence* control;
@@ -96,10 +97,12 @@ private:
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
     std::atomic<bool> pullPhase {false};
-    float* par[109]; // engine.param.getParamCount() +1
+    float* par[111]; // engine.param.getParamCount() +1
     float* dyn[12]; // engine.param.getDynamics()
     float* input0;
     float* input1;
+    float* sidechain0;
+    float* sidechain1;
     float* output0;
     float* output1;
     float* latency;

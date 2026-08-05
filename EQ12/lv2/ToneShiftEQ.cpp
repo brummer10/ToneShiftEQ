@@ -18,9 +18,12 @@ Xtoneshifteq::Xtoneshifteq() :
     ip(),
     conv(),
     vu(),
-    engine(&ip, &conv, &ana, &vu),
+    vuin(),
+    engine(&ip, &conv, &ana, &vu, &vuin),
     input0(NULL),
     input1(NULL),
+    sidechain0(NULL),
+    sidechain1(NULL),
     output0(NULL),
     output1(NULL),
     latency(NULL) {};
@@ -41,7 +44,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0.0f;
-    for (int i = 0; i< 109; i++) {
+    for (int i = 0; i< 111; i++) {
         par[i] = &v;
     }
     for (int i = 0; i< 12; i++) {
@@ -51,7 +54,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
 
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data) {
-    for (int i = 0; i< 109; i++) {
+    for (int i = 0; i< 111; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -59,39 +62,51 @@ void Xtoneshifteq::connect_(uint32_t port,void* data) {
     }
     switch (port)
     {
-        case 109:
+        case 111:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 110:
+        case 112:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 111:
+        case 113:
             input0 = static_cast<float*>(data);
             break;
-        case 112:
+        case 114:
             input1 = static_cast<float*>(data);
             break;
-        case 113:
+        case 115:
             output0 = static_cast<float*>(data);
             break;
-        case 114:
+        case 116:
             output1 = static_cast<float*>(data);
             break;
-        case 115:
+        case 117:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 116:
+        case 118:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 117:
+        case 119:
             latency = static_cast<float*>(data);
+            break;
+        case 132:
+            vuin.meterLout = static_cast<float*>(data);
+            break;
+        case 133:
+            vuin.meterRout = static_cast<float*>(data);
+            break;
+        case 134:
+            sidechain0 = static_cast<float*>(data);
+            break;
+        case 135:
+            sidechain1 = static_cast<float*>(data);
             break;
         default:
             break;
     }
-    for (int i = 118; i< 130; i++) {
+    for (int i = 120; i< 132; i++) {
         if (i == (int)port) {
-            dyn[i-118] = static_cast<float*>(data);
+            dyn[i-120] = static_cast<float*>(data);
             return;
         }
     }
@@ -145,7 +160,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
         }
     }
 
-    engine.process(n_samples, input0, input1, output0, output1);
+    engine.process(n_samples, sidechain0, sidechain1, output0, output1);
 
     for (int i = 0; i< 12; i++) {
         (*dyn[i]) = engine.getDynamics(i);

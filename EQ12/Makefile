@@ -64,7 +64,7 @@ endif
 	# set bundle name
 	NAME = toneshifteq
 	VST3_NAME = Toneshifteq
-	VER = 0.7.1
+	VER = 0.8.0
 
 	PREFIX ?= /usr
 	# check if user is root

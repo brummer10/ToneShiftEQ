@@ -32,8 +32,8 @@ idpy:interface a lv2:ExtensionData .
     lv2:optionalFeature idpy:queue_draw ;
     lv2:optionalFeature <http://lv2plug.in/ns/ext/instance-access>;
     lv2:extensionData idpy:interface ;
-    lv2:minorVersion 7 ;
-    lv2:microVersion 1 ;
+    lv2:minorVersion 8 ;
+    lv2:microVersion 0 ;
 
 rdfs:comment """
 ToneShiftEQ is a modern 12-band parametric equalizer featuring both a minimum-phase FFT convolution engine and a zero-latency biquad engine. 
@@ -1336,8 +1336,30 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     ] ,
 
     [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 109 ;
+        lv2:symbol "volume_in" ;
+        lv2:name "Volume In" ;
+        lv2:default 0 ;
+        lv2:minimum -46 ;
+        lv2:maximum 12 ;
+        units:unit units:db ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:ControlPort ;
+        lv2:index 110 ;
+        lv2:symbol "Sidechain_enable" ;
+        lv2:name "Enable SideChain" ;
+        lv2:default 0 ;
+        lv2:minimum 0 ;
+        lv2:maximum 1 ;
+        lv2:portProperty lv2:toggled , lv2:integer ;
+    ] ,
+
+    [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 109 ; #97
+        lv2:index 111 ; #97
         lv2:symbol "meter_l" ;
         lv2:name "METER_L" ;
         lv2:default -70.0 ;
@@ -1347,7 +1369,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 110 ;
+        lv2:index 112 ;
         lv2:symbol "meter_r" ;
         lv2:name "METER_R" ;
         lv2:default -70.0 ;
@@ -1357,28 +1379,28 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 111 ;
+        lv2:index 113 ;
         lv2:symbol "in_l" ;
         lv2:name "Input L" ;
     ] ,
 
     [
         a lv2:InputPort , lv2:AudioPort ;
-        lv2:index 112 ;
+        lv2:index 114 ;
         lv2:symbol "in_r" ;
         lv2:name "Input R" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 113 ;
+        lv2:index 115 ;
         lv2:symbol "out_l" ;
         lv2:name "Output L" ;
     ] ,
 
     [
         a lv2:OutputPort , lv2:AudioPort ;
-        lv2:index 114 ;
+        lv2:index 116 ;
         lv2:symbol "out_r" ;
         lv2:name "Output R" ;
     ] ,
@@ -1388,7 +1410,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         <http://lv2plug.in/ns/ext/resize-port#minimumSize> 16488 ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 115 ;
+        lv2:index 117 ;
         lv2:symbol "NOTIFY" ;
         lv2:name "NOTIFY";
     ] ,
@@ -1397,7 +1419,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         a lv2:InputPort , atom:AtomPort ;
         atom:bufferType atom:Sequence ;
         lv2:designation lv2:control ;
-        lv2:index 116 ;
+        lv2:index 118 ;
         lv2:symbol "CONTROL" ;
         lv2:name "CONTROL";
     ], 
@@ -1405,7 +1427,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
     [
       a lv2:OutputPort,
            lv2:ControlPort ;
-      lv2:index 117 ;
+      lv2:index 119 ;
       lv2:designation <http://lv2plug.in/ns/lv2core#latency>;
       lv2:portProperty lv2:reportsLatency, lv2:integer;
       units:unit units:frame;
@@ -1417,7 +1439,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 118 ;
+        lv2:index 120 ;
         lv2:symbol "dyn1" ;
         lv2:name "Dynamics1" ;
         lv2:default -48.0 ;
@@ -1428,7 +1450,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 119 ;
+        lv2:index 121 ;
         lv2:symbol "dyn2" ;
         lv2:name "Dynamics2" ;
         lv2:default -48.0 ;
@@ -1439,7 +1461,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 120 ;
+        lv2:index 122 ;
         lv2:symbol "dyn3" ;
         lv2:name "Dynamics3" ;
         lv2:default -48.0 ;
@@ -1450,7 +1472,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 121 ;
+        lv2:index 123 ;
         lv2:symbol "dyn4" ;
         lv2:name "Dynamics4" ;
         lv2:default -48.0 ;
@@ -1461,7 +1483,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 122 ;
+        lv2:index 124 ;
         lv2:symbol "dyn5" ;
         lv2:name "Dynamics5" ;
         lv2:default -48.0 ;
@@ -1472,7 +1494,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 123 ;
+        lv2:index 125 ;
         lv2:symbol "dyn6" ;
         lv2:name "Dynamics6" ;
         lv2:default -48.0 ;
@@ -1483,7 +1505,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 124 ;
+        lv2:index 126 ;
         lv2:symbol "dyn7" ;
         lv2:name "Dynamics7" ;
         lv2:default -48.0 ;
@@ -1494,7 +1516,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 125 ;
+        lv2:index 127 ;
         lv2:symbol "dyn8" ;
         lv2:name "Dynamics8" ;
         lv2:default -48.0 ;
@@ -1505,7 +1527,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 126 ;
+        lv2:index 128 ;
         lv2:symbol "dyn9" ;
         lv2:name "Dynamics9" ;
         lv2:default -48.0 ;
@@ -1516,7 +1538,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 127 ;
+        lv2:index 129 ;
         lv2:symbol "dyn10" ;
         lv2:name "Dynamics10" ;
         lv2:default -48.0 ;
@@ -1527,7 +1549,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 128 ;
+        lv2:index 130 ;
         lv2:symbol "dyn11" ;
         lv2:name "Dynamics11" ;
         lv2:default -48.0 ;
@@ -1538,14 +1560,50 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
 
     [
         a lv2:OutputPort , lv2:ControlPort ;
-        lv2:index 129 ;
+        lv2:index 131 ;
         lv2:symbol "dyn12" ;
         lv2:name "Dynamics12" ;
         lv2:default -48.0 ;
         lv2:minimum -0.0 ;
         lv2:maximum 0.0 ;
         lv2:portProperty  pprop:notOnGUI ;        
-    ] 
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 132 ; #97
+        lv2:symbol "meter_l_in" ;
+        lv2:name "METER_L In" ;
+        lv2:default -70.0 ;
+        lv2:minimum -130.0 ;
+        lv2:maximum 4.0 ;
+    ] ,
+
+    [
+        a lv2:OutputPort , lv2:ControlPort ;
+        lv2:index 133 ;
+        lv2:symbol "meter_r_in" ;
+        lv2:name "METER_R In" ;
+        lv2:default -70.0 ;
+        lv2:minimum -130.0 ;
+        lv2:maximum 4.0 ;
+    ]  ,
+
+    [
+        a lv2:InputPort , lv2:AudioPort ;
+        lv2:index 134 ;
+        lv2:symbol "sidechain_l" ;
+        lv2:name "Sidechain L" ;
+        lv2:portProperty lv2:connectionOptional ;
+    ] ,
+
+    [
+        a lv2:InputPort , lv2:AudioPort ;
+        lv2:index 135 ;
+        lv2:symbol "sidechain_r" ;
+        lv2:name "Sidechain R" ;
+        lv2:portProperty lv2:connectionOptional ;
+    ]
 
     .
 

@@ -39,6 +39,7 @@ public:
     IRMorpherStereo*                conv = nullptr;
     FFTAnalyzer*                    ana = nullptr;
     GainStereo*                     vu = nullptr;
+    GainStereo*                     vuin = nullptr;
     SmoothCascade                   tsc;
     SmoothDynamicCascade            com;
     Detector                        tsd;
@@ -54,7 +55,7 @@ public:
     std::atomic<bool>               dataReady {false};
     std::atomic<bool>               convLoadIR {false};
 
-    inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_);
+    inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_, GainStereo* vuin_);
 
     inline ~Engine();
 
@@ -68,6 +69,10 @@ private:
     float*                          abuffer = nullptr;
     uint32_t                        frames = 0;
     int                             mode = 0;
+    int                             sidechain = 0;
+    int                             sidechain_set = 0;
+    float                           sidechain_gain = 0.0f;
+    float                           direct_gain = 0.0f;
     float                           dynamicThreshold[NumFilters];
     int                             dynamicRatio[NumFilters];
 
@@ -92,13 +97,14 @@ private:
     inline void feedAnanlyzer(uint32_t nframes, float* output, float* output1);
 };
 
-inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_) :
+inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_, GainStereo* vuin_) :
     xrworker(),
     par() {
         ip = ip_;
         conv = conv_;
         ana = ana_;
         vu = vu_;
+        vuin = vuin_;
         
         abuffer = new float[8192];
         memset(abuffer, 0, 8192 * sizeof(float));
@@ -162,7 +168,9 @@ void Engine::registerParameters() {
     for (int i = 0; i < NumFilters; ++i) {
         param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&dynamicRatio[i],true,  IS_INT);
     }
-   
+
+    param.registerParam("Volume In", "Global",-46,  12,  0.0,  0.1,    (void*)&vuin->gain,           false,  IS_FLOAT);
+    param.registerParam("SideChain",     "EQ",  0,   1,   1,    1,     (void*)&sidechain,             true,  IS_INT);
 
 };
 
@@ -174,6 +182,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
 
     ana->init(4096, (float)rate);
     vu->init(rate);
+    vuin->init(rate);
     ip->computeIR((double)rate);
     tsc.prepare((double)rate);
     com.prepare((double)rate);
@@ -330,15 +339,36 @@ inline void Engine::feedAnanlyzer(uint32_t nframes, float* output, float* output
     par.runProcess();
 }
 
-inline void Engine::process(uint32_t nframes, const float* input,
-                const float* input1, float* output, float* output1) {
+inline void Engine::process(uint32_t nframes, const float* sideput,
+                const float* sideput1, float* output, float* output1) {
 
     if(nframes<1) return;
-    if (output != input)
-        std::memcpy(output, input, nframes * sizeof(float));
 
-    if (output1 != input1)
-        std::memcpy(output1, input1, nframes * sizeof(float));
+    if (sidechain != sidechain_set) {
+        if (sidechain) {
+            direct_gain = vuin->gain;
+            param.setParam(109, sidechain_gain);
+        } else {
+            sidechain_gain = vuin->gain;
+            param.setParam(109, direct_gain);
+        }
+        tsd.reset();
+        vuin->clearState();
+        sidechain_set = sidechain;
+    }
+
+    if (sidechain_set) {
+        if (sideput != nullptr && sideput1 != nullptr) {
+            float sp[nframes];
+            float sp1[nframes];
+            memcpy(sp, sideput, nframes * sizeof(float));
+            memcpy(sp1, sideput1, nframes * sizeof(float));
+            vuin->process(nframes, sp, sp1, sp, sp1);
+            tsd.processBlock(nframes, sp, sp1);
+        }
+    } else {
+        vuin->process(nframes, output, output1, output, output1);
+    }
 
     if (modeState == ModeState::FadingOut) {
         fadeGain -= fadeStep;
@@ -370,7 +400,7 @@ inline void Engine::process(uint32_t nframes, const float* input,
     }
     switch (currentMode) {
         case 0:
-            conv->process(nframes, input, input1, output, output1);
+            conv->process(nframes, output, output1, output, output1);
             break;
         case 1:
             tsc.setBypass(conv->bypass);
@@ -382,7 +412,7 @@ inline void Engine::process(uint32_t nframes, const float* input,
             break;
     }
 
-    tsd.processBlock(nframes, output, output1);
+    if (!sidechain_set) tsd.processBlock(nframes, output, output1);
     processDynamic();
     applyDynamicGains();
     com.setBypass(conv->bypass);

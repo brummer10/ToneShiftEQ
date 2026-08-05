@@ -337,7 +337,7 @@ static void draw_frame(void *w_, void* user_data) {
 
     cairo_set_line_width(w->crb,2);
     cairo_set_source_rgba(w->crb, 0.15,0.15,0.17,1.0);
-    roundrec(w->crb, 2, 0, width_t-4, height_t, 5);
+    roundrec(w->crb, 1, 0, width_t-2, height_t, 5);
     cairo_fill_preserve(w->crb);
 
     setFrameColour(w, w->crb, 5, 5, width_t-10, height_t-10);
@@ -372,7 +372,7 @@ static void draw_z_frame(void *w_, void* user_data) {
 
     cairo_set_line_width(w->crb,2);
     cairo_set_source_rgba(w->crb, 0.15,0.15,0.17,1.0);
-    roundrec(w->crb, 2, 20 * w->app->hdpi, width_t-4, height_t- (20 * w->app->hdpi), 5);
+    roundrec(w->crb, 1, 20 * w->app->hdpi, width_t-2, height_t- (20 * w->app->hdpi), 5);
     cairo_fill_preserve(w->crb);
 
     setFrameColour(w, w->crb, 5, 25, width_t-10, height_t-30);
@@ -725,6 +725,179 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
     fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
     fbutton->func.expose_callback = draw_mode_button;
     fbutton->func.button_release_callback = fbutton_released;
+    return fbutton;
+}
+
+/****************************************************************
+ *    hf fade button
+****************************************************************/
+
+void draw_direct_input(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double w = x1 - x0;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+    double y_mid = y_top + h * 0.5;
+
+    cairo_save(cr);
+
+    // frame
+    cairo_set_line_width(cr, size * 0.035);
+    cairo_set_source_rgba(cr, 0.91, 0.949, 0.838, 0.35);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949, 0.883, 0.55);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    cairo_stroke(cr);
+
+    // straight through-path
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_width(cr, state ? size * 0.05 : size * 0.04);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    cairo_move_to(cr, x0+2, y_mid);
+    cairo_line_to(cr, x1 - w * 0.14, y_mid);
+    cairo_stroke(cr);
+
+    // arrowhead
+    double ax = x1 - w * 0.06;
+    double aw = w * 0.10;
+    double ah = h * 0.14;
+    cairo_move_to(cr, ax - aw, y_mid - ah);
+    cairo_line_to(cr, ax, y_mid);
+    cairo_line_to(cr, ax - aw, y_mid + ah);
+    cairo_stroke(cr);
+
+    cairo_pattern_destroy(pat);
+    cairo_restore(cr);
+}
+
+void draw_sidechain_input(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double w = x1 - x0;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+    double y_main = y_top + h * 0.32;
+
+    cairo_save(cr);
+
+    // frame
+    cairo_set_line_width(cr, size * 0.035);
+    cairo_set_source_rgba(cr, 0.91, 0.949, 0.838, 0.35);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949, 0.883, 0.55);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    cairo_stroke(cr);
+
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.55, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.55, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_width(cr, state ? size * 0.05 : size * 0.04);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    // main signal path (top)
+    cairo_move_to(cr, x0+2, y_main);
+    cairo_line_to(cr, x0 + w * 0.5, y_main);
+    cairo_stroke(cr);
+
+    // sidechain
+    cairo_move_to(cr, x0 + w * 0.16, y_bot - h * 0.08);
+    cairo_curve_to(cr, x0 + w * 0.30, y_bot - h * 0.08,
+                        x0 + w * 0.38, y_main,
+                        x0 + w * 0.5, y_main);
+    cairo_stroke(cr);
+
+    // merged path
+    cairo_move_to(cr, x0 + w * 0.5, y_main);
+    cairo_line_to(cr, x1 - w * 0.14, y_main);
+    cairo_stroke(cr);
+
+    double ax = x1 - w * 0.06;
+    double aw = w * 0.10;
+    double ah = h * 0.14;
+    cairo_move_to(cr, ax - aw, y_main - ah);
+    cairo_line_to(cr, ax, y_main);
+    cairo_line_to(cr, ax - aw, y_main + ah);
+    cairo_stroke(cr);
+
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x0 + w * 0.16, y_bot - h * 0.08, size * 0.045, 0, 2 * M_PI);
+    cairo_fill(cr);
+
+    cairo_pattern_destroy(pat);
+    cairo_restore(cr);
+}
+
+void draw_input_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    static int last_state = state;
+    if (state == 0) {
+        draw_direct_input(w->crb, 0.0, 0.0, height, w->state);
+        tooltip_set_my_text(w, "Direct Input");
+    } else if (state == 1) {
+        draw_sidechain_input(w->crb, 0.0, 0.0, height, w->state);
+        tooltip_set_my_text(w, "SideChain Input");
+    }
+    if (last_state != state) {
+        show_tooltip(w);
+        last_state = state;
+    }
+}
+
+Widget_t *add_my_input_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_input_button;
     return fbutton;
 }
 
@@ -1143,15 +1316,20 @@ void draw_vmeter_scale(void *w_, void* user_data) {
         float fraction = log_meter((double)db_points[i]);
         cairo_move_to (w->crb, 0,y0+rect_height - (rect_height * fraction));
         cairo_line_to (w->crb, x0+rect_width-3 ,y0+rect_height -  (rect_height * fraction));
-        if (i<6)
+        if (i<5)
         {
             snprintf (buf, sizeof (buf), "%d", db_points[i]);
             cairo_move_to (w->crb, x0+rect_width*0.1,y0+rect_height - (rect_height * fraction)-3);
         }
+        else if (i<6)
+        {
+            snprintf (buf, sizeof (buf), "%d", db_points[i]);
+            cairo_move_to (w->crb, x0+rect_width*0.25,y0+rect_height - (rect_height * fraction)-3);
+        }
         else if (i<8)
         {
             snprintf (buf, sizeof (buf), "%d", db_points[i]);
-            cairo_move_to (w->crb, x0+rect_width*0.2,y0+rect_height - (rect_height * fraction)-3);
+            cairo_move_to (w->crb, x0+rect_width*0.3,y0+rect_height - (rect_height * fraction)-3);
         }
         else
         {
@@ -1280,6 +1458,25 @@ Widget_t* add_my_vmeter(Widget_t *parent, const char * label, bool show_scale,
     wid->func.expose_callback = draw_vmeter;
     if (show_scale) {
         Widget_t *wid2 = create_widget(parent->app, parent, x+width, y, width+4, height);
+        wid2->scale.gravity = ASPECT;
+        wid2->func.expose_callback =draw_vmeter_scale;
+    }
+    return wid;
+}
+
+Widget_t* add_my_left_vmeter(Widget_t *parent, const char * label, bool show_scale,
+                int x, int y, int width, int height) {
+
+    Widget_t *wid = create_widget(parent->app, parent, x+width+4, y, width, height);
+    create_vertical_meter_image(wid, width, height);
+    wid->label = label;
+    wid->adj_y = add_adjustment(wid,-70.0, -70.0, -180.0, 6.0,0.001, CL_METER);
+    wid->adj = wid->adj_y;
+    wid->flags &= ~USE_TRANSPARENCY;
+    wid->scale.gravity = ASPECT;
+    wid->func.expose_callback = draw_vmeter;
+    if (show_scale) {
+        Widget_t *wid2 = create_widget(parent->app, parent, x, y, width+4, height);
         wid2->scale.gravity = ASPECT;
         wid2->func.expose_callback =draw_vmeter_scale;
     }
