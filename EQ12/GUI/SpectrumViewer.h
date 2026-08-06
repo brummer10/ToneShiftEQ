@@ -187,8 +187,9 @@ public:
         Widget_t* laframe = add_my_z_frame(spec,"", 0, 331, width-130, 100);
         laframe->scale.gravity = WESTEAST;
 
-        ph = add_my_button(spec, width-160, 0, 20, 20, "φ");
+        ph = add_my_button(spec, width-165, 0, 20, 20, "φ");
         ph->parent_struct = this;
+        ph->scale.gravity = FIXEDSIZE;
         ph->func.value_changed_callback = show_phase;
 
         int x = 1;
@@ -367,7 +368,7 @@ public:
         apo_save->func.user_callback = apo_save_response;
 
         #ifndef CLAPPLUG
-        mode = add_my_mode_button(laframe, width-160, 0, 20, 20);
+        mode = add_my_mode_button(laframe, width-165, 0, 20, 20);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
@@ -544,8 +545,13 @@ private:
 
     const float f_min = 20.0f;
     const float f_max = 20000.0f;
-    const float db_min = -72.0f;
-    const float db_max = 24.0f;
+    float db_min = -72.0f;
+    const float db_min_ = -72.0f;
+    float db_max = 24.0f;
+    const float db_max_ = 24.0f;
+
+    int zoom_step = 0;
+    static constexpr int   ZOOM_STEPS  = 12;
 
     struct BandCurveLUTs {
         std::vector<double> freq;
@@ -675,15 +681,30 @@ private:
         }
     }
 
+    void updateDbRange() {
+        const float t = (float)zoom_step / (float)ZOOM_STEPS;
+        db_min = db_min_ * std::pow(-6.0 / db_min_, t);
+        db_max = db_max_ * std::pow(6.0 / db_max_, t);
+    }
+
     static void get_key(void *w_, void *key_, void *user_data) {
-        /*
         Widget_t *w = (Widget_t*)w_;
         if (!w) return;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         XKeyEvent *key = (XKeyEvent*)key_;
-        if (key->keycode == XKeysymToKeycode(w->app->dpy,XK_Control_L)) {
+        if (key->keycode == XKeysymToKeycode(w->app->dpy, XK_plus)) {
+            self->zoom_step = std::min<int>(ZOOM_STEPS, self->zoom_step + 1);
+            self->updateDbRange();
+            self->spec_height = 0;
+            self->rebuild_eq_layer = true;
+            expose_widget(self->spec);
+        } else if (key->keycode == XKeysymToKeycode(w->app->dpy, XK_minus)) {
+            self->zoom_step = std::max<int>(0, self->zoom_step - 1);
+            self->updateDbRange();
+            self->spec_height = 0;
+            self->rebuild_eq_layer = true;
+            expose_widget(self->spec);
         }
-        */
     }
 
     static void release_key(void *w_, void *key_, void *user_data) {
@@ -995,13 +1016,15 @@ private:
         int y1 = xmotion->y;
         self->match_state = 0;
         self->infoString(x1, y1);
-        //std::cout << "x " << x1 << " y " << y1 << std::endl;
-        if ((xmotion->state & (Button1Mask | ControlMask)) == (Button1Mask | ControlMask)) {
-            Metrics_t m;
-            os_get_window_metrics(w, &m);
-            const int width  = m.width;
-            const int height = m.height - (80 * w->app->hdpi);
 
+        Metrics_t m;
+        os_get_window_metrics(w, &m);
+        const int width  = m.width;
+        const int height = m.height - (80 * w->app->hdpi);
+        const float px_to_db = (self->db_max - self->db_min) / (float)height;
+        static constexpr float SNAP_PX = 1.0f;
+
+        if ((xmotion->state & (Button1Mask | ControlMask)) == (Button1Mask | ControlMask)) {
             float target_freq = x_to_freq(x1, self->f_min, self->f_max, width);
             float target_gain = y_to_db(y1, self->db_min, self->db_max, height);
 
@@ -1012,7 +1035,6 @@ private:
             self->sendValueChanged(5 + (6 * band), target_gain);
 
             self->rebuild_eq_layer = true;
-            //expose_widget(self->spec);
 
             self->mx = x1;
             self->my = y1;
@@ -1022,11 +1044,11 @@ private:
                 if (self->dynamic_threshold) {
                     float vg = adj_get_value(self->threshold[self->match_band]->adj);
                     float deltay = (float)y1 - self->my;
-                    vg += deltay * -0.1;
+                    vg += deltay * -px_to_db;
                     self->my = y1;
-                    if (std::abs(vg) < 0.2) vg = 0.0;
+                    if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                     adj_set_value(self->threshold[self->match_band]->adj, vg);
-                   
+
                 } else {
                     float v = adj_get_value(self->freq[self->match_band]->adj);
                     float deltaX = (float)x1 - self->mx;
@@ -1036,12 +1058,11 @@ private:
 
                     float vg = adj_get_value(self->fgain[self->match_band]->adj);
                     float deltay = (float)y1 - self->my;
-                    vg += deltay * -0.1;
+                    vg += deltay * -px_to_db;
                     self->my = y1;
-                    if (std::abs(vg) < 0.2) vg = 0.0;
+                    if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                     adj_set_value(self->fgain[self->match_band]->adj, vg);
                 }
-                //expose_widget(self->spec);
             }
         } else {
             self->find_hovered_band(x1, y1);
@@ -1065,6 +1086,20 @@ private:
                     adj_set_value(self->fq[self->match_band]->adj,vq);
                     // expose_widget(self->spec);
                 }
+            } else {
+                if(xbutton->button == Button4) {
+                    self->zoom_step = std::max<int>(0, self->zoom_step - 1);
+                    self->updateDbRange();
+                    self->spec_height = 0;
+                    self->rebuild_eq_layer = true;
+                    expose_widget(self->spec);
+                } else if(xbutton->button == Button5) {
+                    self->zoom_step = std::min<int>(ZOOM_STEPS, self->zoom_step + 1);
+                    self->updateDbRange();
+                    self->spec_height = 0;
+                    self->rebuild_eq_layer = true;
+                    expose_widget(self->spec);
+                }
             }
         }
 
@@ -1081,6 +1116,12 @@ private:
         return (1.0f - norm) * height;
     }
 
+    static float y_to_db(float y, float db_min, float db_max, int height) {
+        float norm = 1.0f - (y / height);
+        norm = clampf(norm, 0.0f, 1.0f);
+        return db_min + norm * (db_max - db_min);
+    }
+
     static float freq_to_x(float freq, float f_min, float f_max, int width) {
         const float x_pad = 3.0f;
         const float inv_log_range = 1.0f / log10f(f_max / f_min);
@@ -1089,6 +1130,15 @@ private:
 
         float norm = log10f(freq / f_min) * inv_log_range;
         return x_pad + norm * (width - 2.0f * x_pad);
+    }
+
+    static inline double x_to_freq(double x, double f_min, double f_max, int width) {
+        double t = x / (double)width;
+        // log interpolation
+        double log_min = std::log(f_min);
+        double log_max = std::log(f_max);
+        double log_f = log_min + t * (log_max - log_min);
+        return std::exp(log_f);
     }
 
     static void draw_text(cairo_t* cr, float x, float y, const char* txt) {
@@ -1192,22 +1242,6 @@ private:
         // back to linear
         double q = std::exp(shaped * 1.5);
         return q;
-    }
-
-
-    static float y_to_db(float y, float db_min, float db_max, int height) {
-        float norm = 1.0f - (y / height);
-        norm = clampf(norm, 0.0f, 1.0f);
-        return db_min + norm * (db_max - db_min);
-    }
-
-    static inline double x_to_freq(double x, double f_min, double f_max, int width) {
-        double t = x / (double)width;
-        // log interpolation
-        double log_min = std::log(f_min);
-        double log_max = std::log(f_max);
-        double log_f = log_min + t * (log_max - log_min);
-        return std::exp(log_f);
     }
 
     static double eval_band_db(IConnector* conn, bool dy, int i, double f, double sr) {
@@ -1543,7 +1577,7 @@ private:
         std::vector<double> freqs = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
         std::vector<double> minor_freqs = {30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800,
                                                     900, 3000, 4000, 6000, 7000, 8000, 9000};
-        std::vector<double> dbs = { -48, -24, -18, -12, -6, 0, 6, 12, 18, 24};
+        std::vector<double> dbs = { -48, -24, -18, -12, -6, -3, -2, -1, 0, 1, 2, 3, 6, 12, 18, 24};
 
         if (w->image) cairo_surface_destroy(w->image);
         w->image = nullptr;
@@ -1610,6 +1644,8 @@ private:
         for (double db : dbs) {
             double y = db_to_y(db, db_min, db_max, height);
             bool major = (db == 0);
+            bool minor = (db == 3 || db == -3);
+            bool minor_minor = (db < 3 && db > -3 && db != 0);
             cairo_set_source_rgba(
                 cr,
                 major ? t.grid_major_r : t.grid_minor_r,
@@ -1619,6 +1655,8 @@ private:
             );
 
             cairo_set_line_width(cr, major ? 1.5 : 1.0);
+            if (minor && db_min < -36.0) continue;
+            if (minor_minor && db_min < -9.6) continue;
             cairo_move_to(cr, 0, y);
             cairo_line_to(cr, width, y);
             cairo_stroke(cr);
@@ -1640,13 +1678,41 @@ private:
             cairo_fill (cr);
         }
 
+        // 0 dB line
+        double y = db_to_y(0, db_min_, db_max_, height);
+        cairo_set_source_rgba(cr, 0.75, 0.2, 0.9, 0.4);
+        cairo_set_line_width(cr, 1.0);
+        cairo_move_to(cr, 0, y);
+        cairo_line_to(cr, width, y);
+        cairo_stroke(cr);
+
         // dB labels
         for (double db : dbs) {
             double y = db_to_y(db, db_min, db_max, height);
+            bool minor = (db == 3 || db == -3);
+            bool minor_minor = (db < 3 && db > -3 && db != 0);
             char buf[16];
             sprintf(buf, "%.0f", db);
             cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.7);
             cairo_move_to(cr, 5, y - 2);
+            if (y > height - 25) continue;
+            if (minor && db_min < -36.0) continue;
+            if (minor_minor && db_min < -9.6) continue;
+            cairo_text_path (cr, buf);
+            cairo_fill (cr);
+        }
+
+        // dB labels
+        for (double db : dbs) {
+            double y = db_to_y(db, db_min_, db_max_, height);
+            if ((db == 3 || db == -3) && db != 0) continue;
+            if (db < 3 && db > -3 && db != 0) continue;
+            char buf[16];
+            sprintf(buf, "%.0f", db);
+            cairo_text_extents_t extents;
+            cairo_text_extents(cr, buf, &extents);
+            cairo_set_source_rgba(cr, t.text_dim_r, t.text_dim_g, t.text_dim_b, 0.4);
+            cairo_move_to(cr, width-5-extents.width, y - 2);
             cairo_text_path (cr, buf);
             cairo_fill (cr);
         }
@@ -1676,8 +1742,8 @@ private:
         cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         draw_band_points(cr, width, height);
         draw_band_curves(cr, false, width, height);
-        if (show_ph) drawSpectrum(cr, phase_, width, height, 1, sample_rate, 0.945, 0.114, 0.192, "",        height-80);
-        drawSpectrum(cr, ir_,    width, height, 2.5, sample_rate, 0.545, 0.914, 0.992, "",      height-80);
+        if (show_ph) drawSpectrum(cr, phase_, width, height, db_min, db_max, 1, sample_rate, 0.945, 0.114, 0.192, "",        height-80);
+        drawSpectrum(cr, ir_,    width, height, db_min, db_max, 2.5, sample_rate, 0.545, 0.914, 0.992, "",      height-80);
         cairo_destroy(cr);
         rebuild_eq_layer = false;
     }
@@ -1715,7 +1781,7 @@ private:
         spec_width = width;
 
         draw_band_curves(cr, true, width, height);
-        drawSpectrum(cr, mag_, width, height, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
+        drawSpectrum(cr, mag_, width, height, db_min_, db_max_, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
         //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         surface_set_font_from_ttf(cr, LDVAR_FONT(RobotoCondensedRegular_ttf),
@@ -1724,8 +1790,8 @@ private:
 
     }
 
-    void drawSpectrum(cairo_t* cr, const Vec& mags, int width, int height, double line_width,
-                      float sample_rate, float r, float g, float b, const char* label,
+    void drawSpectrum(cairo_t* cr, const Vec& mags, int width, int height, float dB_min, float dB_max,
+                      double line_width, float sample_rate, float r, float g, float b, const char* label,
                       float label_y, bool dash = false, bool fill = false) {
 
         if (mags.empty()) return;
@@ -1753,7 +1819,7 @@ private:
             if (bin < 1.0f) continue;
             if (bin > bins - 3) break;
             float mag = hermiteLookup(mags, bin);
-            float y = db_to_y(mag, db_min, db_max, height);
+            float y = db_to_y(mag, dB_min, dB_max, height);
             if (!started) {
                 cairo_move_to(cr, px, y);
                 started = true;

@@ -1454,11 +1454,11 @@ Widget_t* add_my_vmeter(Widget_t *parent, const char * label, bool show_scale,
     wid->adj_y = add_adjustment(wid,-70.0, -70.0, -180.0, 6.0,0.001, CL_METER);
     wid->adj = wid->adj_y;
     wid->flags &= ~USE_TRANSPARENCY;
-    wid->scale.gravity = ASPECT;
+    wid->scale.gravity = WESTSOUTH;
     wid->func.expose_callback = draw_vmeter;
     if (show_scale) {
         Widget_t *wid2 = create_widget(parent->app, parent, x+width, y, width+4, height);
-        wid2->scale.gravity = ASPECT;
+        wid2->scale.gravity = WESTSOUTH;
         wid2->func.expose_callback =draw_vmeter_scale;
     }
     return wid;
@@ -1473,11 +1473,11 @@ Widget_t* add_my_left_vmeter(Widget_t *parent, const char * label, bool show_sca
     wid->adj_y = add_adjustment(wid,-70.0, -70.0, -180.0, 6.0,0.001, CL_METER);
     wid->adj = wid->adj_y;
     wid->flags &= ~USE_TRANSPARENCY;
-    wid->scale.gravity = ASPECT;
+    wid->scale.gravity = WESTSOUTH;
     wid->func.expose_callback = draw_vmeter;
     if (show_scale) {
         Widget_t *wid2 = create_widget(parent->app, parent, x, y, width+4, height);
-        wid2->scale.gravity = ASPECT;
+        wid2->scale.gravity = WESTSOUTH;
         wid2->func.expose_callback =draw_vmeter_scale;
     }
     return wid;
@@ -1500,8 +1500,8 @@ void draw_vslider(void *w_, void* user_data) {
     cairo_fill(w->crb);
 
     cairo_pattern_t *track = cairo_pattern_create_linear(0, 0, 0, m.height);
-    cairo_pattern_add_color_stop_rgba(track, 0.0, 0.157, 0.165, 0.212, 0.8);
-    cairo_pattern_add_color_stop_rgba(track, 1.0, 0.157, 0.165, 0.212, 1.0);
+    cairo_pattern_add_color_stop_rgba(track, 0.0, 0.127, 0.145, 0.2192, 0.8);
+    cairo_pattern_add_color_stop_rgba(track, 1.0, 0.127, 0.145, 0.192, 1.0);
 
     cairo_rectangle(w->crb, m.width*0.25, 4, m.width*0.5, m.height-8);
     cairo_set_source(w->crb, track);
@@ -1546,7 +1546,7 @@ void draw_vslider(void *w_, void* user_data) {
     cairo_set_source_rgba(w->crb, 0.85, 0.85, 0.9, 0.85);
     char buf[32];
     snprintf(buf, sizeof(buf), "%.1f", adj_get_value(w->adj));
-    cairo_set_font_size(w->crb, m.width * 0.40);
+    cairo_set_font_size(w->crb, m.width * 0.50);
     cairo_text_extents(w->crb, buf, &ext);
     cairo_move_to(w->crb, (m.width - ext.width)/2, ext.height + 2);
     cairo_text_path (w->crb, buf);
