@@ -37,6 +37,7 @@ public:
     //Widget_t*               TopWin;
     Params*                 param;
     FFTAnalyzer             ana;
+    FFTAnalyzer             anain;
     IRProcessor             ip;
     IRMorpherStereo         conv;
     GainStereo              vu;
@@ -45,7 +46,9 @@ public:
     StandaloneConnector     conn;
     SpectrumViewer          sw;
 
-    ToneShiftEQ() : ana(), ip(), conv(), vu(), vuin(), engine(&ip, &conv, &ana, &vu, &vuin), conn(&engine), sw(&conn) {
+    ToneShiftEQ() : ana(), anain(), ip(), conv(), vu(), vuin(),
+                    engine(&ip, &conv, &ana, &anain, &vu, &vuin),
+                                        conn(&engine), sw(&conn) {
         title = "ToneShiftEQ";
         firstLoop = true;
         p = 0;
@@ -87,6 +90,8 @@ public:
         getEngineValues();
         widget_show_all(sw.top);
         sw.set_controller_mode();
+        sw.zoom_step = (int)param->getParam(113);
+        if (sw.zoom_step) sw.updateDbRange();
         firstLoop = true;
     }
     
@@ -203,6 +208,9 @@ public:
             copyValuesToGui(sw.ratio[i], (float)param->getParam(97 + i));
         }
         copyValuesToGui(sw.vuing,       (float)param->getParam(109));
+        copyValuesToGui(sw.side,        (float)param->getParam(110));
+        copyValuesToGui(sw.gthr,        (float)param->getParam(111));
+        copyValuesToGui(sw.gthrv,       (float)param->getParam(112));
     }
 
 

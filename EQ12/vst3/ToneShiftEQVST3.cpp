@@ -442,6 +442,7 @@ struct toneshifteq_controller : v3_edit_controller_cpp {
         uint32_t flags = V3_PARAM_CAN_AUTOMATE;
 
         if (idx ==  descriptor.hiddenParameter) flags |= V3_PARAM_IS_HIDDEN;
+        if (idx ==  113) flags |= V3_PARAM_IS_HIDDEN;
         if (c->mode == MODE_LIVE) {
             if (idx == 79 || idx == 80 || idx == 81 || idx == 83) {
                 flags |= V3_PARAM_IS_HIDDEN;

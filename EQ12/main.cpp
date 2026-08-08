@@ -67,20 +67,24 @@ void getEngineValues(Params* param, SpectrumViewer* sw) {
         copyValuesToGui(sw->threshold[i], (float)param->getParam(85 + i));
     }
     for (int i = 0; i< 12; i++) {
-        copyValuesToGui(sw->ratio[i], (float)param->getParam(97 + i));
+        copyValuesToGui(sw->ratio[i],(float)param->getParam(97 + i));
     }
     copyValuesToGui(sw->vuing,       (float)param->getParam(109));
+    copyValuesToGui(sw->side,        (float)param->getParam(110));
+    copyValuesToGui(sw->gthr,        (float)param->getParam(111));
+    copyValuesToGui(sw->gthrv,       (float)param->getParam(112));
 }
 
 int main(int argc, char *argv[]){
 
     AudioFile af;
     FFTAnalyzer ana;
+    FFTAnalyzer anain;
     IRProcessor ip;
     IRMorpherStereo conv;
     GainStereo vu;
     GainStereo vuin;
-    Engine engine(&ip, &conv, &ana, &vu, &vuin);
+    Engine engine(&ip, &conv, &ana, &anain, &vu, &vuin);
     StandaloneConnector conn(&engine);
     SpectrumViewer sw(&conn);
     JackClient jack(&engine, &sw);

@@ -38,6 +38,7 @@ public:
     IRProcessor*                    ip = nullptr;
     IRMorpherStereo*                conv = nullptr;
     FFTAnalyzer*                    ana = nullptr;
+    FFTAnalyzer*                    anain = nullptr;
     GainStereo*                     vu = nullptr;
     GainStereo*                     vuin = nullptr;
     SmoothCascade                   tsc;
@@ -55,7 +56,9 @@ public:
     std::atomic<bool>               dataReady {false};
     std::atomic<bool>               convLoadIR {false};
 
-    inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_, GainStereo* vuin_);
+    inline Engine(IRProcessor *ip_, IRMorpherStereo* conv_,
+                  FFTAnalyzer* ana_, FFTAnalyzer* anain_,
+                  GainStereo* vu_, GainStereo* vuin_);
 
     inline ~Engine();
 
@@ -68,9 +71,12 @@ private:
     ParallelThread                  par;
     float*                          abuffer = nullptr;
     uint32_t                        frames = 0;
+    int                             zoom_step = 0; // ui parameter
     int                             mode = 0;
     int                             sidechain = 0;
     int                             sidechain_set = 0;
+    int                             gthreshold = 0;
+    float                           gthreshold_value = 0.0f;
     float                           sidechain_gain = 0.0f;
     float                           direct_gain = 0.0f;
     float                           dynamicThreshold[NumFilters];
@@ -91,18 +97,21 @@ private:
 
     void registerParameters();
     void updateCascadeFromParams();
+    inline void processBufferIn();
     inline void processBuffer();
     inline void processDynamic();
     inline void applyDynamicGains();
-    inline void feedAnanlyzer(uint32_t nframes, float* output, float* output1);
+    inline void feedAnanlyzer(uint32_t nframes, uint32_t proc, const float* output, const float* output1);
 };
 
-inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_, GainStereo* vu_, GainStereo* vuin_) :
+inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana_,
+                      FFTAnalyzer* anain_, GainStereo* vu_, GainStereo* vuin_) :
     xrworker(),
     par() {
         ip = ip_;
         conv = conv_;
         ana = ana_;
+        anain = anain_;
         vu = vu_;
         vuin = vuin_;
         
@@ -169,9 +178,13 @@ void Engine::registerParameters() {
         param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&dynamicRatio[i],true,  IS_INT);
     }
 
-    param.registerParam("Volume In", "Global",-46,  12,  0.0,  0.1,    (void*)&vuin->gain,           false,  IS_FLOAT);
-    param.registerParam("SideChain",     "EQ",  0,   1,   1,    1,     (void*)&sidechain,             true,  IS_INT);
+    param.registerParam("Volume In", "Global",-46,  12,  0.0,  0.1,     (void*)&vuin->gain,           false,  IS_FLOAT);
+    param.registerParam("SideChain",     "EQ",  0,   1,   1,    1,      (void*)&sidechain,             true,  IS_INT);
 
+    param.registerParam("GThreshold", "Global",  0,   1,   0,    1,     (void*)&gthreshold,            true,  IS_INT);
+    param.registerParam("Gtresh Value","Global",-46.0, 0.0, 0.0, 0.1,   (void*)&gthreshold_value,     false,  IS_FLOAT);
+
+    param.registerParam("Zoom",      "Global",  0,   12,   0,    1,     (void*)&zoom_step,             true,  IS_INT);
 };
 
 
@@ -181,6 +194,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     s_rate = rate;
 
     ana->init(4096, (float)rate);
+    anain->init(4096, (float)rate);
     vu->init(rate);
     vuin->init(rate);
     ip->computeIR((double)rate);
@@ -200,7 +214,8 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
 
     par.setThreadName("RT");
     par.setPriority(rt_prio_, rt_policy_);
-    par.set<Engine, &Engine::processBuffer>(this);
+    par.set<0, Engine, &Engine::processBufferIn>(this);
+    par.set<1, Engine, &Engine::processBuffer>(this);
 };
 
 
@@ -286,7 +301,11 @@ inline void Engine::processDynamic() {
             dynGainOffset[i].store(0.0f, std::memory_order_relaxed);
             continue;
         }
-        if (dynamicThreshold[i] > -0.1f) continue;
+        float gthr = 0.0f;
+        if (gthreshold) {
+            if (!dynamicThreshold[i]) gthr = -0.1;
+        }
+        if ((dynamicThreshold[i] + gthr + dynGainOffset[i].load()) > -0.1f) continue;
         float levelDB = tsd.getDB(i);
         float gainReductionDB = 0.0f;
         switch (dynamicRatio[i]) {
@@ -304,8 +323,10 @@ inline void Engine::processDynamic() {
             break;
         }
 
-        if (levelDB > dynamicThreshold[i])
-            gainReductionDB = (levelDB - dynamicThreshold[i]) * (1.0f - 1.0f / ratio);
+        if (gthreshold) levelDB += -gthreshold_value;
+        if (levelDB > (dynamicThreshold[i] + gthr))
+            gainReductionDB = (levelDB - (dynamicThreshold[i] + gthr)) * (1.0f - 1.0f / ratio);
+
 
         dynGainOffset[i].store(-gainReductionDB, std::memory_order_release);
     }
@@ -322,13 +343,17 @@ inline void Engine::applyDynamicGains() {
     }
 }
 
+inline void Engine::processBufferIn() {
+    if (!frames) return;
+        anain->processBlock(abuffer, frames);
+}
+
 inline void Engine::processBuffer() {
     if (!frames) return;
         ana->processBlock(abuffer, frames);
 }
 
-
-inline void Engine::feedAnanlyzer(uint32_t nframes, float* output, float* output1) {
+inline void Engine::feedAnanlyzer(uint32_t nframes, uint32_t proc, const float* output, const float* output1) {
     for (uint32_t i = 0; i < nframes; ++i) {
         const float l = std::fabs(output[i]);
         const float r = std::fabs(output1[i]);
@@ -336,6 +361,7 @@ inline void Engine::feedAnanlyzer(uint32_t nframes, float* output, float* output
     }
 
     frames = nframes;
+    par.setProcessor(proc);
     par.runProcess();
 }
 
@@ -364,10 +390,12 @@ inline void Engine::process(uint32_t nframes, const float* sideput,
             memcpy(sp, sideput, nframes * sizeof(float));
             memcpy(sp1, sideput1, nframes * sizeof(float));
             vuin->process(nframes, sp, sp1, sp, sp1);
+            feedAnanlyzer(nframes, 0, sp, sp1);
             tsd.processBlock(nframes, sp, sp1);
         }
     } else {
         vuin->process(nframes, output, output1, output, output1);
+        feedAnanlyzer(nframes, 0, output, output1);
     }
 
     if (modeState == ModeState::FadingOut) {
@@ -427,7 +455,8 @@ inline void Engine::process(uint32_t nframes, const float* sideput,
 
     vu->process(nframes, output, output1, output, output1);
 
-    feedAnanlyzer(nframes, output, output1);
+    feedAnanlyzer(nframes, 1, output, output1);
+
     if(workToDo.load(std::memory_order_acquire) && !execute.load(std::memory_order_acquire)) {
         workToDo.store(false, std::memory_order_release);
         xrworker.runProcess();

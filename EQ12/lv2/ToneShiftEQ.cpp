@@ -15,11 +15,12 @@ namespace toneshifteq {
 // constructor
 Xtoneshifteq::Xtoneshifteq() :
     ana(),
+    anain(),
     ip(),
     conv(),
     vu(),
     vuin(),
-    engine(&ip, &conv, &ana, &vu, &vuin),
+    engine(&ip, &conv, &ana, &anain, &vu, &vuin),
     input0(NULL),
     input1(NULL),
     sidechain0(NULL),
@@ -44,7 +45,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
     sampleRate = (float)rate;
     engine.init(rate, 20, 1);
     float v = 0.0f;
-    for (int i = 0; i< 111; i++) {
+    for (int i = 0; i < METER_L; i++) {
         par[i] = &v;
     }
     for (int i = 0; i< 12; i++) {
@@ -54,7 +55,7 @@ void Xtoneshifteq::init_dsp_(uint32_t rate) {
 
 // connect the Ports used by the plug-in class
 void Xtoneshifteq::connect_(uint32_t port,void* data) {
-    for (int i = 0; i< 111; i++) {
+    for (int i = 0; i < METER_L; i++) {
         if (i == (int)port) {
             par[i] = static_cast<float*>(data);
             return;
@@ -62,51 +63,51 @@ void Xtoneshifteq::connect_(uint32_t port,void* data) {
     }
     switch (port)
     {
-        case 111:
+        case METER_L:
             vu.meterLout = static_cast<float*>(data);
             break;
-        case 112:
+        case METER_R:
             vu.meterRout = static_cast<float*>(data);
             break;
-        case 113:
+        case IN_L:
             input0 = static_cast<float*>(data);
             break;
-        case 114:
+        case IN_R:
             input1 = static_cast<float*>(data);
             break;
-        case 115:
+        case OUT_L:
             output0 = static_cast<float*>(data);
             break;
-        case 116:
+        case OUT_R:
             output1 = static_cast<float*>(data);
             break;
-        case 117:
+        case NOTIFY:
             notify = (LV2_Atom_Sequence*)data;
             break;
-        case 118:
+        case CONTROL:
             control = (const LV2_Atom_Sequence*)data;
             break;
-        case 119:
+        case LATENCY:
             latency = static_cast<float*>(data);
             break;
-        case 132:
+        case METER_L_IN:
             vuin.meterLout = static_cast<float*>(data);
             break;
-        case 133:
+        case METER_R_IN:
             vuin.meterRout = static_cast<float*>(data);
             break;
-        case 134:
+        case SIDECHAIN_L:
             sidechain0 = static_cast<float*>(data);
             break;
-        case 135:
+        case SIDECHAIN_R:
             sidechain1 = static_cast<float*>(data);
             break;
         default:
             break;
     }
-    for (int i = 120; i< 132; i++) {
+    for (int i = DYN1; i <= DYN12; i++) {
         if (i == (int)port) {
-            dyn[i-120] = static_cast<float*>(data);
+            dyn[i - DYN1] = static_cast<float*>(data);
             return;
         }
     }
@@ -166,11 +167,32 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
         (*dyn[i]) = engine.getDynamics(i);
     }
 
+    // draw inline display when supported
+    if (queue_draw) {
+        if (ana.hasNewData()) queue_draw->queue_draw(queue_draw->handle);
+    }
+    // report latency
+    *(latency) = (int)*(par[84]) ? 0 : engine.conv->getLatency();
+    // finish here when we have instance-access, otherwise send data via atom messages
     if (!atomTransfer.load(std::memory_order_acquire)) return;
-
+    // get size of a empty message once
     static constexpr size_t atom_overhead = sizeof(LV2_Atom_Object) + sizeof(LV2_Atom_Property_Body)
                                           + sizeof(LV2_Atom_Vector_Body) + 64; 
 
+    // send in spectrum 
+    if (anain.hasNewData()) {
+        size_t needed = atom_overhead + anain.getBins() * sizeof(float);
+        if (forge.size - forge.offset >= needed) {
+            LV2_Atom_Forge_Frame frame;
+            lv2_atom_forge_frame_time(&this->forge, 0);
+            lv2_atom_forge_object(&this->forge, &frame, 1, uris->spectrum_in_data);
+            lv2_atom_forge_property_head(&this->forge, uris->atom_Vector, 0);
+            lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float,
+                                  anain.getBins(), (void*)anain.getMagnitudes());
+            lv2_atom_forge_pop(&this->forge, &frame);
+            anain.clearFlag();
+        }
+    }
     // send spectrum
     if (ana.hasNewData()) {
         size_t needed = atom_overhead + ana.getBins() * sizeof(float);
@@ -182,7 +204,6 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
             lv2_atom_forge_vector(&this->forge, sizeof(float), uris->atom_Float,
                                   ana.getBins(), (void*)ana.getMagnitudes());
             lv2_atom_forge_pop(&this->forge, &frame);
-            if (queue_draw) queue_draw->queue_draw(queue_draw->handle);
             ana.clearFlag();
         }
     }
@@ -220,8 +241,6 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
             pullPhase.store(true, std::memory_order_release);
         }
     }
-
-    *(latency) = (int)*(par[84]) ? 0 : engine.conv->getLatency();
 }
 
 void Xtoneshifteq::connect_all__ports(uint32_t port, void* data) {

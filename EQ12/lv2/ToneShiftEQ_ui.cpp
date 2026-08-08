@@ -88,7 +88,17 @@ void XToneShiftEQ_UI::sendParameter(uint32_t port, float value) {
 }
 
 void XToneShiftEQ_UI::handleAtom(const LV2_Atom_Object* obj) {
-    if (obj->body.otype == uris.spectrum_data) {
+    if (obj->body.otype == uris.spectrum_in_data) {
+        const LV2_Atom* vector_data = NULL;
+        const int n_props  = lv2_atom_object_get(obj,uris.atom_Vector, &vector_data, NULL);
+        if (!n_props) return;
+        const LV2_Atom_Vector* vec = (LV2_Atom_Vector*)LV2_ATOM_BODY(vector_data);
+        if (vec->atom.type == uris.atom_Float) {
+            const float* data =  (float*) LV2_ATOM_BODY(&vec->atom);
+            uint32_t bins = (vector_data->size - sizeof(LV2_Atom_Vector_Body)) / vec->atom.size;
+            sw.setInSpec(data, bins);
+        }
+    } else if (obj->body.otype == uris.spectrum_data) {
         const LV2_Atom* vector_data = NULL;
         const int n_props  = lv2_atom_object_get(obj,uris.atom_Vector, &vector_data, NULL);
         if (!n_props) return;
@@ -165,6 +175,23 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.mode, value);
         sw.set_controller_mode();
         break;
+    case 109:
+        copyValuesToGui(sw.vuing, value);
+        break;
+    case 110:
+        copyValuesToGui(sw.side, value);
+        break;
+    case 111:
+        copyValuesToGui(sw.gthr, value);
+        if ((int)value) widget_show(sw.gthrv);
+        break;
+    case 112:
+        copyValuesToGui(sw.gthrv, value);
+        break;
+    case 113:
+        sw.zoom_step = (int)value;
+        if (sw.zoom_step) sw.updateDbRange();        
+        break;
     default:
         break;
     }
@@ -202,8 +229,8 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.threshold[port - 85], value);
     } else if  (port >= 97 && port <= 108) {
         copyValuesToGui(sw.ratio[port - 97], value);
-    } else if  (port >= 120 && port <= 131) {
-        conn.dyn[port - 120] = value;
+    } else if  (port >= DYN1 && port <= DYN12) {
+        conn.dyn[port - DYN1] = value;
     }
 }
 
@@ -213,13 +240,13 @@ void XToneShiftEQ_UI::port_event(LV2UI_Handle handle, uint32_t port, uint32_t bu
 
     if (format == 0) {
         const float value = *(const float*)buffer;
-        if (port == 111) {
+        if (port == METER_L) {
             adj_set_value(self->sw.vumeterL->adj, power2db(self->sw.vumeterL, value));
-        } else if (port == 112) {
+        } else if (port == METER_R) {
             adj_set_value(self->sw.vumeterR->adj, power2db(self->sw.vumeterR, value));
-        } else if (port == 132) {
+        } else if (port == METER_L_IN) {
             adj_set_value(self->sw.vuinmeterL->adj, power2db(self->sw.vuinmeterL, value));
-        } else if (port == 133) {
+        } else if (port == METER_R_IN) {
             adj_set_value(self->sw.vuinmeterR->adj, power2db(self->sw.vuinmeterR, value));
         } else {
             self->conn.setParValue(port, value);
@@ -323,7 +350,7 @@ void XToneShiftEQ_UI::notify_dsp(XToneShiftEQ_UI* self) {
     LV2_Atom_Forge_Frame frame;
     LV2_Atom* msg = (LV2_Atom*)lv2_atom_forge_object(&self->forge, &frame, 0, self->uris.ir_request);
 
-    self->write_function(self->controller, 118, lv2_atom_total_size(msg),
+    self->write_function(self->controller, CONTROL, lv2_atom_total_size(msg),
                        self->uris.atom_eventTransfer, msg);
 }
 
@@ -335,15 +362,22 @@ int XToneShiftEQ_UI::idle(LV2UI_Handle handle) {
             self->sw.setFilter(self->engine->getIRMag().data(), 4096);
             self->sw.setPhase(self->engine->getPhase().data(), 1024);
         }
+        if (self->engine->hasNewInData()) {
+            self->sw.setInSpec(self->engine->getInMagnitudes(), self->engine->getInBins());
+        }
         if (self->engine->hasNewData()) {
             self->sw.setSpec(self->engine->getMagnitudes(), self->engine->getBins());
         }
-    } else if (self->check) {
+   } else if (self->check) {
         self->notify_dsp(self);
         self->check = false;
     }
 
     run_embedded(self->sw.getMain());
+    if (self->check) {
+        self->sw.setFilter(self->engine->getIRMag().data(), 4096);
+        self->check = false;
+    }
     return 0;
 }
 

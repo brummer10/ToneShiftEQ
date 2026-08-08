@@ -88,6 +88,22 @@ public:
         engine->ana->clearFlag();
     }
 
+    bool checkNewInData() override {
+        return engine->anain->hasNewData();
+    }
+
+    int getInBins() override {
+        return engine->anain->getBins();
+    }
+
+    const float* getInMagnitudes() override {
+        return engine->anain->getMagnitudes();
+    }
+
+    void clearInAna() override {
+        engine->anain->clearFlag();
+    }
+
     bool haveData() override {
         if (engine->dataReady.load(std::memory_order_acquire)) {
             engine->dataReady.store(false, std::memory_order_release);

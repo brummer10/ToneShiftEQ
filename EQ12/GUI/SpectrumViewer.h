@@ -31,6 +31,7 @@ public:
     using Vec = std::vector<float>;
     bool run = false;
     int active_panel = 0;
+    int zoom_step = 0;
     Widget_t* top = nullptr;
     Widget_t* bp = nullptr;
     Widget_t* frame[FilterTypes::NumFilters];
@@ -63,6 +64,10 @@ public:
     Widget_t* vuinmeterL = nullptr;
     Widget_t* vuinmeterR = nullptr;
     Widget_t* apo_loader = nullptr;
+    Widget_t* side = nullptr;
+    Widget_t* gthr = nullptr;
+    Widget_t* gthrv = nullptr;
+
     std::atomic<bool> havePreset {false};
     std::vector<double> dstL;
     std::vector<double> dstR;
@@ -81,6 +86,14 @@ public:
 
     void setPhase(const std::vector<float>& phase) {
         phase_.assign(phase.begin(), phase.end());
+    }
+
+    void setInSpec(const float* data, int bin) {
+        magin_.clear();
+        for (int i = 0; i<bin; i++) {
+            magin_.push_back(data[i]);
+        }
+        os_expose_widget(spec);
     }
 
     void setSpec(const float* data, int bin) {
@@ -154,9 +167,18 @@ public:
         Widget_t* linframe = add_my_frame(top,"", 1, 350, 64, 80);
         linframe->scale.gravity = EASTWEST;
 
-        Widget_t* side =  add_my_input_button(linframe, 16, 2, 40, 40);
+        side = add_my_input_button(linframe, 16, 0, 40, 40);
         side->parent_struct = this;
         side->func.value_changed_callback = set_side;
+
+        gthr =  add_my_threshold_button(linframe, 16, 40, 40, 40);
+        gthr->parent_struct = this;
+        gthr->func.value_changed_callback = set_global_threshold;
+
+        gthrv = add_my_mini_slider(linframe, "", 4, 4, 10, 72);
+        gthrv->parent_struct = this;
+        set_adjustment(gthrv->adj,0.0, 0.0, -46.0, 0.0, 0.1, CL_CONTINUOS);
+        gthrv->func.value_changed_callback = set_global_threshold_value;
 
         Widget_t* gframe = add_my_frame(top,"", width-65, 0, 64, height-82);
         gframe->scale.gravity = WESTSOUTH;
@@ -449,10 +471,23 @@ public:
         o_mode = c_mode;
     }
 
+    void updateDbRange() {
+        sendValueChanged(113, zoom_step);
+        const float t = (float)zoom_step / (float)ZOOM_STEPS;
+        db_min = db_min_ * std::pow(-6.0 / db_min_, t);
+        db_max = db_max_ * std::pow(6.0 / db_max_, t);
+        spec_height = 0;
+        rebuild_eq_layer = true;
+        expose_widget(spec);
+    }
+
     void show() {
         widget_show_all(top);
         raise_control_panel(active_panel);
         set_controller_mode();
+        zoom_step = conn->getParameterValue(113);
+        if (zoom_step) updateDbRange();
+        if (!conn->getParameterValue(111)) widget_hide(gthrv);
     }
 
     void setSampleRate(const double sr) {
@@ -477,6 +512,17 @@ public:
         adj_set_value(vumeterR->adj, power2db(vumeterR, conn->getMeterR()));
         adj_set_value(vuinmeterL->adj, power2db(vuinmeterL, conn->getInMeterL()));
         adj_set_value(vuinmeterR->adj, power2db(vuinmeterR, conn->getInMeterR()));
+        bool setRefresh = false;
+        if (conn->checkNewInData()) {
+            bin = conn->getInBins();
+            magin_.clear();
+            const float* m = conn->getInMagnitudes();
+            for (int i = 0; i<bin; i++) {
+                magin_.push_back(m[i]);
+            }
+            conn->clearInAna();
+            setRefresh = true;
+        }
         if (conn->checkNewData()) {
             bin = conn->getBins();
             mag_.clear();
@@ -485,8 +531,9 @@ public:
                 mag_.push_back(m[i]);
             }
             conn->clearAna();
-            expose_widget(spec);
+            setRefresh = true;
         }
+        if (setRefresh) expose_widget(spec);
     }
 
     void check_irmatch() {
@@ -519,10 +566,12 @@ private:
     Vec ir_; // filter
     Vec phase_; // phase
     Vec mag_; // spectrum
+    Vec magin_; // input spectrum
 
     char cfreq[64];
     char cgain[64];
     double sampleRate = 48000.0;
+    bool threshold_match = false;
     bool band_match = false;
     bool show_ph = false;
     int match_state = -1;
@@ -550,7 +599,6 @@ private:
     float db_max = 24.0f;
     const float db_max_ = 24.0f;
 
-    int zoom_step = 0;
     static constexpr int   ZOOM_STEPS  = 12;
 
     struct BandCurveLUTs {
@@ -681,12 +729,6 @@ private:
         }
     }
 
-    void updateDbRange() {
-        const float t = (float)zoom_step / (float)ZOOM_STEPS;
-        db_min = db_min_ * std::pow(-6.0 / db_min_, t);
-        db_max = db_max_ * std::pow(6.0 / db_max_, t);
-    }
-
     static void get_key(void *w_, void *key_, void *user_data) {
         Widget_t *w = (Widget_t*)w_;
         if (!w) return;
@@ -695,15 +737,9 @@ private:
         if (key->keycode == XKeysymToKeycode(w->app->dpy, XK_plus)) {
             self->zoom_step = std::min<int>(ZOOM_STEPS, self->zoom_step + 1);
             self->updateDbRange();
-            self->spec_height = 0;
-            self->rebuild_eq_layer = true;
-            expose_widget(self->spec);
         } else if (key->keycode == XKeysymToKeycode(w->app->dpy, XK_minus)) {
             self->zoom_step = std::max<int>(0, self->zoom_step - 1);
             self->updateDbRange();
-            self->spec_height = 0;
-            self->rebuild_eq_layer = true;
-            expose_widget(self->spec);
         }
     }
 
@@ -733,6 +769,19 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(110, adj_get_value(w->adj));
+    }
+
+    static void set_global_threshold(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        adj_get_value(w->adj) ? widget_show(self->gthrv) : widget_hide(self->gthrv);
+        self->sendValueChanged(111, adj_get_value(w->adj));
+    }
+
+    static void set_global_threshold_value(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(112, adj_get_value(w->adj));
     }
 
     static void set_hf_fade(void *w_, void* user_data) {
@@ -1063,6 +1112,13 @@ private:
                     if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                     adj_set_value(self->fgain[self->match_band]->adj, vg);
                 }
+            } else if (self->threshold_match) {
+                float vg = adj_get_value(self->gthrv->adj);
+                float deltay = (float)y1 - self->my;
+                vg += deltay * -px_to_db;
+                self->my = y1;
+                if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
+                adj_set_value(self->gthrv->adj, vg);
             }
         } else {
             self->find_hovered_band(x1, y1);
@@ -1090,15 +1146,9 @@ private:
                 if(xbutton->button == Button4) {
                     self->zoom_step = std::max<int>(0, self->zoom_step - 1);
                     self->updateDbRange();
-                    self->spec_height = 0;
-                    self->rebuild_eq_layer = true;
-                    expose_widget(self->spec);
                 } else if(xbutton->button == Button5) {
                     self->zoom_step = std::min<int>(ZOOM_STEPS, self->zoom_step + 1);
                     self->updateDbRange();
-                    self->spec_height = 0;
-                    self->rebuild_eq_layer = true;
-                    expose_widget(self->spec);
                 }
             }
         }
@@ -1339,6 +1389,15 @@ private:
             }
         }
         band_match = false;
+        if (conn->getParameterValue(111)) {
+            float y = db_to_y(conn->getParameterValue(112), db_min_, db_max_, height);
+            float dy = my - y;
+            if (dy * dy < 12*12) {
+                threshold_match = true;
+                return;
+            }
+            threshold_match = false;
+        }
     }
 
     // draw band curves
@@ -1573,6 +1632,24 @@ private:
         }
     }
 
+    void draw_threshold_line(cairo_t* cr, const int width, const int height) {
+        // threshold line
+        double gt = conn->getParameterValue(112);
+        double y = db_to_y(gt, db_min_, db_max_, height);
+        cairo_set_source_rgba(cr, 0.2, 0.9, 0.5, 0.6);
+        cairo_set_line_width(cr, 1.0);
+        cairo_move_to(cr, 0, y);
+        cairo_line_to(cr, width, y);
+        cairo_stroke(cr);
+        if (threshold_match) {
+            cairo_set_source_rgba(cr, 0.2, 0.9, 0.5, 0.2);
+            cairo_set_line_width(cr, 7.0);
+            cairo_move_to(cr, 0, y);
+            cairo_line_to(cr, width, y);
+            cairo_stroke(cr);
+        }
+    }
+
     void create_background(Widget_t *w, const int width, const int height) {
         std::vector<double> freqs = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
         std::vector<double> minor_freqs = {30, 40, 60, 70, 80, 90, 300, 400, 600, 700, 800,
@@ -1781,6 +1858,8 @@ private:
         spec_width = width;
 
         draw_band_curves(cr, true, width, height);
+        if (conn->getParameterValue(111)) draw_threshold_line(cr, width, height);
+        drawSpectrum(cr, magin_, width, height, db_min_, db_max_, 1.5, sample_rate, 0.2, 0.75, 0.45, "", height-100, false, true);
         drawSpectrum(cr, mag_, width, height, db_min_, db_max_, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
 
         //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
@@ -1836,8 +1915,8 @@ private:
             cairo_line_to(cr, 3, height);
             cairo_close_path(cr);
             cairo_pattern_t* pat = cairo_pattern_create_linear(0, 0, 0, height);
-            cairo_pattern_add_color_stop_rgba(pat, 0.0, 0.75, 0.2, 0.9, 0.25);
-            cairo_pattern_add_color_stop_rgba(pat, 1.0, 0.45, 0.2, 0.75, 0.05);
+            cairo_pattern_add_color_stop_rgba(pat, 0.0, 0.35, 0.85, 0.55, 0.25);
+            cairo_pattern_add_color_stop_rgba(pat, 1.0, r, g, b, 0.05);
             cairo_set_source(cr, pat);
             cairo_fill(cr);
             cairo_pattern_destroy(pat);

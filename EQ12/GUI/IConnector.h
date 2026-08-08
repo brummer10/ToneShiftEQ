@@ -40,6 +40,11 @@ public:
     virtual const float* getMagnitudes() = 0;
     virtual void clearAna() = 0;
 
+    virtual bool checkNewInData() = 0;
+    virtual int getInBins() = 0;
+    virtual const float* getInMagnitudes() = 0;
+    virtual void clearInAna() = 0;
+
     virtual bool haveData() = 0;
     virtual const std::vector<double>& getRef(std::vector<double>& l, std::vector<double>& r, double s) = 0;
     virtual const std::vector<float>& getIR() = 0;

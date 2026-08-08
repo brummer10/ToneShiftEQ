@@ -729,7 +729,90 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
 }
 
 /****************************************************************
- *    hf fade button
+ *    threshold button
+****************************************************************/
+
+void draw_threshold(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+    double y_mid = y_top + h * 0.5;
+
+    cairo_save(cr);
+
+    // frame
+    cairo_set_line_width(cr, size * 0.035 + ac);
+    cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
+    cairo_stroke(cr);
+
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_width(cr, state ? size * 0.05 : size * 0.04);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    cairo_move_to(cr, x0 + 2, y_mid);
+    cairo_line_to(cr, x1 - 2, y_mid);
+    cairo_stroke(cr);
+
+    cairo_pattern_destroy(pat);
+    cairo_restore(cr);
+}
+
+void draw_threshold_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+
+    draw_threshold(w->crb, 0.0, 0.0, height, w->state, state);
+    tooltip_set_my_text(w, "Global Threshold");
+}
+
+Widget_t *add_my_threshold_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_threshold_button;
+    return fbutton;
+}
+
+/****************************************************************
+ *    select input button
 ****************************************************************/
 
 void draw_direct_input(cairo_t *cr, double x, double y, double size, int state) {
@@ -1500,8 +1583,8 @@ void draw_vslider(void *w_, void* user_data) {
     cairo_fill(w->crb);
 
     cairo_pattern_t *track = cairo_pattern_create_linear(0, 0, 0, m.height);
-    cairo_pattern_add_color_stop_rgba(track, 0.0, 0.127, 0.145, 0.2192, 0.8);
-    cairo_pattern_add_color_stop_rgba(track, 1.0, 0.127, 0.145, 0.192, 1.0);
+    cairo_pattern_add_color_stop_rgba(track, 0.0, 0.107, 0.125, 0.1992, 0.8);
+    cairo_pattern_add_color_stop_rgba(track, 1.0, 0.107, 0.125, 0.172, 1.0);
 
     cairo_rectangle(w->crb, m.width*0.25, 4, m.width*0.5, m.height-8);
     cairo_set_source(w->crb, track);
@@ -1510,10 +1593,11 @@ void draw_vslider(void *w_, void* user_data) {
 
     float fill_h = (m.height-8) * value;
     float y = (m.height-4) - fill_h;
+    float glow = w->state > 0 ? 0.1 : 0.0;
 
     cairo_pattern_t *fill = cairo_pattern_create_linear(0, y, 0, m.height);
-    cairo_pattern_add_color_stop_rgba(fill, 0.0, 0.219,0.208,0.235, 0.8);
-    cairo_pattern_add_color_stop_rgba(fill, 1.0, 0.16,0.16,0.18, 1.0);
+    cairo_pattern_add_color_stop_rgba(fill, 0.0, 0.219 + glow,0.208 + glow,0.235 + glow, 0.8);
+    cairo_pattern_add_color_stop_rgba(fill, 1.0, 0.16 + glow,0.16 + glow,0.18 + glow, 1.0);
 
     cairo_rectangle(w->crb, m.width*0.25, y, m.width*0.5, fill_h);
     cairo_set_source(w->crb, fill);
@@ -1579,6 +1663,79 @@ Widget_t* add_my_vslider(Widget_t *parent, const char * label,
     return wid;
 }
 
+
+/****************************************************************
+ *    slider
+****************************************************************/
+
+void draw_mslider(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    Metrics_t m;
+    os_get_window_metrics(w, &m);
+    if (!m.visible) return;
+
+    float value = adj_get_state(w->adj_y);
+
+    cairo_set_source_rgb(w->crb, 0.10, 0.11, 0.13);
+    cairo_rectangle(w->crb, 0, 0, m.width, m.height);
+    cairo_fill(w->crb);
+
+    cairo_pattern_t *track = cairo_pattern_create_linear(0, 0, 0, m.height);
+    cairo_pattern_add_color_stop_rgba(track, 0.0, 0.107, 0.125, 0.1992, 0.8);
+    cairo_pattern_add_color_stop_rgba(track, 1.0, 0.107, 0.125, 0.172, 1.0);
+
+    cairo_rectangle(w->crb, m.width*0.25, 4, m.width*0.5, m.height-8);
+    cairo_set_source(w->crb, track);
+    cairo_fill(w->crb);
+    cairo_pattern_destroy(track);
+
+    float fill_h = (m.height-8) * value;
+    float y = (m.height-4) - fill_h;
+    float glow = w->state > 0 ? 0.1 : 0.0;
+
+    cairo_pattern_t *fill = cairo_pattern_create_linear(0, y, 0, m.height);
+    cairo_pattern_add_color_stop_rgba(fill, 0.0, 0.219 + glow,0.208 + glow,0.235 + glow, 0.8);
+    cairo_pattern_add_color_stop_rgba(fill, 1.0, 0.16 + glow,0.16 + glow,0.18 + glow, 1.0);
+
+    cairo_rectangle(w->crb, m.width*0.25, y, m.width*0.5, fill_h);
+    cairo_set_source(w->crb, fill);
+    cairo_fill(w->crb);
+    cairo_pattern_destroy(fill);
+
+    cairo_set_source_rgba(w->crb, 1,1,1,0.06);
+    cairo_rectangle(w->crb, m.width*0.25, 4, m.width*0.5, m.height-8);
+    cairo_stroke(w->crb);
+
+    cairo_set_source_rgba(w->crb, 0,0,0,0.6);
+    cairo_rectangle(w->crb, 0, 0, m.width, m.height);
+    cairo_stroke(w->crb);
+}
+
+void mslider_released(void *w_, void* button_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    expose_widget(w);
+}
+
+Widget_t* add_my_mini_slider(Widget_t *parent, const char * label,
+                int x, int y, int width, int height) {
+
+    Widget_t *wid = create_widget(parent->app, parent, x, y, width, height);
+    Slider_t *slider;
+    slider = (Slider_t*)malloc(sizeof(Slider_t));
+    slider->frames = 101;
+    wid->private_struct = slider;
+    wid->flags |= HAS_MEM;
+    wid->label = label;
+    wid->adj_y = add_adjustment(wid,0.0, 0.0, 0.0, 1.0,0.01, CL_CONTINUOS);
+    wid->adj = wid->adj_y;
+    wid->scale.gravity = ASPECT;
+    wid->func.expose_callback = draw_mslider;
+    wid->func.enter_callback = os_transparent_draw;
+    wid->func.leave_callback = os_transparent_draw;
+    wid->func.button_release_callback = mslider_released;
+    wid->func.mem_free_callback = slider_mem_free;
+    return wid;
+}
 
 /****************************************************************
  *    value display

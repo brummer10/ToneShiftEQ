@@ -42,6 +42,7 @@
 
 #define PLUGIN_URI "urn:brummer:toneshifteq"
 #define TONESHIFTEQ_spectrum PLUGIN_URI "#spectrum"
+#define TONESHIFTEQ_spectrum_in PLUGIN_URI "#spectrum_in"
 #define TONESHIFTEQ_irdata PLUGIN_URI "#irdata"
 #define TONESHIFTEQ_irphase PLUGIN_URI "#irphase"
 #define TONESHIFTEQ_ir_request PLUGIN_URI "#ir_request"
@@ -55,6 +56,7 @@ typedef struct {
     LV2_URID atom_URID;
     LV2_URID atom_eventTransfer;
     LV2_URID spectrum_data;
+    LV2_URID spectrum_in_data;
     LV2_URID ir_data;
     LV2_URID ir_phase;
     LV2_URID ir_request;
@@ -68,10 +70,51 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
     uris->atom_URID               = map->map(map->handle, LV2_ATOM__URID);
     uris->atom_eventTransfer      = map->map(map->handle, LV2_ATOM__eventTransfer);
     uris->spectrum_data           = map->map(map->handle, TONESHIFTEQ_spectrum);
+    uris->spectrum_in_data        = map->map(map->handle, TONESHIFTEQ_spectrum_in);
     uris->ir_data                 = map->map(map->handle, TONESHIFTEQ_irdata);
     uris->ir_phase                = map->map(map->handle, TONESHIFTEQ_irphase);
     uris->ir_request              = map->map(map->handle, TONESHIFTEQ_ir_request);
 }
+
+///////////////////////// LV2 PORT INDICES //////////////////////////////
+
+enum PortIndex
+{
+    METER_L = 114,
+    METER_R,
+
+    IN_L,
+    IN_R,
+    OUT_L,
+    OUT_R,
+
+    NOTIFY,  // atom:Sequence, output
+    CONTROL, // atom:Sequence, input
+
+    LATENCY,
+
+    // notOnGUI dynamics gain-reduction meters (per band)
+    DYN1,
+    DYN2,
+    DYN3,
+    DYN4,
+    DYN5,
+    DYN6,
+    DYN7,
+    DYN8,
+    DYN9,
+    DYN10,
+    DYN11,
+    DYN12,
+
+    METER_L_IN,
+    METER_R_IN,
+
+    SIDECHAIN_L,
+    SIDECHAIN_R,
+
+    PORT_COUNT
+};
 
 ////////////////////////////// PLUG-IN CLASS ///////////////////////////
 
@@ -82,6 +125,7 @@ class Xtoneshifteq
 private:
     Params*                 param;
     FFTAnalyzer             ana;
+    FFTAnalyzer             anain;
     IRProcessor             ip;
     IRMorpherStereo         conv;
     GainStereo              vu;
@@ -97,7 +141,7 @@ private:
     LV2_Atom_Forge_Frame notify_frame;
     URIs uris;
     std::atomic<bool> pullPhase {false};
-    float* par[111]; // engine.param.getParamCount() +1
+    float* par[METER_L]; // engine.param.getParamCount() +1
     float* dyn[12]; // engine.param.getDynamics()
     float* input0;
     float* input1;
@@ -135,6 +179,9 @@ public:
     const bool irReady() { return engine.dataReady.load(std::memory_order_acquire); }
     const std::vector<float>& getIRMag() { return ip.getIRMag(); }
     const std::vector<float>& getPhase() { return ip.getIRPhase(); }
+    const bool hasNewInData() { return anain.hasNewData(); }
+    const float* getInMagnitudes() { return anain.getMagnitudes(); }
+    const int getInBins() { return anain.getBins(); }
     const bool hasNewData() { return ana.hasNewData(); }
     const float* getMagnitudes() { return ana.getMagnitudes(); }
     const int getBins() { return ana.getBins(); }
