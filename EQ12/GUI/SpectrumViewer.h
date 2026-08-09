@@ -32,6 +32,8 @@ public:
     bool run = false;
     int active_panel = 0;
     int zoom_step = 0;
+    float threshold_tilt = 0.0f;
+
     Widget_t* top = nullptr;
     Widget_t* bp = nullptr;
     Widget_t* frame[FilterTypes::NumFilters];
@@ -601,6 +603,10 @@ private:
 
     static constexpr int   ZOOM_STEPS  = 12;
 
+    static constexpr float THR_TILT_PIVOT_HZ = 1000.0f;
+    static constexpr float THR_TILT_STEP = 0.5f;
+    static constexpr float THR_TILT_MAX  = 12.0f;
+
     struct BandCurveLUTs {
         std::vector<double> freq;
         std::vector<std::complex<double>> zInv, zInv2, alpha;
@@ -1142,6 +1148,16 @@ private:
                     adj_set_value(self->fq[self->match_band]->adj,vq);
                     // expose_widget(self->spec);
                 }
+            } else if (self->threshold_match) {
+                if (xbutton->button == Button4) {
+                    self->threshold_tilt = std::clamp(self->threshold_tilt + THR_TILT_STEP,
+                                                       -THR_TILT_MAX, THR_TILT_MAX);
+                } else if (xbutton->button == Button5) {
+                    self->threshold_tilt = std::clamp(self->threshold_tilt - THR_TILT_STEP,
+                                                       -THR_TILT_MAX, THR_TILT_MAX);
+                }
+                self->sendValueChanged(114, self->threshold_tilt);
+                expose_widget(self->spec);
             } else {
                 if(xbutton->button == Button4) {
                     self->zoom_step = std::max<int>(0, self->zoom_step - 1);
@@ -1633,16 +1649,36 @@ private:
     }
 
     void draw_threshold_line(cairo_t* cr, const int width, const int height) {
-        // threshold line
         double gt = conn->getParameterValue(112);
         double y = db_to_y(gt, db_min_, db_max_, height);
-        cairo_set_source_rgba(cr, 0.2, 0.9, 0.5, 0.6);
+        cairo_set_source_rgba(cr, 0.95, 0.65, 0.15, 0.7);
         cairo_set_line_width(cr, 1.0);
         cairo_move_to(cr, 0, y);
         cairo_line_to(cr, width, y);
         cairo_stroke(cr);
+
+        if (threshold_tilt != 0.0f) {
+            bool started = false;
+            for (int px = 0; px < width; ++px) {
+                float freq = x_to_freq((float)px, f_min, f_max, (float)width);
+                float eff = std::clamp((float)gt + threshold_tilt * std::log2(freq / THR_TILT_PIVOT_HZ), db_min_, db_max_);
+                float ey = db_to_y(eff, db_min_, db_max_, height);
+                started ? cairo_line_to(cr, px, ey) : cairo_move_to(cr, px, ey);
+                started = true;
+            }
+            cairo_set_source_rgba(cr, 0.98, 0.55, 0.1, 0.55);
+            cairo_set_line_width(cr, 1.0);
+            cairo_stroke_preserve(cr);
+
+            cairo_line_to(cr, width, y);
+            cairo_line_to(cr, 0, y);
+            cairo_close_path(cr);
+            cairo_set_source_rgba(cr, 0.95, 0.6, 0.1, 0.1);
+            cairo_fill(cr);
+        }
+
         if (threshold_match) {
-            cairo_set_source_rgba(cr, 0.2, 0.9, 0.5, 0.2);
+            cairo_set_source_rgba(cr, 0.95, 0.65, 0.15, 0.2);
             cairo_set_line_width(cr, 7.0);
             cairo_move_to(cr, 0, y);
             cairo_line_to(cr, width, y);
@@ -1861,12 +1897,6 @@ private:
         if (conn->getParameterValue(111)) draw_threshold_line(cr, width, height);
         drawSpectrum(cr, magin_, width, height, db_min_, db_max_, 1.5, sample_rate, 0.2, 0.75, 0.45, "", height-100, false, true);
         drawSpectrum(cr, mag_, width, height, db_min_, db_max_, 1.5, sample_rate, 0.45, 0.2, 0.75, "", height-100, false, true);
-
-        //cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        surface_set_font_from_ttf(cr, LDVAR_FONT(RobotoCondensedRegular_ttf),
-                                      LDLEN_FONT(RobotoCondensedRegular_ttf));
-        cairo_set_font_size(cr, 11);
-
     }
 
     void drawSpectrum(cairo_t* cr, const Vec& mags, int width, int height, float dB_min, float dB_max,

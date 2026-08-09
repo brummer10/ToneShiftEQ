@@ -92,6 +92,7 @@ public:
         sw.set_controller_mode();
         sw.zoom_step = (int)param->getParam(113);
         if (sw.zoom_step) sw.updateDbRange();
+        sw.threshold_tilt = param->getParam(114);
         firstLoop = true;
     }
     

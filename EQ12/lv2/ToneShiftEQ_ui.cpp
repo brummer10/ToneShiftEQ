@@ -192,6 +192,9 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         sw.zoom_step = (int)value;
         if (sw.zoom_step) sw.updateDbRange();        
         break;
+    case 114:
+        sw.threshold_tilt = value;
+        break;
     default:
         break;
     }

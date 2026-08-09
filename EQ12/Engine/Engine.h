@@ -77,6 +77,7 @@ private:
     int                             sidechain_set = 0;
     int                             gthreshold = 0;
     float                           gthreshold_value = 0.0f;
+    float                           gthreshold_tilt = 0.0f;
     float                           sidechain_gain = 0.0f;
     float                           direct_gain = 0.0f;
     float                           dynamicThreshold[NumFilters];
@@ -185,6 +186,7 @@ void Engine::registerParameters() {
     param.registerParam("Gtresh Value","Global",-46.0, 0.0, 0.0, 0.1,   (void*)&gthreshold_value,     false,  IS_FLOAT);
 
     param.registerParam("Zoom",      "Global",  0,   12,   0,    1,     (void*)&zoom_step,             true,  IS_INT);
+    param.registerParam("Gtresh tilt","Global",-12.0, 12.0, 0.0, 0.5,   (void*)&gthreshold_tilt,      false,  IS_FLOAT);
 };
 
 
@@ -323,10 +325,16 @@ inline void Engine::processDynamic() {
             break;
         }
 
-        if (gthreshold) levelDB += -gthreshold_value;
+        if (gthreshold) {
+            levelDB += -gthreshold_value;
+            if (gthreshold_tilt != 0.0f) {
+                float tiltOffsetDB = gthreshold_tilt *
+                                      std::log2((float)ip->bands[i].freq / 1000.0f);
+                levelDB -= tiltOffsetDB;
+            }
+        }
         if (levelDB > (dynamicThreshold[i] + gthr))
             gainReductionDB = (levelDB - (dynamicThreshold[i] + gthr)) * (1.0f - 1.0f / ratio);
-
 
         dynGainOffset[i].store(-gainReductionDB, std::memory_order_release);
     }

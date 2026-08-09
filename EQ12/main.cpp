@@ -73,6 +73,9 @@ void getEngineValues(Params* param, SpectrumViewer* sw) {
     copyValuesToGui(sw->side,        (float)param->getParam(110));
     copyValuesToGui(sw->gthr,        (float)param->getParam(111));
     copyValuesToGui(sw->gthrv,       (float)param->getParam(112));
+
+    sw->zoom_step       = (int)param->getParam(113);
+    sw->threshold_tilt  = (float)param->getParam(114);
 }
 
 int main(int argc, char *argv[]){
