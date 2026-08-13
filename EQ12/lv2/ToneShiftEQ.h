@@ -80,7 +80,7 @@ static inline void map_lv2_uris(LV2_URID_Map* map, URIs* uris) {
 
 enum PortIndex
 {
-    METER_L = 115,
+    METER_L = 128,
     METER_R,
 
     IN_L,

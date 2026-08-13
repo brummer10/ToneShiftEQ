@@ -90,9 +90,6 @@ public:
         getEngineValues();
         widget_show_all(sw.top);
         sw.set_controller_mode();
-        sw.zoom_step = (int)param->getParam(113);
-        if (sw.zoom_step) sw.updateDbRange();
-        sw.threshold_tilt = param->getParam(114);
         firstLoop = true;
     }
     
@@ -197,7 +194,7 @@ public:
 
         copyValuesToGui(sw.smooth,     (float)param->getParam(79));
         copyValuesToGui(sw.dynamics,   (float)param->getParam(80));
-        copyValuesToGui(sw.tilt,       (float)param->getParam(81));
+        //copyValuesToGui(sw.tilt,       (float)param->getParam(81));
 
         copyValuesToGui(sw.vug,        (float)param->getParam(82));
         copyValuesToGui(sw.hf_fade,    (float)param->getParam(83));
@@ -212,6 +209,16 @@ public:
         copyValuesToGui(sw.side,        (float)param->getParam(110));
         copyValuesToGui(sw.gthr,        (float)param->getParam(111));
         copyValuesToGui(sw.gthrv,       (float)param->getParam(112));
+
+        sw.zoom_step = (int)param->getParam(113);
+        if (sw.zoom_step) sw.updateDbRange();
+        sw.threshold_tilt = param->getParam(114);
+
+        copyValuesToGui(sw.dyn,         (float)param->getParam(115));
+
+        for (int i = 0; i< 12; i++) {
+            copyValuesToGui(sw.com_ex[i], (float)param->getParam(116 + i));
+        }
     }
 
 

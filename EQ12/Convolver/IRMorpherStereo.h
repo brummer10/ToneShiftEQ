@@ -33,13 +33,13 @@ public:
     // load initial stereo IR
     void init(const std::pair<Vec, Vec> ir) {
         convA->setIR(ir.first.data(), ir.second.data());
-        IrReady.store(true, std::memory_order_release);
+        //IrReady.store(true, std::memory_order_release);
     }
 
     // change stereo IR
     void setIR(const std::pair<Vec, Vec> ir) {
         convA->setIR(ir.first.data(), ir.second.data());
-        IrReady.store(true, std::memory_order_release);
+        //IrReady.store(true, std::memory_order_release);
     }
 
     void reset() {
@@ -54,7 +54,7 @@ public:
 
     void process(uint32_t nframes, const float* inputL, const float* inputR,
                                             float* outputL, float* outputR) {
-
+/*
         if (!IrReady.load(std::memory_order_acquire)) {
 
             if (outputL != inputL)
@@ -65,6 +65,7 @@ public:
 
             return;
         }
+*/
         convA->setBypass(bypass);
 
         // process active IR
@@ -81,5 +82,5 @@ private:
     std::vector<float> bufferAL;
     std::vector<float> bufferAR;
 
-    std::atomic<bool> IrReady{false};
+    //std::atomic<bool> IrReady{false};
 };

@@ -74,6 +74,11 @@ static bool params_get_info(const clap_plugin_t* plugin, uint32_t param_index, c
     if (def.isStepped) flags |= CLAP_PARAM_IS_STEPPED;
     if ((int)param_index == 84) flags |= CLAP_PARAM_IS_HIDDEN;
     if ((int)param_index == 113) flags |= CLAP_PARAM_IS_HIDDEN;
+    if (plug->mode == MODE_LIVE) {
+        if (param_index == 79 || param_index == 80 || param_index == 81 || param_index == 83) {
+            flags |= CLAP_PARAM_IS_HIDDEN;
+        }
+    }
     param_info->flags = flags;
     param_info->cookie = nullptr;
     return true;

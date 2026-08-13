@@ -214,6 +214,50 @@ public:
         return out;
     }
 
+    static Vec spectral_duck(const Vec& mag, const Vec& sidechainDb,
+                double thresholdDb, double amount, double tilt, double sr) {
+        Vec out = mag;
+        size_t n = mag.size();
+        const double nyquist = sr * 0.5;
+
+        for (size_t i = 0; i < n; ++i) {
+            double freq = (double)i / (n - 1) * nyquist;
+            if (freq < 1.0) continue;
+            double tiltOffsetDB = tilt * std::log2(freq / 1000.0f);
+            double excess = sidechainDb[i]  - thresholdDb - tiltOffsetDB;
+            if (excess > 0.0) {
+                out[i] -= excess * amount;
+                
+            }
+        }
+        return out;
+    }
+
+    static Vec spectral_duck(const Vec& mag, const Vec& sidechainDb,
+                              double thresholdDb, double amount,
+                              double centerFreq, double widthOct,
+                              double sr) {
+        Vec out = mag;
+        size_t n = mag.size();
+        const double nyquist = sr * 0.5;
+        const double edgeOct = 0.25;
+
+        for (size_t i = 0; i < n; ++i) {
+            double freq = (double)i / (n - 1) * nyquist;
+            double excess = sidechainDb[i] - thresholdDb;
+            if (excess <= 0.0) continue;
+
+            double distOct = std::log2(std::max(freq, 1.0) / centerFreq);
+            double halfW = widthOct * 0.5;
+            double edgeDist = halfW - std::abs(distOct);
+            double mask = std::clamp(edgeDist / edgeOct, 0.0, 1.0);
+            mask = 0.5 - 0.5 * std::cos(mask * M_PI);
+
+            out[i] -= excess * amount * mask;
+        }
+        return out;
+    }
+
     static Vec spectral_dynamics(const Vec& mag, Vec& smooth, double amount, double tilt, double sr) {
         //Vec smooth = adaptive_log_smooth(mag, sr);
         Vec out = mag;
@@ -239,7 +283,7 @@ public:
             out[i] = smooth[i] + delta;
         }
         // dc block
-        if (n > 1) out[0] = out[1];
+        //if (n > 1) out[0] = out[1];
         return out;
     }
 

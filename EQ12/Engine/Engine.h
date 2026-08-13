@@ -75,13 +75,9 @@ private:
     int                             mode = 0;
     int                             sidechain = 0;
     int                             sidechain_set = 0;
-    int                             gthreshold = 0;
-    float                           gthreshold_value = 0.0f;
-    float                           gthreshold_tilt = 0.0f;
     float                           sidechain_gain = 0.0f;
     float                           direct_gain = 0.0f;
-    float                           dynamicThreshold[NumFilters];
-    int                             dynamicRatio[NumFilters];
+    int                             duck_mode_ = 0.0;
 
     enum class ModeState { Running, FadingOut, FadingIn };
     ModeState modeState = ModeState::Running;
@@ -118,11 +114,6 @@ inline Engine::Engine(IRProcessor *ip_, IRMorpherStereo* conv_, FFTAnalyzer* ana
         
         abuffer = new float[8192];
         memset(abuffer, 0, 8192 * sizeof(float));
-
-        for (int i = 0; i< NumFilters; i++) {
-            dynamicThreshold[i] = 0.0;
-            dynamicRatio[i] = 1;
-        }
 
         for (auto& g : dynGainOffset)
             g.store(0.0f, std::memory_order_relaxed);
@@ -163,7 +154,7 @@ void Engine::registerParameters() {
     param.registerParam("Highcut freq",   "EQ", 110,22000,22000,0.01,   (void*)&ip->highcut,        false,  IS_DOUBLE);
 
     param.registerParam("Smooth",         "IR",  0,   1,  0.3, 0.01,    (void*)&ip->smooth_amount,  false,  IS_DOUBLE);
-    param.registerParam("Contrast",       "IR", -1,   1,  0.0, 0.01,    (void*)&ip->dynamics_amount,false,  IS_DOUBLE);
+    param.registerParam("Amount", "Compressor", 0.1, 2.0, 1.0, 0.01,    (void*)&ip->dynamics_amount,false,  IS_DOUBLE);
     param.registerParam("Tone Bias",      "IR", -1,   1,  0.0, 0.01,    (void*)&ip->tilt_amount,    false,  IS_DOUBLE);
    
     param.registerParam("Volume Out", "Global",-46,  12,  0.0,  0.1,    (void*)&vu->gain,           false,  IS_FLOAT);
@@ -172,21 +163,28 @@ void Engine::registerParameters() {
     param.registerParam("Mode",           "EQ",  0,   2,   0,    1,     (void*)&mode,                true,  IS_INT);
 
     for (int i = 0; i < NumFilters; ++i) {
-        param.registerParam("Threshold" + std::to_string(i + 1), "Compressor",-46.0,0.0, 0.0,0.1, (void*)&dynamicThreshold[i],false,  IS_FLOAT);
+        param.registerParam("Threshold" + std::to_string(i + 1), "Compressor",-46.0,0.0, 0.0,0.1, (void*)&ip->bands[i].threshold,false,  IS_DOUBLE);
     }
 
     for (int i = 0; i < NumFilters; ++i) {
-        param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&dynamicRatio[i],true,  IS_INT);
+        param.registerParam("Ratio" + std::to_string(i + 1), "Compressor",0, 4, 1,1, (void*)&ip->bands[i].ratio,true,  IS_INT);
     }
 
     param.registerParam("Volume In", "Global",-46,  12,  0.0,  0.1,     (void*)&vuin->gain,           false,  IS_FLOAT);
     param.registerParam("SideChain",     "EQ",  0,   1,   1,    1,      (void*)&sidechain,             true,  IS_INT);
 
-    param.registerParam("GThreshold", "Global",  0,   1,   0,    1,     (void*)&gthreshold,            true,  IS_INT);
-    param.registerParam("Gtresh Value","Global",-46.0, 0.0, 0.0, 0.1,   (void*)&gthreshold_value,     false,  IS_FLOAT);
+    param.registerParam("Duck enable", "Compressor",  0,   1,   0,    1,     (void*)&ip->duck_on,            true,  IS_INT);
+    param.registerParam("Duck Threshold", "Compressor", -60.0, 0.0, 0.0, 0.1, (void*)&ip->duck_threshold, false, IS_DOUBLE);
 
     param.registerParam("Zoom",      "Global",  0,   12,   0,    1,     (void*)&zoom_step,             true,  IS_INT);
-    param.registerParam("Gtresh tilt","Global",-12.0, 12.0, 0.0, 0.5,   (void*)&gthreshold_tilt,      false,  IS_FLOAT);
+    param.registerParam("Duck tilt","Compressor",-12.0, 12.0, 0.0, 0.5,   (void*)&ip->duck_tilt,      false,  IS_DOUBLE);
+
+    param.registerParam("Duck Mode",    "Compressor",   0.0,  1.0,  0.0, 0.01,(void*)&ip->duck_mode,     true, IS_INT);
+
+    for (int i = 0; i < NumFilters; ++i) {
+        param.registerParam("Expand" + std::to_string(i + 1), "Compressor",0, 1, 0,1, (void*)&ip->bands[i].expander,true,  IS_INT);
+    }
+
 };
 
 
@@ -297,20 +295,19 @@ void Engine::do_work_mono() {
 
 inline void Engine::processDynamic() {
     float ratio     = 3.0f;   // 3:1
-
     for (int i = 0; i < NumFilters; ++i) {
         if (!dynamicActive[i]) {
             dynGainOffset[i].store(0.0f, std::memory_order_relaxed);
             continue;
         }
         float gthr = 0.0f;
-        if (gthreshold) {
-            if (!dynamicThreshold[i]) gthr = -0.1;
+        if (ip->duck_on) {
+            if (!ip->bands[i].threshold) gthr = -0.1;
         }
-        if ((dynamicThreshold[i] + gthr + dynGainOffset[i].load()) > -0.1f) continue;
+        if (std::fabsf(ip->bands[i].threshold + gthr + dynGainOffset[i].load()) < 0.1f) continue;
         float levelDB = tsd.getDB(i);
         float gainReductionDB = 0.0f;
-        switch (dynamicRatio[i]) {
+        switch (ip->bands[i].ratio) {
             case 0: ratio = 2.0f;
             break;
             case 1: ratio = 3.0f;
@@ -325,24 +322,23 @@ inline void Engine::processDynamic() {
             break;
         }
 
-        if (gthreshold) {
-            levelDB += -gthreshold_value;
-            if (gthreshold_tilt != 0.0f) {
-                float tiltOffsetDB = gthreshold_tilt *
-                                      std::log2((float)ip->bands[i].freq / 1000.0f);
+        if (ip->duck_on) {
+            levelDB += -ip->duck_threshold;
+            if (ip->duck_tilt != 0.0f) {
+                float tiltOffsetDB = ip->duck_tilt * std::log2((float)ip->bands[i].freq / 1000.0f);
                 levelDB -= tiltOffsetDB;
             }
         }
-        if (levelDB > (dynamicThreshold[i] + gthr))
-            gainReductionDB = (levelDB - (dynamicThreshold[i] + gthr)) * (1.0f - 1.0f / ratio);
+        if (levelDB > (ip->bands[i].threshold + gthr))
+            gainReductionDB = ip->duck_mode ? 0.0 : (levelDB - (ip->bands[i].threshold + gthr)) * (1.0f - (1.0f / ratio));
 
-        dynGainOffset[i].store(-gainReductionDB, std::memory_order_release);
+        dynGainOffset[i].store(ip->bands[i].expander ? gainReductionDB : -gainReductionDB, std::memory_order_release);
     }
 }
 
 inline void Engine::applyDynamicGains() {
     for (int i = 0; i < NumFilters; ++i) {
-        if (!dynamicActive[i]) continue;
+        //if (!dynamicActive[i]) continue;
         float dynGainDB = dynGainOffset[i].load(std::memory_order_acquire);
         FilterConfig cfg = baseFilterConfig[i];
         cfg.gainDB = std::clamp(dynGainDB, -48.0f, 24.0f);
@@ -354,6 +350,15 @@ inline void Engine::applyDynamicGains() {
 inline void Engine::processBufferIn() {
     if (!frames) return;
         anain->processBlock(abuffer, frames);
+
+    if ((ip->duck_mode && anain->hasNewData()) || duck_mode_ != ip->duck_mode) {
+        duck_mode_ = ip->duck_mode;
+        ip->setSidechainSpectrum(anain->getMagnitudes(), anain->getBins());
+       // anain->clearFlag();
+        processIR.store(true, std::memory_order_release);
+        workToDo.store(true, std::memory_order_release);
+    }
+
 }
 
 inline void Engine::processBuffer() {

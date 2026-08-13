@@ -48,6 +48,7 @@ public:
     Widget_t* next[FilterTypes::NumFilters];
     Widget_t* threshold[FilterTypes::NumFilters];
     Widget_t* ratio[FilterTypes::NumFilters];
+    Widget_t* com_ex[FilterTypes::NumFilters];
 
     Widget_t* lowcut = nullptr;
     Widget_t* highcut = nullptr;
@@ -69,6 +70,7 @@ public:
     Widget_t* side = nullptr;
     Widget_t* gthr = nullptr;
     Widget_t* gthrv = nullptr;
+    Widget_t* dyn = nullptr;
 
     std::atomic<bool> havePreset {false};
     std::vector<double> dstL;
@@ -362,10 +364,15 @@ public:
             set_adjustment(threshold[i]->adj, 0.0, 0.0, -46.0, 0.0, 0.1, CL_CONTINUOS);
             threshold[i]->func.value_changed_callback = set_threshold;
 
+            com_ex[i] = add_my_comp_exp_button(frame[i], 246,63,15, 15);
+            com_ex[i]->data = i;
+            com_ex[i]->parent_struct = this;
+            com_ex[i]->func.value_changed_callback = set_comp_exp_mode;
+
             x += 133;
         }
 
-        lowcut = add_my_knob(laframe, "LowCut", "Hz", 20,26,60, 70);
+        lowcut = add_my_knob(laframe, "LowCut", "Hz", 0,26,60, 70);
         set_adjustment(lowcut->adj, 19.0, 19.0, 19.0, 2200.0, 0.01, CL_LOGARITHMIC);
         lowcut->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(lowcut, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -373,7 +380,7 @@ public:
         lowcut->func.value_changed_callback = set_lowcut;
         lowcut->func.button_release_callback = set;
 
-        highcut = add_my_knob(laframe, "HighCut", "Hz", 100,26,60, 70);
+        highcut = add_my_knob(laframe, "HighCut", "Hz", 60,26,60, 70);
         set_adjustment(highcut->adj, 22000.0, 22000.0, 110.0, 22000.0, 0.01, CL_LOGARITHMIC);
         highcut->flags = USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(highcut, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
@@ -381,12 +388,12 @@ public:
         highcut->func.value_changed_callback = set_highcut;
         highcut->func.button_release_callback = set;
 
-        apo_loader = add_my_file_button(laframe, 170, 20, 40, 40, "APO", " ", ".txt");
+        apo_loader = add_my_file_button(laframe, 120, 20, 40, 40, "APO", " ", ".txt");
         apo_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         apo_loader->parent_struct = this;
         apo_loader->func.user_callback = apo_load_response;
 
-        Widget_t* apo_save = add_ysave_file_button(laframe, 170, 60, 40, 40, "APO", " ", ".txt");
+        Widget_t* apo_save = add_ysave_file_button(laframe, 120, 60, 40, 40, "APO", " ", ".txt");
         apo_save->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         apo_save->parent_struct = this;
         apo_save->func.user_callback = apo_save_response;
@@ -398,41 +405,46 @@ public:
         mode->func.value_changed_callback = set_mode;
         #endif
         #ifndef LV2PLUG
-        Widget_t* ir_loader = add_my_lfile_button(laframe, 220, 20, 40, 40, "IR", " ", ".wav|.WAV");
+        Widget_t* ir_loader = add_my_lfile_button(laframe, 170, 20, 40, 40, "IR", " ", ".wav|.WAV");
         ir_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         ir_loader->parent_struct = this;
         ir_loader->func.user_callback = ref_load_response;
 
-        save = add_xsave_file_button(laframe, 220, 60, 40, 40, "Save IR", " ", ".wav|.WAV");
+        save = add_xsave_file_button(laframe, 170, 60, 40, 40, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
         #endif
 
-        hf_fade = add_my_fade_button(laframe, 560, 20, 40, 40);
+        hf_fade = add_my_fade_button(laframe, 220, 20, 40, 40);
         hf_fade->parent_struct = this;
         hf_fade->func.value_changed_callback = set_hf_fade;
 
-        bp = add_my_bypass_button(laframe, 560, 60, 40, 40);
+        bp = add_my_bypass_button(laframe, 220, 60, 40, 40);
         bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         bp->parent_struct = this;
         bp->func.value_changed_callback = bp_response;
 
-        smooth = add_my_knob(laframe, "Smooth", "", 610,26,60, 70);
+        dyn = add_my_dyn_button(laframe, 750, 40, 40, 40);
+        dyn->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        dyn->parent_struct = this;
+        dyn->func.value_changed_callback = dyn_response;
+
+        smooth = add_my_knob(laframe, "Smooth", "", 620,26,60, 70);
         set_adjustment(smooth->adj, 0.3, 0.3, 0.0, 1.0, 0.01, CL_CONTINUOS);
         smooth->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(smooth, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
         smooth->parent_struct = this;
         smooth->func.value_changed_callback = set_smooth;
-        smooth->func.button_release_callback = set;
+        //smooth->func.button_release_callback = set;
 
-        dynamics = add_my_knob(laframe, "Contrast", "", 670,26,60, 70);
-        set_adjustment(dynamics->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
+        dynamics = add_my_knob(laframe, "Amount", "", 690,26,60, 70);
+        set_adjustment(dynamics->adj, 1.0, 1.0, 0.1, 2.0, 0.01, CL_CONTINUOS);
         dynamics->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         set_widget_color(dynamics, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
         dynamics->parent_struct = this;
         dynamics->func.value_changed_callback = set_dynamics;
-        dynamics->func.button_release_callback = set;
-
+        //dynamics->func.button_release_callback = set;
+/*
         tilt = add_my_knob(laframe, "Tone Bias", "", 730,26,60, 70);
         set_adjustment(tilt->adj, 0.0, 0.0, -1.0, 1.0, 0.01, CL_CONTINUOS);
         tilt->flags |= USE_TRANSPARENCY | FAST_REDRAW;
@@ -440,6 +452,7 @@ public:
         tilt->parent_struct = this;
         tilt->func.value_changed_callback = set_tilt;
         tilt->func.button_release_callback = set;
+*/
     }
 
     void set_controller_mode() {
@@ -448,27 +461,48 @@ public:
         if (c_mode) {
             if (!o_mode) {
                 show_ph = false;
-                smooth_s = adj_get_value(smooth->adj);
-                dynamic_s = adj_get_value(dynamics->adj);
-                tilt_s =  adj_get_value(tilt->adj);
+                Metrics_t m;
+                os_get_window_metrics(smooth, &m);
+                if (m.visible) {
+                    smooth_s = adj_get_value(smooth->adj);
+                    dynamic_s = adj_get_value(dynamics->adj);
+                }
                 adj_set_value(smooth->adj, 0.0);
-                adj_set_value(dynamics->adj, 0.0);
-                adj_set_value(tilt->adj, 0.0);
+                adj_set_value(dynamics->adj, 1.0);
+                xevfunc store = dyn->func.value_changed_callback;
+                dyn->func.value_changed_callback = null_callback;
+                adj_set_value(dyn->adj, 0.0);
+                sendValueChanged(115, 0.0);
+                dyn->func.value_changed_callback = store;
                 widget_hide(ph);
                 widget_hide(smooth);
                 widget_hide(dynamics);
-                widget_hide(tilt);
+                widget_hide(dyn);
                 widget_hide(hf_fade);
             }
         } else {
-            adj_set_value(smooth->adj, smooth_s);
-            adj_set_value(dynamics->adj, dynamic_s);
-            adj_set_value(tilt->adj, tilt_s);
+            adj_set_value(dyn->adj, dyn_s);
+            widget_show(dyn);
+            if ((int) conn->getParameterValue(115)) {
+                adj_set_value(dynamics->adj, dynamic_s);
+                adj_set_value(smooth->adj, smooth_s);
+                widget_show(smooth);
+                widget_show(dynamics);
+            }
             widget_show(ph);
-            widget_show(smooth);
-            widget_show(dynamics);
-            widget_show(tilt);
             widget_show(hf_fade);
+        }
+        if (!(int)conn->getParameterValue(115)) {
+            Metrics_t m;
+            os_get_window_metrics(smooth, &m);
+            if (m.visible) {
+                smooth_s = adj_get_value(smooth->adj);
+                dynamic_s = adj_get_value(dynamics->adj);
+            }
+            adj_set_value(smooth->adj, 0.0);
+            adj_set_value(dynamics->adj, 1.0);
+            widget_hide(smooth);
+            widget_hide(dynamics);
         }
         o_mode = c_mode;
     }
@@ -591,8 +625,8 @@ private:
     std::string ref_file;
 
     float smooth_s = 0.3f;
-    float dynamic_s = 0.0f;
-    float tilt_s = 0.0f;
+    float dynamic_s = 1.0f;
+    float dyn_s = 0.0f;
 
     const float f_min = 20.0f;
     const float f_max = 20000.0f;
@@ -912,6 +946,12 @@ private:
         self->sendValueChanged(97 + w->data, (int) adj_get_value(w->adj));
     }
 
+    static void set_comp_exp_mode(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->sendValueChanged(116 + w->data, adj_get_value(w->adj));
+    }
+
     static void set_lowcut(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
@@ -946,6 +986,14 @@ private:
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(79, adj_get_value(w->adj));
+    }
+
+    static void dyn_response(void *w_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+        self->dyn_s = adj_get_value(w->adj);
+        self->sendValueChanged(115, self->dyn_s);
+        self->set_controller_mode();
     }
 
     static void set_dynamics(void *w_, void* user_data) {

@@ -52,8 +52,13 @@ public:
     double lowcut = 19.0;
     double highcut = 22000.0;
     double smooth_amount = 0.3;
-    double dynamics_amount = 0.0;
+    double dynamics_amount = 1.0;
     double tilt_amount = 0.0;
+
+    double duck_threshold = 0.0;
+    double duck_tilt = 0.0;
+    int duck_mode = 0;
+    int duck_on = 0;
 
     ~IRProcessor() {
         stopWorker();
@@ -78,31 +83,31 @@ public:
     };
 
     Band bands[12] = {
-        // Low Shelf
-        {1, Band::LowShelf,    40.0,   0.0, 0.7, 0},
+        // Low Shelf           freq,  gain,   Q, thr, r, e, m
+        {1, Band::LowShelf,    40.0,   0.0, 0.7, 0.0, 1, 0, 0},
 
         // Bass
-        {1, Band::Peak,        70.0,   0.0, 1.0, 0},
-        {1, Band::Peak,       120.0,   0.0, 1.0, 0},
+        {1, Band::Peak,        70.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,       120.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // Low Mid
-        {1, Band::Peak,       210.0,   0.0, 1.0, 0},
-        {1, Band::Peak,       370.0,   0.0, 1.0, 0},
+        {1, Band::Peak,       210.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,       370.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // Mid
-        {1, Band::Peak,       650.0,   0.0, 1.0, 0},
-        {1, Band::Peak,      1150.0,   0.0, 1.0, 0},
+        {1, Band::Peak,       650.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,      1150.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // Upper Mid
-        {1, Band::Peak,      2000.0,   0.0, 1.0, 0},
-        {1, Band::Peak,      3500.0,   0.0, 1.0, 0},
+        {1, Band::Peak,      2000.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,      3500.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // Presence / Air
-        {1, Band::Peak,      6100.0,   0.0, 1.0, 0},
-        {1, Band::Peak,     10700.0,   0.0, 1.0, 0},
+        {1, Band::Peak,      6100.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,     10700.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // High Shelf
-        {1, Band::HighShelf, 18000.0,  0.0, 0.7, 0}
+        {1, Band::HighShelf, 18000.0,  0.0, 0.7, 0.0, 0, 0}
     };
 
     void computeIR(const Vec& refL, const Vec& refR,
@@ -124,6 +129,11 @@ public:
 
         Vec srcL_trunc = center_crop(srcL, maxAnalysisSize);
         Vec srcR_trunc = center_crop(srcR, maxAnalysisSize);
+
+        dc_block(refL_trunc);
+        dc_block(refR_trunc);
+        dc_block(srcL_trunc);
+        dc_block(srcR_trunc);
 
         size_t maxSize = std::max({ refL_trunc.size(), refR_trunc.size(),
                                     srcL_trunc.size(), srcR_trunc.size() });
@@ -230,6 +240,11 @@ public:
         return mergeAverage(ir.first, ir.second);
     }
 
+    void setSidechainSpectrum(const float* mags, int bins) {
+        std::lock_guard<std::mutex> lock(sidechainMutex_);
+        sidechain_mag_.assign(mags, mags + bins);
+    }
+
     const std::vector<float>& getIRMag() const { return gui_ir_; }
     const std::vector<float>& getIRPhase() const { return gui_phase_; }
     const Vec& getDiffMag() const { return gui_diff_; }
@@ -300,6 +315,17 @@ private:
     bool pendingRebuild = false;
     std::condition_variable cv;
     std::mutex cvMutex;
+
+    Vec sidechain_mag_;
+    std::mutex sidechainMutex_;
+
+    static void dc_block(Vec& buf) {
+        if (buf.empty()) return;
+        double mean = 0.0;
+        for (double v : buf) mean += v;
+        mean /= (double)buf.size();
+        for (double& v : buf) v -= mean;
+    }
 
     void applyHighFrequencyFade(Vec& mag, double sr, double startFreq = 20000.0) {
         size_t n = mag.size();
@@ -380,11 +406,22 @@ private:
         double highcut_ = highcut;
         double smooth_amount_ = smooth_amount;
         double dynamics_amount_ = dynamics_amount;
-        double tilt_amount_ = tilt_amount;
+        //double tilt_amount_ = tilt_amount;
         int lowcut_enabled_ = lowcut_enabled;
         int highcut_enabled_ = highcut_enabled;
         int solo_band_ = solo_band;
         int solo_enabled_ = solo_enabled;
+
+        int duck_mode_    = duck_mode;
+        int duck_on_    = duck_on;
+        double duck_threshold_ = duck_on_ ? duck_threshold : 0.0;
+        double duck_tilt_      = duck_tilt;
+
+        Vec sc_local;
+        {
+            std::lock_guard<std::mutex> lock(sidechainMutex_);
+            sc_local = sidechain_mag_;
+        }
 
         Band localBands[12];
         std::copy(std::begin(bands), std::end(bands), std::begin(localBands));
@@ -413,14 +450,17 @@ private:
         constexpr double eps = 1e-12;
 
         const bool needSmooth   = std::abs(smooth_amount_)   > eps;
-        const bool needDynamics = std::abs(dynamics_amount_) > eps;
-        const bool needTilt     = std::abs(tilt_amount_)     > eps;
 
-        if (needSmooth || needDynamics || needTilt) {
+        if (duck_mode_ && !sc_local.empty()) {
+            Vec sc = remap_mag_bins(sc_local, analysisN, synthesisN);
+            eq.apply_spectral_dynamics(mag_ir, sampleRate, localBands, 12, sc, duck_threshold_, duck_tilt_, dynamics_amount_);
+        }
+        if (needSmooth || duck_mode_) {
             Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
             if (needSmooth) mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
-            if (needDynamics || needTilt)
-                mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
+            else if (duck_mode_ && !sc_local.empty()) mag_ir = designer.lerpv(mag_ir, smooth, 0.1);
+          //  if (needDynamics || needTilt)
+          //      mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
         }
         //mag_ir = designer.adaptive_log_smooth(mag_ir, sampleRate * 0.001);
         //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);

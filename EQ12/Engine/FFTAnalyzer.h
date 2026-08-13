@@ -88,6 +88,8 @@ public:
         std::memset(fifo, 0, sizeof(float) * N);
         fifo_pos = 0;
         samples_since_last_fft = 0;
+        dc_x1 = 0.0f;
+        dc_y1 = 0.0f;
 
         for (int i = 0; i < bins; ++i)
             smooth[i] = -90.0f;
@@ -103,7 +105,11 @@ public:
             float v = input[i];
             if (!std::isfinite(v)) v = 0.0f;
 
-            fifo[fifo_pos++] = v;
+            float y = v - dc_x1 + 0.995f * dc_y1;
+            dc_x1 = v;
+            dc_y1 = y;
+
+            fifo[fifo_pos++] = y;
             if (fifo_pos >= N)
                 fifo_pos = 0;
 
@@ -148,6 +154,7 @@ public:
 
 private:
     int N = 0, bins = 0;
+    float dc_x1 = 0.0f, dc_y1 = 0.0f;
     float sample_rate = 0.0f;
 
     float* in = nullptr;

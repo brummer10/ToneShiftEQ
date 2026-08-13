@@ -238,6 +238,60 @@ public:
         }
     }
 
+    static void apply_spectral_dynamics(Vec& mag, double sr, const Band* bands, size_t count,
+                    const Vec& sidechainDb, double thresholdDb, double tilt, double amount) {
+        const size_t n = mag.size();
+        if (!n || sidechainDb.size() != n) return;
+        const double nyquist = sr * 0.5;
+        const double edgeOct = 0.25;
+
+        for (size_t i = 0; i < n; ++i) {
+            double freq = (double)i / (n - 1) * nyquist;
+            if (freq < 1.0) continue;
+
+            double tiltOffsetDB = tilt * std::log2(freq / 1000.0);
+            double baseThreshold = thresholdDb + tiltOffsetDB;
+
+            double best = 0.0; // signed: negativ = duck, positiv = expand
+            for (size_t bi = 0; bi < count; ++bi) {
+                const Band& b = bands[bi];
+                if (!b.enabled) continue;
+
+                double sigma = q_to_sigma(mapQ(std::max(b.Q, 5.0)));
+                double halfW = sigma * 3.0;
+                double distOct = std::log2(freq / b.freq);
+                double edgeDist = halfW - std::abs(distOct);
+                double m = std::clamp(edgeDist / edgeOct, 0.0, 1.0);
+                if (m <= 0.0) continue;
+                m = 0.5 - 0.5 * std::cos(m * M_PI);
+
+                double ratio = 3.0;
+                switch (b.ratio) {
+                    case 0: ratio = 2.0;  break;
+                    case 1: ratio = 3.0;  break;
+                    case 2: ratio = 4.0;  break;
+                    case 3: ratio = 5.0;  break;
+                    case 4: ratio = 10.0; break;
+                    default: ratio = 3.0; break;
+                }
+                double band_threshold = b.threshold * (1.0 - (1.0 / ratio));
+
+                double excess = sidechainDb[i] - (baseThreshold + band_threshold);
+                if (excess <= 0.0) continue;
+
+                double r = excess * m * amount;
+                if (b.expander) {
+                    const double max_boost = 12.0;
+                    r = std::tanh(r / max_boost) * max_boost;
+                }
+                double signed_r = b.expander ? r : -r;
+                if (std::abs(signed_r) > std::abs(best)) best = signed_r;
+            }
+
+            if (best != 0.0) mag[i] += best;
+        }
+    }
+
     static double mapQ(double q_ui) {
         return std::clamp(q_ui, 0.1, 10.0);
     }

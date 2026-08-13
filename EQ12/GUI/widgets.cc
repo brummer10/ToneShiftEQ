@@ -622,7 +622,7 @@ Widget_t* add_my_combobox(Widget_t *p,const char * label,
     w->func.expose_callback = draw_my_combobox;
     w->childlist->childs[0]->func.expose_callback = null_callback;
     w->childlist->childs[0]->func.button_release_callback = dummy_callback;
-    //destroy_widget(w->childlist->childs[0], w->app);
+    destroy_widget(w->childlist->childs[0], w->app);
     //w->func.value_changed_callback = value_changed;
     return w;
 }

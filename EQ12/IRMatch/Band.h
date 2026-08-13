@@ -22,6 +22,9 @@ struct Band {
     double freq;
     double gain;
     double Q;
+    double threshold;
+    int ratio;
+    int expander;
     int mute;
 };
 

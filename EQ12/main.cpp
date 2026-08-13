@@ -58,7 +58,7 @@ void getEngineValues(Params* param, SpectrumViewer* sw) {
 
     copyValuesToGui(sw->smooth,     (float)param->getParam(79));
     copyValuesToGui(sw->dynamics,   (float)param->getParam(80));
-    copyValuesToGui(sw->tilt,       (float)param->getParam(81));
+    //copyValuesToGui(sw->tilt,       (float)param->getParam(81));
 
     copyValuesToGui(sw->vug,        (float)param->getParam(82));
     copyValuesToGui(sw->hf_fade,    (float)param->getParam(83));

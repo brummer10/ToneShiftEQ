@@ -730,6 +730,245 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
 }
 
 /****************************************************************
+ *    dynamic Compress/Expand switch button
+****************************************************************/
+
+void draw_comp_exp_toggle(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double ac = active ? 0.5 : 0.0;
+    double pad = size * 0.15;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y0 = y + pad + offset;
+    double y1 = y + size - pad - offset;
+    double cx = x + size * 0.5;
+
+    cairo_save(cr);
+    cairo_set_line_width(cr, size * 0.08);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    if (state) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    else        cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.838 - ac, 0.55);
+
+    cairo_move_to(cr, x0, active ? y1 : y0);
+    cairo_line_to(cr, x1, active ? y1 : y0);
+    cairo_line_to(cr, cx, active ? y0 : y1);
+    cairo_close_path(cr);
+    cairo_fill_preserve(cr);
+    cairo_stroke(cr);
+
+    cairo_restore(cr);
+}
+
+void draw_comp_exp_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    static int last_state = state;
+    draw_comp_exp_toggle(w->crb, 0.0, 0.0, height, w->state, state);
+    if (state == 0) {
+        tooltip_set_my_text(w, "Compress");
+    } else if (state == 1) {
+        tooltip_set_my_text(w, "Expand");
+    }
+    
+    if (w->state) {
+        if (last_state != state) {
+            show_tooltip(w);
+            last_state = state;
+        }
+    }
+}
+
+Widget_t *add_my_comp_exp_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_comp_exp_button;
+    return fbutton;
+}
+
+/****************************************************************
+ *    dynamic modeswitch button
+****************************************************************/
+
+void draw_dyn_biquad(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double h = y_bot - y_top;
+    double r = state ? size * 0.11 : size * 0.09;
+    double cx = x0 + (x1 - x0) * 0.5;
+    double y_mid = y_top + h * 0.25;
+
+    cairo_save(cr);
+    // frame
+    cairo_set_line_width(cr, size * 0.035 + ac);
+    cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
+    cairo_stroke(cr);
+
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_width(cr, state ? size * 0.05 : size * 0.04);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    cairo_move_to(cr, x0 + 1, y_mid);
+    cairo_line_to(cr, x1 - 1, y_mid);
+    cairo_stroke(cr);
+
+    // Biquad
+    cairo_move_to(cr, x0 + 4, y_mid);
+    cairo_curve_to(cr, x0 + 4 + (cx - x0) * 0.6, y_mid,
+                        cx - (cx - x0) * 0.2, y_bot - h * 0.3,
+                        cx, y_bot - h * 0.3);
+    cairo_curve_to(cr, cx + (x1 - cx) * 0.2, y_bot - h * 0.3,
+                        x1  - 4 - (x1 - cx) * 0.6, y_mid,
+                        x1 - 4, y_mid);
+    cairo_stroke(cr);
+
+    cairo_pattern_destroy(pat);
+    cairo_restore(cr);
+}
+
+void draw_dyn_spectral(cairo_t *cr, double x, double y, double size, int state, const int active) {
+    double pad = state ? size * 0.1 : size * 0.16;
+    double ac = active ? 0.5 : 0.0;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y_top = y + pad + offset;
+    double y_bot = y + size - pad - offset;
+    double h = y_bot - y_top;
+    double w = x1 - x0;
+    double r = state ? size * 0.11 : size * 0.09;
+    double y_mid = y_top + h * 0.25;
+
+    cairo_save(cr);
+    // frame
+    cairo_set_line_width(cr, size * 0.035 + ac);
+    cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.838 - ac, 0.35 + ac);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949 - ac, 0.883 - ac, 0.55);
+    if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y_top + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y_bot - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y_bot - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y_top + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    if (active) {
+        cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.15);
+        cairo_fill_preserve(cr);
+    }
+    cairo_stroke(cr);
+
+    cairo_pattern_t *pat = cairo_pattern_create_linear(x0, 0, x1, 0);
+    if (!state) {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.55, 0.55, 0.58, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.55, 0.55, 0.58, 0.12);
+    } else {
+        cairo_pattern_add_color_stop_rgba(pat, 0.00, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 0.80, 0.91, 0.949, 0.883, 1.0);
+        cairo_pattern_add_color_stop_rgba(pat, 1.00, 0.91, 0.949, 0.883, 0.12);
+    }
+    cairo_set_source(cr, pat);
+    cairo_set_line_width(cr, state ? size * 0.05 : size * 0.04);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+
+    cairo_move_to(cr, x0 + 2, y_mid);
+    cairo_line_to(cr, x1, y_mid);
+    cairo_stroke(cr);
+
+    // Spectral Dynamics
+    cairo_move_to(cr, x0 + 6, y_mid);
+   // cairo_line_to(cr, x0 + w * 0.15, y_mid);
+    cairo_line_to(cr, x0 + w * 0.30, y_bot - h * 0.40);
+    cairo_line_to(cr, x0 + w * 0.40, y_mid);
+    cairo_line_to(cr, x0 + w * 0.50, y_bot - h * 0.20);
+    cairo_line_to(cr, x0 + w * 0.61, y_mid + h * 0.10);
+    cairo_line_to(cr, x0 + w * 0.70, y_bot - h * 0.45);
+   // cairo_line_to(cr, x0 + w * 0.75, y_mid);
+    cairo_line_to(cr, x1 - 7, y_mid);
+    cairo_stroke(cr);
+
+    cairo_pattern_destroy(pat);
+    cairo_restore(cr);
+}
+
+void draw_dyn_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
+    static int last_state = state;
+    if (state == 0) {
+        draw_dyn_biquad(w->crb, 0.0, 0.0, height, w->state, state);
+        tooltip_set_my_text(w, "Biquad Dynamics");
+    } else if (state == 1) {
+        draw_dyn_spectral(w->crb, 0.0, 0.0, height, w->state, state);
+        tooltip_set_my_text(w, "Spectral Dynamics");
+    }
+    
+    if (w->state) {
+        if (last_state != state) {
+            show_tooltip(w);
+            last_state = state;
+        }
+    }
+}
+
+Widget_t *add_my_dyn_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_toggle_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_dyn_button;
+    return fbutton;
+}
+
+/****************************************************************
  *    threshold button
 ****************************************************************/
 

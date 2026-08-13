@@ -163,7 +163,7 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.dynamics, value);
         break;
     case 81:
-        copyValuesToGui(sw.tilt, value);
+       // copyValuesToGui(sw.tilt, value);
         break;
     case 82:
         copyValuesToGui(sw.vug, value);
@@ -194,6 +194,9 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         break;
     case 114:
         sw.threshold_tilt = value;
+        break;
+    case 115:
+        copyValuesToGui(sw.dyn, value);
         break;
     default:
         break;
@@ -232,6 +235,8 @@ void XToneShiftEQ_UI::getEngineValues(uint32_t port, float value) {
         copyValuesToGui(sw.threshold[port - 85], value);
     } else if  (port >= 97 && port <= 108) {
         copyValuesToGui(sw.ratio[port - 97], value);
+    } else if  (port >= 116 && port <= 127) {
+        copyValuesToGui(sw.com_ex[port - 116], value);
     } else if  (port >= DYN1 && port <= DYN12) {
         conn.dyn[port - DYN1] = value;
     }
