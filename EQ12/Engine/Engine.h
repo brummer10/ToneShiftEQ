@@ -304,7 +304,7 @@ inline void Engine::processDynamic() {
         if (ip->duck_on) {
             if (!ip->bands[i].threshold) gthr = -0.1;
         }
-        if (std::fabsf(ip->bands[i].threshold + gthr + dynGainOffset[i].load()) < 0.1f) continue;
+        if (std::fabs(ip->bands[i].threshold + gthr + dynGainOffset[i].load()) < 0.1f) continue;
         float levelDB = tsd.getDB(i);
         float gainReductionDB = 0.0f;
         switch (ip->bands[i].ratio) {
