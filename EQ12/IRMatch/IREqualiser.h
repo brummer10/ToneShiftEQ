@@ -96,7 +96,7 @@ public:
             mag[i] = db * mask + (-220.0) * (1.0 - mask);
         }
 
-        mag[0] = mag[1];
+        //mag[0] = mag[1];
         return mag;
     }
 
@@ -158,7 +158,7 @@ public:
             double keep = 1.0 - remove_mask;
             mag[i] = mag[i] * keep + (-220.0) * remove_mask;
         }
-        mag[0] = mag[1];
+        //mag[0] = mag[1];
         return mag;
     }
 
@@ -257,7 +257,7 @@ public:
                 const Band& b = bands[bi];
                 if (!b.enabled) continue;
 
-                double sigma = q_to_sigma(mapQ(std::max(b.Q, 5.0)));
+                double sigma = q_to_sigma(mapQ(std::max(b.Q, 4.0)));
                 double halfW = sigma * 3.0;
                 double distOct = std::log2(freq / b.freq);
                 double edgeDist = halfW - std::abs(distOct);

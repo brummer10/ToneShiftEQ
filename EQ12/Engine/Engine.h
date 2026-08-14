@@ -301,10 +301,12 @@ inline void Engine::processDynamic() {
             continue;
         }
         float gthr = 0.0f;
+        float dg = dynGainOffset[i].load();
         if (ip->duck_on) {
             if (!ip->bands[i].threshold) gthr = -0.1;
+            dg *= ip->bands[i].expander ? -1.0f : 1.0f;
         }
-        if (std::fabs(ip->bands[i].threshold + gthr + dynGainOffset[i].load()) < 0.1f) continue;
+        if (std::fabs(ip->bands[i].threshold + gthr + dg) < 0.1f) continue;
         float levelDB = tsd.getDB(i);
         float gainReductionDB = 0.0f;
         switch (ip->bands[i].ratio) {
@@ -331,8 +333,13 @@ inline void Engine::processDynamic() {
         }
         if (levelDB > (ip->bands[i].threshold + gthr))
             gainReductionDB = ip->duck_mode ? 0.0 : (levelDB - (ip->bands[i].threshold + gthr)) * (1.0f - (1.0f / ratio));
+        if (ip->bands[i].expander) {
+            gainReductionDB = std::tanh(gainReductionDB / 12.0f) * 12.0f; // max_boost
+        } else {
+            gainReductionDB *= -1.0f;
+        }
 
-        dynGainOffset[i].store(ip->bands[i].expander ? gainReductionDB : -gainReductionDB, std::memory_order_release);
+        dynGainOffset[i].store(gainReductionDB, std::memory_order_release);
     }
 }
 

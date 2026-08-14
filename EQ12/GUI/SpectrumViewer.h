@@ -1125,7 +1125,7 @@ private:
         const int width  = m.width;
         const int height = m.height - (80 * w->app->hdpi);
         const float px_to_db = (self->db_max - self->db_min) / (float)height;
-        static constexpr float SNAP_PX = 1.0f;
+        //static constexpr float SNAP_PX = 1.0f;
 
         if ((xmotion->state & (Button1Mask | ControlMask)) == (Button1Mask | ControlMask)) {
             float target_freq = x_to_freq(x1, self->f_min, self->f_max, width);
@@ -1149,7 +1149,7 @@ private:
                     float deltay = (float)y1 - self->my;
                     vg += deltay * -px_to_db;
                     self->my = y1;
-                    if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
+                    //if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                     adj_set_value(self->threshold[self->match_band]->adj, vg);
 
                 } else {
@@ -1163,15 +1163,16 @@ private:
                     float deltay = (float)y1 - self->my;
                     vg += deltay * -px_to_db;
                     self->my = y1;
-                    if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
+                    //if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                     adj_set_value(self->fgain[self->match_band]->adj, vg);
                 }
             } else if (self->threshold_match) {
+                const float pxt_to_db = (self->db_max_ - self->db_min_) / (float)height;
                 float vg = adj_get_value(self->gthrv->adj);
                 float deltay = (float)y1 - self->my;
-                vg += deltay * -px_to_db;
+                vg += deltay * -pxt_to_db;
                 self->my = y1;
-                if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
+                //if (std::abs(vg) < SNAP_PX * px_to_db) vg = 0.0;
                 adj_set_value(self->gthrv->adj, vg);
             }
         } else {

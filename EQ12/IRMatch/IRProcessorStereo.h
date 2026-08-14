@@ -455,13 +455,6 @@ private:
             Vec sc = remap_mag_bins(sc_local, analysisN, synthesisN);
             eq.apply_spectral_dynamics(mag_ir, sampleRate, localBands, 12, sc, duck_threshold_, duck_tilt_, dynamics_amount_);
         }
-        if (needSmooth || duck_mode_) {
-            Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
-            if (needSmooth) mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
-            else if (duck_mode_ && !sc_local.empty()) mag_ir = designer.lerpv(mag_ir, smooth, 0.1);
-          //  if (needDynamics || needTilt)
-          //      mag_ir = designer.spectral_dynamics(mag_ir, smooth, dynamics_amount_, tilt_amount_, sampleRate);
-        }
         //mag_ir = designer.adaptive_log_smooth(mag_ir, sampleRate * 0.001);
         //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
         //mag_ir = designer.soften_peaks(mag_ir, 0.2);
@@ -474,17 +467,22 @@ private:
         if (solo_enabled_) {
             if (localBands[solo_band_].enabled) {
                 mag_ir = eq.buildBandSoloIR(localBands[solo_band_], mag_ir, sampleRate);
-                mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
+                //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
             }
         } else {
             for (auto& b : localBands) {
                 if (b.enabled) {
                     if (b.mute ) {
                         mag_ir = eq.buildBandMuteIR(b, mag_ir, sampleRate);
-                        mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
+                        //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
                     }
                 }
             }
+        }
+        if (needSmooth || duck_mode_) {
+            Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
+            if (needSmooth) mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
+            else if (duck_mode_ && !sc_local.empty()) mag_ir = designer.lerpv(mag_ir, smooth, 0.1333);
         }
         //designer.smooth_low_end_hermite(mag_ir, sampleRate);
     }
