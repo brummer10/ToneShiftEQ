@@ -97,7 +97,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 40 ;
         lv2:minimum 20 ;
         lv2:maximum 60 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -166,7 +166,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 70 ;
         lv2:minimum 40 ;
         lv2:maximum 100 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -235,7 +235,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 120 ;
         lv2:minimum 70 ;
         lv2:maximum 180 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -304,7 +304,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 210 ;
         lv2:minimum 120 ;
         lv2:maximum 300 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -373,7 +373,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 370 ;
         lv2:minimum 200 ;
         lv2:maximum 550 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -442,7 +442,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 650 ;
         lv2:minimum 350 ;
         lv2:maximum 900 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -511,7 +511,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 1150 ;
         lv2:minimum 650 ;
         lv2:maximum 1600 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -580,7 +580,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 2000 ;
         lv2:minimum 1100 ;
         lv2:maximum 2800 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -649,7 +649,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 3500 ;
         lv2:minimum 1800 ;
         lv2:maximum 5000 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -718,7 +718,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 6100 ;
         lv2:minimum 3500 ;
         lv2:maximum 9000 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -787,7 +787,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 10700 ;
         lv2:minimum 6000 ;
         lv2:maximum 15000 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -856,7 +856,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 18000 ;
         lv2:minimum 10000 ;
         lv2:maximum 20000 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -921,7 +921,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 19 ;
         lv2:minimum 19 ;
         lv2:maximum 2200 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
@@ -944,7 +944,7 @@ guiext:ui <urn:brummer:toneshifteq_ui> ;
         lv2:default 22000 ;
         lv2:minimum 110 ;
         lv2:maximum 22000 ;
-        lv2:portProperty lv2:logarithmic ;
+        lv2:portProperty pprop:logarithmic ;
         units:unit units:hz ;
     ] ,
 
