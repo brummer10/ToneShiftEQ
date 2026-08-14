@@ -257,13 +257,28 @@ public:
                 const Band& b = bands[bi];
                 if (!b.enabled) continue;
 
-                double sigma = q_to_sigma(mapQ(std::max(b.Q, 4.0)));
-                double halfW = sigma * 3.0;
-                double distOct = std::log2(freq / b.freq);
-                double edgeDist = halfW - std::abs(distOct);
-                double m = std::clamp(edgeDist / edgeOct, 0.0, 1.0);
-                if (m <= 0.0) continue;
-                m = 0.5 - 0.5 * std::cos(m * M_PI);
+                double m = 0.0;
+                switch (b.type) {
+                    case Band::LowShelf:
+                        m = eval_low_shelf(freq, b.freq, 1.0, b.Q);
+                        break;
+
+                    case Band::HighShelf:
+                        m = eval_high_shelf(freq, b.freq, 1.0, b.Q);
+                        break;
+
+                    default:
+                    {
+                        double sigma = q_to_sigma(mapQ(std::max(b.Q, 4.0)));
+                        double halfW = sigma * 3.0;
+                        double distOct = std::log2(freq / b.freq);
+                        double edgeDist = halfW - std::abs(distOct);
+                        m = std::clamp(edgeDist / edgeOct, 0.0, 1.0);
+                        if (m <= 0.0) continue;
+                        m = 0.5 - 0.5 * std::cos(m * M_PI);
+                        break;
+                    }
+                }
 
                 double ratio = 3.0;
                 switch (b.ratio) {
