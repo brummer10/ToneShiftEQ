@@ -20,9 +20,11 @@ It is designed for transparent tone shaping, corrective equalization, mixing and
 * APO EQ profile import/export
 * FFT/Biquad Mode switch
 * HF Fade smooth high-frequency roll-off
-* Tone Bias control for broad spectral balancing
-* Smooth control for natural filter transitions
-* Contrast control for adaptive processing
+* Spectral or Equaliser dynamic processor
+* Global threshold with tilt control
+* Per Band threshold, ratio and direction control
+* Side-chain or direct input for dynamic processing
+* Smooth and Amount control for natural filter transitions
 * Real-time spectrum display with phase overlay
 * Interactive curve drawing with Ctrl + drag
 * Stereo processing
@@ -38,12 +40,14 @@ FFT Mode
 
 * Minimum-phase convolution
 * 128 samples latency
-* Supports Smooth, Contrast, Tone Bias, HF Fade and IR export
+* Supports HF Fade and IR export
+* Spectral Dynamics with smooth and amount control
 * Best suited for mixing and mastering
 
 Biquad Mode
 
 * Cascaded parametric biquad filters
+* Dynamic Equaliser with threshold, ratio and direction control
 * Zero latency
 * Low CPU usage
 * Ideal for recording and live monitoring
@@ -98,7 +102,7 @@ The Biquad engine implements the same filter configuration as a cascade of
 second-order IIR filters for true zero-latency operation.
 
 Dynamic processing is performed independently for each band, allowing
-frequency-selective compression using configurable Threshold and Ratio controls.
+frequency-selective compression/expanding using configurable Threshold and Ratio controls.
 
 Both engines share the same user interface and parameter model,
 allowing instant switching depending on the application.
