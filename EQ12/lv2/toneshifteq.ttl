@@ -14,26 +14,31 @@
 @prefix pprop:  <http://lv2plug.in/ns/ext/port-props#> .
 @prefix midi:   <http://lv2plug.in/ns/ext/midi#> .
 @prefix idpy:   <http://harrisonconsoles.com/lv2/inlinedisplay#> .
+@prefix tseq:  <urn:brummer:toneshifteq#> .
+
 
 idpy:queue_draw a lv2:Feature .
 idpy:interface a lv2:ExtensionData .
 
-<urn:name#me>
+<tseq:name#me>
    a foaf:Person ;
-   foaf:name "brummer" .
+   foaf:name "brummer" ;
+   foaf:mbox <mailto:brummer@web.de> ;
+   foaf:homepage <https://github.com/brummer10> .
 
 <urn:brummer:toneshifteq>
     a lv2:Plugin ,
        lv2:EQPlugin ;
     doap:name "ToneShift-EQ12" ;
-    doap:maintainer <urn:name#me> ;
+    doap:license <https://spdx.org/licenses/BSD-3-Clause> ;
+    doap:maintainer <tseq:name#me> ;
     lv2:requiredFeature urid:map ;
     lv2:optionalFeature lv2:hardRTCapable ;
     lv2:optionalFeature idpy:queue_draw ;
     lv2:optionalFeature <http://lv2plug.in/ns/ext/instance-access>;
     lv2:extensionData idpy:interface ;
     lv2:minorVersion 8 ;
-    lv2:microVersion 0 ;
+    lv2:microVersion 1 ;
 
 rdfs:comment """
 ToneShiftEQ is a modern 12-band parametric equalizer featuring both a minimum-phase FFT convolution engine and a zero-latency biquad engine. 

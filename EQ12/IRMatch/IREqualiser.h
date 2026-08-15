@@ -261,10 +261,12 @@ public:
                 switch (b.type) {
                     case Band::LowShelf:
                         m = eval_low_shelf(freq, b.freq, 1.0, b.Q);
+                        if (m < 1e-4) continue;
                         break;
 
                     case Band::HighShelf:
                         m = eval_high_shelf(freq, b.freq, 1.0, b.Q);
+                        if (m < 1e-4) continue;
                         break;
 
                     default:
