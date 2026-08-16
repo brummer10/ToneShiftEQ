@@ -275,6 +275,13 @@ void draw_my_knob(void *w_, void* user_data) {
     show_label(w, width, height + ((w->app->small_font + 9) + w->app->normal_font) * w->app->hdpi);
 }
 
+static void reset_default(void *w_, void* /* xbutton_ */, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (w->flags & HAS_POINTER) {
+        adj_set_value(w->adj, adj_get_std_value(w->adj));
+    }
+}
+
 Widget_t* add_eq_knob(Widget_t *parent, const char * label, const char* type,
                 int x, int y, int width, int height) {
 
@@ -283,6 +290,7 @@ Widget_t* add_eq_knob(Widget_t *parent, const char * label, const char* type,
     wid->flags |= NO_PROPAGATE;
     set_widget_color(wid, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
     wid->func.expose_callback = draw_eq_knob;
+    wid->func.double_click_callback = reset_default;
     snprintf(wid->input_label, 31, "%s", type);
     return wid;
 }
@@ -295,6 +303,7 @@ Widget_t* add_my_knob(Widget_t *parent, const char * label, const char* type,
     wid->flags |= NO_PROPAGATE;
     set_widget_color(wid, (Color_state)0, (Color_mod)0, 0.15, 0.52, 0.55, 1.0);
     wid->func.expose_callback = draw_my_knob;
+    wid->func.double_click_callback = reset_default;
     snprintf(wid->input_label, 31, "%s", type);
     return wid;
 }
@@ -723,7 +732,7 @@ Widget_t *add_my_mode_button(Widget_t *parent, int x, int y, int width, int heig
     Widget_t *fbutton = add_hslider(parent, "", x, y, width, height);
     set_adjustment(fbutton->adj, 0.0, 0.0, 0.0, 2.0, 1.0, CL_CONTINUOS);
     fbutton->scale.gravity = ASPECT;
-    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->flags |= HAS_TOOLTIP;
     fbutton->func.expose_callback = draw_mode_button;
     fbutton->func.button_release_callback = fbutton_released;
     return fbutton;

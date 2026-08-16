@@ -515,7 +515,7 @@ void draw_i_button(void *w_, void* user_data) {
     } else if(w->state==3) {
         offset = 2.0;
     }
-    if(w->adj_y->value) g = -0.5;
+    if(w->adj->value) g = -0.5;
     widget_set_scale(w);
     cairo_text_extents_t extents_f;
     adjust_font_size (w->crb, (w->app->normal_font + 1 + offset) * w->app->hdpi, width, w->label);
@@ -531,7 +531,7 @@ void draw_i_button(void *w_, void* user_data) {
 Widget_t *add_my_button(Widget_t *parent, int x, int y, int width, int height, const char *label) {
     Widget_t *fbutton = add_button(parent, label, x, y, width, height);
     fbutton->scale.gravity = ASPECT;
-    fbutton->flags |= NO_PROPAGATE;
+    //fbutton->flags |= NO_PROPAGATE;
     fbutton->func.expose_callback = draw_i_button;
     return fbutton;
 }

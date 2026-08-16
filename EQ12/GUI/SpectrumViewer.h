@@ -227,11 +227,11 @@ public:
             set_widget_color(frame[i], (Color_state)0, (Color_mod)1, r, g, bcol, 1.0);
            
 
-            prev[i] = add_my_button(frame[i], 5, 78, 22, 18, "<");
+            prev[i] = add_my_button(frame[i], 0, 78, 22, 18, "<");
             prev[i]->data = i;
             prev[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             prev[i]->parent_struct = this;
-            prev[i]->func.value_changed_callback = prev_response;
+            prev[i]->func.button_release_callback = prev_response;
 
             fenable[i] = add_my_enable_button(frame[i], 32, 78, 20, 20, "");
             fenable[i]->data = i;
@@ -281,11 +281,11 @@ public:
             combobox_set_active_entry(ratio[i], 1);
             ratio[i]->func.value_changed_callback = set_ratio;
 
-            next[i] = add_my_button(frame[i], 243, 78, 22, 18, ">");
+            next[i] = add_my_button(frame[i], 248, 78, 22, 18, ">");
             next[i]->data = i;
             next[i]->flags |= USE_TRANSPARENCY | FAST_REDRAW;
             next[i]->parent_struct = this;
-            next[i]->func.value_changed_callback = next_response;
+            next[i]->func.button_release_callback = next_response;
 
             freq[i] = add_eq_knob(frame[i], "FREQ", "Hz", 37,10,42, 68);
             set_widget_color(freq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
@@ -612,6 +612,7 @@ private:
     bool show_ph = false;
     int match_state = -1;
     int match_band = -1;
+    int selected_band = -1;
     int mx = 0;
     int my = 0;
     int bin = 0;
@@ -868,25 +869,40 @@ private:
         for(int i = 0; i < FilterTypes::NumFilters; i++) {
             widget_hide(frame[i]);
             if (i == a) {
-                active_panel = a;
-                widget_show_all(frame[i]);
+                selected_band = a;
+                active_panel = selected_band;
+                widget_show_all(frame[selected_band]);
                 //os_raise_widget(frame[i]);
+                rebuild_eq_layer = true;
+                expose_widget(spec);
             }
         }
     }
 
-    static void prev_response(void *w_, void* user_data) {
+    static void prev_response(void *w_, void *xbutton_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        int r = std::max<int>(0, w->data - 1);
-        self->raise_control_panel(r);
+        XButtonEvent *xbutton = (XButtonEvent*)xbutton_;
+        if (w->flags & HAS_POINTER) {
+            if(xbutton->button == Button1) {
+                auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+                int r = std::max<int>(0, w->data - 1);
+                self->raise_control_panel(r);
+                adj_set_value(w->adj, 0.0);
+            }
+        }
     }
 
-    static void next_response(void *w_, void* user_data) {
+    static void next_response(void *w_, void *xbutton_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
-        auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
-        int r = std::min<int>(11, w->data + 1);
-        self->raise_control_panel(r);
+        XButtonEvent *xbutton = (XButtonEvent*)xbutton_;
+        if (w->flags & HAS_POINTER) {
+            if(xbutton->button == Button1) {
+                auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+                int r = std::min<int>(11, w->data + 1);
+                self->raise_control_panel(r);
+                adj_set_value(w->adj, 0.0);
+            }
+        }
     }
 
     static void solo_response(void *w_, void* user_data) {
@@ -1407,6 +1423,18 @@ private:
             ring   = 18.0;
             alpha  = 0.6;
         }
+        else if (state == 2) {
+            radius = 6.5;
+            ring   = 12.0;
+            alpha  = 0.4;
+
+            // ring
+            cairo_arc(cr, x, y, radius + 3, 0, 2*M_PI);
+            cairo_set_line_width(cr, 2.0);
+            cairo_set_source_rgba(cr, r, g, bcol, 0.9 * alpha);
+            cairo_stroke(cr);
+            return;
+        }
 
         // glow
         cairo_arc(cr, x, y, ring, 0, 2*M_PI);
@@ -1449,7 +1477,7 @@ private:
             } else if (band_match) {
                 band_match = false;
                 rebuild_eq_layer = true;
-                mouse_leave_spec(spec, nullptr);
+                //mouse_leave_spec(spec, nullptr);
                 os_expose_widget(spec);
             }
         }
@@ -1604,26 +1632,27 @@ private:
     }
 
     inline void stroke_band_fill_glow_line(cairo_t* cr, double startX, double stopX,
-                                    float y0, double r, double g, double bcol) {
+                                    float y0, double r, double g, double bcol, bool fill) {
         cairo_line_to(cr, stopX, y0);
         cairo_line_to(cr, startX, y0);
         cairo_close_path(cr);
 
-        cairo_set_source_rgba(cr, r, g, bcol, t.band_fill_alpha);
-        cairo_fill_preserve(cr);
+        if (fill) {
+            cairo_set_source_rgba(cr, r, g, bcol, t.band_fill_alpha);
+            cairo_fill_preserve(cr);
 
-        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
-        cairo_pattern_t* glow = cairo_pattern_create_linear(startX, 0, stopX, 0);
-        cairo_pattern_add_color_stop_rgba(glow, 0,   r, g, bcol, t.band_glow_alpha * 0.1);
-        cairo_pattern_add_color_stop_rgba(glow, 0.5, r, g, bcol, t.band_glow_alpha * 0.8);
-        cairo_pattern_add_color_stop_rgba(glow, 1,   r, g, bcol, t.band_glow_alpha * 0.1);
-        for (int k = 0; k < 3; ++k) {
-            cairo_set_line_width(cr, 6.0 + k * 4.0);
-            cairo_set_source(cr, glow);
-            cairo_stroke_preserve(cr);
+            cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+            cairo_pattern_t* glow = cairo_pattern_create_linear(startX, 0, stopX, 0);
+            cairo_pattern_add_color_stop_rgba(glow, 0,   r, g, bcol, t.band_glow_alpha * 0.1);
+            cairo_pattern_add_color_stop_rgba(glow, 0.5, r, g, bcol, t.band_glow_alpha * 0.8);
+            cairo_pattern_add_color_stop_rgba(glow, 1,   r, g, bcol, t.band_glow_alpha * 0.1);
+            for (int k = 0; k < 3; ++k) {
+                cairo_set_line_width(cr, 6.0 + k * 4.0);
+                cairo_set_source(cr, glow);
+                cairo_stroke_preserve(cr);
+            }
+            cairo_pattern_destroy(glow);
         }
-        cairo_pattern_destroy(glow);
-
         cairo_pattern_t* grad = cairo_pattern_create_linear(startX, 0, stopX, 0);
         cairo_pattern_add_color_stop_rgba(grad, 0,   r, g, bcol, t.band_line_alpha * 0.1);
         cairo_pattern_add_color_stop_rgba(grad, 0.5, r, g, bcol, t.band_line_alpha * 1.0);
@@ -1635,7 +1664,8 @@ private:
     }
 
     void draw_band_curves(cairo_t* cr, bool dyn, int width, int height) {
-        const int MODEL = dyn ? 1 : (int)conn->getParameterValue(84); // dynamic is always Biquad
+        int dyn_mode    = (int)conn->getParameterValue(115);
+        const int MODEL = dyn && !dyn_mode ? 1 : (int)conn->getParameterValue(84);
         const int STEPS = width;
         const float y0 = db_to_y(0.0, db_min, db_max, height);
         const double epsilon_db = 0.5 * (db_max - db_min) / (double)height;
@@ -1648,12 +1678,19 @@ private:
             double bandFreq = conn->getParameterValue(i * 6 + 4);
             double gain     = conn->getParameterValue(i * 6 + 5);
             double q        = conn->getParameterValue(i * 6 + 6);
-            int    type     = (int)conn->getParameterValue(i * 6 + 2);
+            int type        = (int)conn->getParameterValue(i * 6 + 2);
+            int dyn_dir     = (int)conn->getParameterValue(116 + i);
 
             double d = 0.0;
-            if (dyn) {
+            bool fill = true;
+            if (dyn && ! dyn_mode) {
                 d = conn->getDynamics(i);
                 if (d == 0.0) continue;
+            } else if (dyn_mode && (std::fabs(gain) <= epsilon_db) && (selected_band == i)) {
+                d = dyn_dir ? 6.0 : -6.0;
+                fill = false;
+            } else {
+                d = gain;
             }
 
             double Q  = mapQ(q);
@@ -1670,7 +1707,7 @@ private:
 
             double r, g, bcol;
             get_band_color(i, r, g, bcol);
-            stroke_band_fill_glow_line(cr, startX, stopX, y0, r, g, bcol);
+            stroke_band_fill_glow_line(cr, startX, stopX, y0, r, g, bcol, fill);
         }
     }
 
@@ -1688,6 +1725,10 @@ private:
             cairo_move_to(cr, freq, db);
             cairo_line_to(cr, freq, db);
             cairo_stroke(cr);
+
+            if (selected_band == i) {
+                draw_band_ring(cr, freq, db, i, 2);
+            }
 
             if (on) {
                 if (band_match && (match_band == i)) {

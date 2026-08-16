@@ -242,8 +242,8 @@ public:
                     const Vec& sidechainDb, double thresholdDb, double tilt, double amount) {
         const size_t n = mag.size();
         if (!n || sidechainDb.size() != n) return;
+
         const double nyquist = sr * 0.5;
-        const double edgeOct = 0.25;
 
         for (size_t i = 0; i < n; ++i) {
             double freq = (double)i / (n - 1) * nyquist;
@@ -251,36 +251,27 @@ public:
 
             double tiltOffsetDB = tilt * std::log2(freq / 1000.0);
             double baseThreshold = thresholdDb + tiltOffsetDB;
+            double response = 0.0;
 
-            double best = 0.0; // signed: negativ = duck, positiv = expand
             for (size_t bi = 0; bi < count; ++bi) {
                 const Band& b = bands[bi];
                 if (!b.enabled) continue;
 
                 double m = 0.0;
                 switch (b.type) {
+                    case Band::Peak:
+                        m = eval_peak_db(freq, b.freq, 1.0, b.Q);
+                        break;
                     case Band::LowShelf:
                         m = eval_low_shelf(freq, b.freq, 1.0, b.Q);
-                        if (m < 1e-4) continue;
                         break;
-
                     case Band::HighShelf:
                         m = eval_high_shelf(freq, b.freq, 1.0, b.Q);
-                        if (m < 1e-4) continue;
                         break;
-
                     default:
-                    {
-                        double sigma = q_to_sigma(mapQ(std::max(b.Q, 4.0)));
-                        double halfW = sigma * 3.0;
-                        double distOct = std::log2(freq / b.freq);
-                        double edgeDist = halfW - std::abs(distOct);
-                        m = std::clamp(edgeDist / edgeOct, 0.0, 1.0);
-                        if (m <= 0.0) continue;
-                        m = 0.5 - 0.5 * std::cos(m * M_PI);
-                        break;
-                    }
+                        continue;
                 }
+                if (m <= 0.0) continue;
 
                 double ratio = 3.0;
                 switch (b.ratio) {
@@ -291,8 +282,8 @@ public:
                     case 4: ratio = 10.0; break;
                     default: ratio = 3.0; break;
                 }
-                double band_threshold = b.threshold * (1.0 - (1.0 / ratio));
 
+                double band_threshold = b.threshold * (1.0 - (1.0 / ratio));
                 double excess = sidechainDb[i] - (baseThreshold + band_threshold);
                 if (excess <= 0.0) continue;
 
@@ -301,11 +292,10 @@ public:
                     const double max_boost = 12.0;
                     r = std::tanh(r / max_boost) * max_boost;
                 }
-                double signed_r = b.expander ? r : -r;
-                if (std::abs(signed_r) > std::abs(best)) best = signed_r;
+                response += b.expander ? r : -r;
             }
 
-            if (best != 0.0) mag[i] += best;
+            if (response != 0.0) mag[i] += response;
         }
     }
 

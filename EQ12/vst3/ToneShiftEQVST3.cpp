@@ -104,19 +104,25 @@ struct toneshifteq_processor : v3_audio_processor_cpp {
     }
 
     static v3_result V3_API set_bus_arrangements(void*, v3_speaker_arrangement* inputs, int32_t numIn,
-                                                        v3_speaker_arrangement* outputs, int32_t numOut) {
-        if (numIn != 1 || numOut != 1) return V3_NOT_IMPLEMENTED;
-        if (inputs[0] != (V3_SPEAKER_L | V3_SPEAKER_R) || outputs[0] != (V3_SPEAKER_L | V3_SPEAKER_R))
-            return V3_NOT_IMPLEMENTED;
+                                                     v3_speaker_arrangement* outputs, int32_t numOut) {
+        if (numIn < 1 || numIn > 2 || numOut != 1) return V3_NOT_IMPLEMENTED;
+        if (outputs[0] != (V3_SPEAKER_L | V3_SPEAKER_R)) return V3_NOT_IMPLEMENTED;
+        for (int32_t i = 0; i < numIn; ++i)
+            if (inputs[i] != (V3_SPEAKER_L | V3_SPEAKER_R)) return V3_NOT_IMPLEMENTED;
 
         return V3_OK;
     }
 
-    static v3_result V3_API get_bus_arrangement(void*, int32_t, int32_t idx, v3_speaker_arrangement* arr) {
-        if (idx != 0) return V3_INVALID_ARG;
-        *arr = V3_SPEAKER_L | V3_SPEAKER_R;
-
-        return V3_OK;
+    static v3_result V3_API get_bus_arrangement(void*, int32_t dir, int32_t idx, v3_speaker_arrangement* arr) {
+        if (dir == V3_INPUT && (idx == 0 || idx == 1)) {
+            *arr = V3_SPEAKER_L | V3_SPEAKER_R;
+            return V3_OK;
+        }
+        if (dir == V3_OUTPUT && idx == 0) {
+            *arr = V3_SPEAKER_L | V3_SPEAKER_R;
+            return V3_OK;
+        }
+        return V3_INVALID_ARG;
     }
 
     static v3_result V3_API can_process_sample_size(void*, int32_t symbolicSampleSize) {

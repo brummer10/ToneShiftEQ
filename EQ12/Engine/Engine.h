@@ -79,13 +79,17 @@ private:
     float                           direct_gain = 0.0f;
     int                             duck_mode_ = 0.0;
 
+    float                           spectrumThrottle; 
+    static constexpr float          spectrumThrottleMs = 10.0f; 
+
+    int                             pendingMode = 0;
+    int                             currentMode = 0;
+    int                             warmupBlocks = 1;
+    float                           fadeGain = 1.0f;
+    static constexpr float          fadeStep = 0.25f;
+
     enum class ModeState { Running, FadingOut, FadingIn };
     ModeState modeState = ModeState::Running;
-    int pendingMode = 0;
-    int currentMode = 0;
-    int warmupBlocks = 1;
-    float fadeGain = 1.0f;
-    static constexpr float fadeStep = 0.25f;
 
     std::array<FilterConfig, NumFilters> baseFilterConfig {};
     std::array<bool, NumFilters> dynamicActive {};
@@ -204,6 +208,7 @@ inline void Engine::init(uint32_t rate, int32_t rt_prio_, int32_t rt_policy_) {
     svf.prepare((double)rate);
     updateCascadeFromParams();
     execute.store(false, std::memory_order_release);
+    spectrumThrottle = 0;
 
     xrworker.start();
     par.start();
@@ -360,12 +365,17 @@ inline void Engine::processBufferIn() {
 
     if ((ip->duck_mode && anain->hasNewData()) || duck_mode_ != ip->duck_mode) {
         duck_mode_ = ip->duck_mode;
-        ip->setSidechainSpectrum(anain->getMagnitudes(), anain->getBins());
-       // anain->clearFlag();
-        processIR.store(true, std::memory_order_release);
-        workToDo.store(true, std::memory_order_release);
-    }
 
+        spectrumThrottle += frames/(s_rate*0.001);
+
+        if (spectrumThrottle >= spectrumThrottleMs) {
+            ip->setSidechainSpectrum(anain->getMagnitudes(), anain->getBins());
+            spectrumThrottle = 0;
+
+            processIR.store(true, std::memory_order_release);
+            workToDo.store(true, std::memory_order_release);
+        }
+    }
 }
 
 inline void Engine::processBuffer() {
