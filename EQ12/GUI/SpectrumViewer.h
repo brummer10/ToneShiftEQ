@@ -263,10 +263,13 @@ public:
             combobox_add_entry(ftype[i],"High Shelf");
             if (i>0 && i<11) {
                 combobox_set_active_entry(ftype[i], 1);
+                adj_set_std_value(ftype[i]->adj, 1);
             } else if (i>=11) {
                 combobox_set_active_entry(ftype[i], 2);
+                adj_set_std_value(ftype[i]->adj, 2);
             } else {
                 combobox_set_active_entry(ftype[i], 0);
+                adj_set_std_value(ftype[i]->adj, 0);
             }
             ftype[i]->func.value_changed_callback = set_ftype;
 
@@ -279,6 +282,7 @@ public:
             combobox_add_entry(ratio[i], "Ratio 5/1");
             combobox_add_entry(ratio[i], "Ratio 10/1");
             combobox_set_active_entry(ratio[i], 1);
+            adj_set_std_value(ratio[i]->adj, 1);
             ratio[i]->func.value_changed_callback = set_ratio;
 
             next[i] = add_my_button(frame[i], 248, 78, 22, 18, ">");
@@ -327,25 +331,25 @@ public:
             if (i == 0)          // Low Shelf
                 set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 1)     // 70 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.0, 1.0, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 2)     // 120 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.0, 1.0, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 3)     // 210 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.1, 1.1, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 4)     // 370 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.2, 1.2, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 5)     // 650 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.3, 1.3, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 6)     // 1150 Hz
                 set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 7)     // 2000 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.5, 1.5, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 8)     // 3500 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.6, 1.6, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 9)     // 6100 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.5, 1.5, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 10)    // 10700 Hz
-                set_adjustment(fq[i]->adj, 1.4, 1.4, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
+                set_adjustment(fq[i]->adj, 1.3, 1.3, 0.5, 10.0, 0.01, CL_LOGARITHMIC);
             else if (i == 11)    // High Shelf
                 set_adjustment(fq[i]->adj, 0.7, 0.7, 0.4, 10.0, 0.01, CL_LOGARITHMIC);
 
@@ -399,7 +403,7 @@ public:
         apo_save->func.user_callback = apo_save_response;
 
         #ifndef CLAPPLUG
-        mode = add_my_mode_button(laframe, width-165, 0, 20, 20);
+        mode = add_my_mode_button(laframe, width-165, 0, 18, 18);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
@@ -415,16 +419,21 @@ public:
         save->func.user_callback = save_response;
         #endif
 
-        hf_fade = add_my_fade_button(laframe, 220, 20, 40, 40);
+        hf_fade = add_my_fade_button(laframe, 750, 60, 40, 40);
         hf_fade->parent_struct = this;
         hf_fade->func.value_changed_callback = set_hf_fade;
 
-        bp = add_my_bypass_button(laframe, 220, 60, 40, 40);
+        bp = add_my_bypass_button(laframe, 220, 20, 40, 40);
         bp->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         bp->parent_struct = this;
         bp->func.value_changed_callback = bp_response;
 
-        dyn = add_my_dyn_button(laframe, 750, 40, 40, 40);
+        Widget_t *reset_button = add_my_clear_button(laframe, 220, 60, 40, 40);
+        reset_button->flags |= USE_TRANSPARENCY | FAST_REDRAW;
+        reset_button->parent_struct = this;
+        reset_button->func.button_release_callback = clear_to_default;
+
+        dyn = add_my_dyn_button(laframe, 750, 20, 40, 40);
         dyn->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         dyn->parent_struct = this;
         dyn->func.value_changed_callback = dyn_response;
@@ -646,6 +655,37 @@ private:
         std::vector<double> freq;
         std::vector<std::complex<double>> zInv, zInv2, alpha;
     };
+
+    void reset_to_default() {
+        for (int i = 0; i < FilterTypes::NumFilters; ++i) {
+            adj_set_value(fenable[i]->adj, 1.0f);
+            adj_set_value(mute[i]->adj, adj_get_std_value(mute[i]->adj));
+            adj_set_value(solo[i]->adj, adj_get_std_value(solo[i]->adj));
+            adj_set_value(ftype[i]->adj, adj_get_std_value(ftype[i]->adj));
+            adj_set_value(freq[i]->adj, adj_get_std_value(freq[i]->adj));
+            adj_set_value(fgain[i]->adj, adj_get_std_value(fgain[i]->adj));
+            adj_set_value(fq[i]->adj, adj_get_std_value(fq[i]->adj));
+            adj_set_value(threshold[i]->adj, adj_get_std_value(threshold[i]->adj));
+            adj_set_value(ratio[i]->adj, adj_get_std_value(ratio[i]->adj));
+            adj_set_value(com_ex[i]->adj, adj_get_std_value(com_ex[i]->adj));
+        }
+        adj_set_value(lowcut->adj, adj_get_std_value(lowcut->adj));
+        adj_set_value(highcut->adj, adj_get_std_value(highcut->adj));
+        rebuild_eq_layer = true;
+        expose_widget(spec);
+    }
+
+    static void clear_to_default(void *w_, void *xbutton_, void* user_data) {
+        Widget_t *w = (Widget_t*)w_;
+        XButtonEvent *xbutton = (XButtonEvent*)xbutton_;
+        if (w->flags & HAS_POINTER) {
+            if(xbutton->button == Button1) {
+                auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
+                self->reset_to_default();
+                adj_set_value(w->adj_y, 0.0);
+            }
+        }
+    }
 
     static void save_response(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
@@ -1687,7 +1727,9 @@ private:
                 d = conn->getDynamics(i);
                 if (d == 0.0) continue;
             } else if (dyn_mode && (std::fabs(gain) <= epsilon_db) && (selected_band == i)) {
-                d = dyn_dir ? 6.0 : -6.0;
+                d = dyn_dir ? 3.0 : -3.0;
+                fill = false;
+            }else if (dyn_mode && dyn) {
                 fill = false;
             } else {
                 d = gain;

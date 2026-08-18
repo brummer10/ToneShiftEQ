@@ -91,20 +91,20 @@ public:
         {1, Band::Peak,       120.0,   0.0, 1.0, 0.0, 1, 0, 0},
 
         // Low Mid
-        {1, Band::Peak,       210.0,   0.0, 1.0, 0.0, 1, 0, 0},
-        {1, Band::Peak,       370.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,       210.0,   0.0, 1.1, 0.0, 1, 0, 0},
+        {1, Band::Peak,       370.0,   0.0, 1.2, 0.0, 1, 0, 0},
 
         // Mid
-        {1, Band::Peak,       650.0,   0.0, 1.0, 0.0, 1, 0, 0},
-        {1, Band::Peak,      1150.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,       650.0,   0.0, 1.3, 0.0, 1, 0, 0},
+        {1, Band::Peak,      1150.0,   0.0, 1.4, 0.0, 1, 0, 0},
 
         // Upper Mid
-        {1, Band::Peak,      2000.0,   0.0, 1.0, 0.0, 1, 0, 0},
-        {1, Band::Peak,      3500.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,      2000.0,   0.0, 1.5, 0.0, 1, 0, 0},
+        {1, Band::Peak,      3500.0,   0.0, 1.6, 0.0, 1, 0, 0},
 
         // Presence / Air
-        {1, Band::Peak,      6100.0,   0.0, 1.0, 0.0, 1, 0, 0},
-        {1, Band::Peak,     10700.0,   0.0, 1.0, 0.0, 1, 0, 0},
+        {1, Band::Peak,      6100.0,   0.0, 1.5, 0.0, 1, 0, 0},
+        {1, Band::Peak,     10700.0,   0.0, 1.3, 0.0, 1, 0, 0},
 
         // High Shelf
         {1, Band::HighShelf, 18000.0,  0.0, 0.7, 0.0, 0, 0}
@@ -427,15 +427,17 @@ private:
         std::copy(std::begin(bands), std::end(bands), std::begin(localBands));
 
         switch (MODEL) {
-            case 1: eq.apply_all_biquad(mag_ir, sampleRate, localBands, 12,
+            case 1: eq.apply_all_biquad(mag_ir, sampleRate, localBands, 12, solo_enabled_, solo_band_, 
                                          lowcut_enabled_, lowcut_, highcut_enabled_, highcut_); break;
-            case 2: eq.apply_all_svf(mag_ir, sampleRate, localBands, 12,
-                                      lowcut_enabled_, lowcut_, highcut_enabled_, highcut_); break;
+            case 2: eq.apply_all_svf(mag_ir, sampleRate, localBands, 12, solo_enabled_, solo_band_, 
+                                         lowcut_enabled_, lowcut_, highcut_enabled_, highcut_); break;
             default:
                 if (lowcut_enabled_)  eq.apply_low_rolloff(mag_ir, sampleRate, lowcut_);
                 if (highcut_enabled_) eq.apply_high_rolloff(mag_ir, sampleRate, highcut_);
+                int s = 0;
                 for (auto& b : localBands) {
-                    if (!b.enabled) continue;
+                    if (solo_enabled_ && solo_band_ != s++) continue;
+                    if (!b.enabled || b.mute) continue;
                     switch (b.type) {
                         case Band::Peak:      eq.apply_peak(mag_ir, sampleRate, b.freq, b.gain, b.Q); break;
                         case Band::LowShelf:  eq.apply_low_shelf(mag_ir, sampleRate, b.freq, b.gain, b.Q); break;
@@ -446,39 +448,15 @@ private:
                 break;
         }
         
-        //apply_peak(mag_ir, sampleRate, 1000.0, -24.0, 1.0); // Q 0.0 - 5  
         constexpr double eps = 1e-12;
-
         const bool needSmooth   = std::abs(smooth_amount_)   > eps;
 
         if (duck_mode_ && !sc_local.empty()) {
             Vec sc = remap_mag_bins(sc_local, analysisN, synthesisN);
-            eq.apply_spectral_dynamics(mag_ir, sampleRate, localBands, 12, sc, duck_threshold_, duck_tilt_, dynamics_amount_);
-        }
-        //mag_ir = designer.adaptive_log_smooth(mag_ir, sampleRate * 0.001);
-        //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
-        //mag_ir = designer.soften_peaks(mag_ir, 0.2);
-
-        if (!haveSource && ! haveReference) {
-           // peak = std::max(peak, *std::max_element(mag_ir.begin(), mag_ir.end()));
-           // for (auto& v : mag_ir) v -= peak;
+            eq.apply_spectral_dynamics(mag_ir, sampleRate, localBands, 12, solo_enabled_, solo_band_, 
+                                                    sc, duck_threshold_, duck_tilt_, dynamics_amount_);
         }
 
-        if (solo_enabled_) {
-            if (localBands[solo_band_].enabled) {
-                mag_ir = eq.buildBandSoloIR(localBands[solo_band_], mag_ir, sampleRate);
-                //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
-            }
-        } else {
-            for (auto& b : localBands) {
-                if (b.enabled) {
-                    if (b.mute ) {
-                        mag_ir = eq.buildBandMuteIR(b, mag_ir, sampleRate);
-                        //mag_ir = designer.harmonic_refine(mag_ir, sampleRate);
-                    }
-                }
-            }
-        }
         if (needSmooth || duck_mode_) {
             Vec smooth = designer.adaptive_log_smooth(mag_ir, sampleRate);
             if (needSmooth) mag_ir = designer.lerpv(mag_ir, smooth, smooth_amount_);
@@ -567,9 +545,6 @@ private:
 
         processChannel(refL, srcL, out.left, mag_ir_L_, rebuild);
         processChannel(refR, srcR, out.right, mag_ir_R_, rebuild);
-
-        //aplayFilter(mag_ir_L_);
-        //aplayFilter(mag_ir_R_);
 
         updateGuiCurves(out);
 

@@ -175,7 +175,7 @@ void Engine::registerParameters() {
     }
 
     param.registerParam("Volume In", "Global",-46,  12,  0.0,  0.1,     (void*)&vuin->gain,           false,  IS_FLOAT);
-    param.registerParam("SideChain",     "EQ",  0,   1,   1,    1,      (void*)&sidechain,             true,  IS_INT);
+    param.registerParam("SideChain",     "EQ",  0,   1,   0,    1,      (void*)&sidechain,             true,  IS_INT);
 
     param.registerParam("Duck enable", "Compressor",  0,   1,   0,    1,     (void*)&ip->duck_on,            true,  IS_INT);
     param.registerParam("Duck Threshold", "Compressor", -60.0, 0.0, 0.0, 0.1, (void*)&ip->duck_threshold, false, IS_DOUBLE);

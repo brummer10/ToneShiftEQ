@@ -61,6 +61,7 @@ public:
         int id = static_cast<int>(parameter.size());
         Parameter p = {id, name, group, min, max, def, step, value, isStepped, type, false};
         parameter.push_back(p);
+        setParam(id, def);
     }
 
     // register a variable as parameter
@@ -70,6 +71,7 @@ public:
         int id = static_cast<int>(parameter.size());
         Parameter p = {id, name, group, min, max, def, step, value, isStepped, type, false};
         parameter.push_back(p);
+        setParam(id, def);
     }
 
     // indicate a parameter change by the user

@@ -1317,7 +1317,7 @@ void draw_fade_button(void *w_, void* user_data) {
     const int height = metrics.height;
     const int state  = (int)adj_get_value(w->adj); // 0 = off, 1 = on
     draw_hf_fadeout(w->crb, 0.0, 0.0, height, w->state, state);
-    tooltip_set_my_text(w, "HF Fade out");
+    tooltip_set_my_text(w, "20 kHz Fade out");
 }
 
 Widget_t *add_my_fade_button(Widget_t *parent, int x, int y, int width, int height) {
@@ -1416,6 +1416,92 @@ Widget_t *add_my_bypass_button(Widget_t *parent, int x, int y, int width, int he
     return fbutton;
 }
 
+/****************************************************************
+ *    reset button
+****************************************************************/
+
+void draw_clear(cairo_t *cr, double x, double y, double size, int state) {
+    double pad = state ? size * 0.10 : size * 0.16;
+    double offset = 0.0f;
+    if (state == 2) offset = 1.0f; // pressed
+    double x0 = x + pad + offset;
+    double x1 = x + size - pad - offset;
+    double y0 = y + pad + offset;
+    double y1 = y + size - pad - offset;
+    double w = x1 - x0;
+    double h = y1 - y0;
+    double r = state ? size * 0.11 : size * 0.09;
+
+    cairo_save(cr);
+    // frame
+    cairo_set_line_width(cr, size * 0.035);
+    cairo_set_source_rgba(cr, 0.91, 0.949, 0.838, 0.35);
+    if (state) cairo_set_source_rgba(cr, 0.91, 0.949, 0.883, 0.55);
+    //if (active) cairo_set_source_rgba(cr, 0.15, 0.52, 0.55, 0.96);
+    cairo_new_sub_path(cr);
+    cairo_arc(cr, x1 - r, y0 + r, r, -M_PI_2, 0);
+    cairo_arc(cr, x1 - r, y1 - r, r, 0, M_PI_2);
+    cairo_arc(cr, x0 + r, y1 - r, r, M_PI_2, M_PI);
+    cairo_arc(cr, x0 + r, y0 + r, r, M_PI, 3 * M_PI_2);
+    cairo_close_path(cr);
+    cairo_stroke_preserve(cr);
+    cairo_stroke(cr);
+
+    // Symbol: reset/undo arrow (open circular arc + arrowhead)
+    double cx = x0 + w * 0.5;
+    double cy = y0 + h * 0.5;
+    double rad = h * 0.28;
+
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_width(cr, size * 0.045);
+    cairo_set_source_rgb(cr, 0.55, 0.55, 0.58);
+    if (state) cairo_set_source_rgb(cr, 0.91, 0.949, 0.883);
+    //if (active) cairo_set_source_rgb(cr, 0.15, 0.52, 0.55);
+
+    double startAngle = -M_PI * 0.15;
+    double endAngle   =  M_PI * 1.55;
+    cairo_arc(cr, cx, cy, rad, startAngle, endAngle);
+    cairo_stroke(cr);
+
+    // arrowhead at the open end
+    double ax = cx + rad * std::cos(startAngle);
+    double ay = cy + rad * std::sin(startAngle);
+    double tangent = startAngle - M_PI_2;
+    double alen = size * 0.09;
+    double a1x = ax - alen * std::cos(tangent - 0.5);
+    double a1y = ay - alen * std::sin(tangent - 0.5);
+    double a2x = ax - alen * std::cos(tangent + 0.5);
+    double a2y = ay - alen * std::sin(tangent + 0.5);
+
+    cairo_move_to(cr, ax, ay);
+    cairo_line_to(cr, a1x, a1y);
+    cairo_move_to(cr, ax, ay);
+    cairo_line_to(cr, a2x, a2y);
+    cairo_stroke(cr);
+
+    cairo_restore(cr);
+}
+
+void draw_clear_button(void *w_, void* user_data) {
+    Widget_t *w = (Widget_t*)w_;
+    if (!w) return;
+
+    Metrics_t metrics;
+    os_get_window_metrics(w, &metrics);
+    if (!metrics.visible) return;
+
+    const int height = metrics.height;
+    draw_clear(w->crb, 0.0, 0.0, height, w->state);
+    tooltip_set_my_text(w, "Clear EQ settings");
+}
+
+Widget_t *add_my_clear_button(Widget_t *parent, int x, int y, int width, int height) {
+    Widget_t *fbutton = add_button(parent, "", x, y, width, height);
+    fbutton->scale.gravity = ASPECT;
+    fbutton->flags |= NO_PROPAGATE | HAS_TOOLTIP;
+    fbutton->func.expose_callback = draw_clear_button;
+    return fbutton;
+}
 
 /****************************************************************
  *    combobox

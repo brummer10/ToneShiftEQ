@@ -163,8 +163,8 @@ public:
     }
 
 
-    static void apply_all_biquad(Vec& mag, double sr, const Band* bands, size_t count,
-            bool lowCutEnabled, double lowCutFreq, bool highCutEnabled, double highCutFreq) {
+    static void apply_all_biquad(Vec& mag, double sr, const Band* bands, size_t count, int solo_enabled,
+            int solo_band, bool lowCutEnabled, double lowCutFreq, bool highCutEnabled, double highCutFreq) {
         const size_t n = mag.size();
         if (!n) return;
         const double nyquist = sr * 0.5;
@@ -179,7 +179,8 @@ public:
 
         for (size_t bi = 0; bi < count; ++bi) {
             const Band& b = bands[bi];
-            if (!b.enabled) continue;
+            if (solo_enabled && solo_band != (int)bi) continue;
+            if (!b.enabled || b.mute) continue;
             FilterTypes::Type ftype = b.type == Band::LowShelf  ? FilterTypes::Type::LowShelf
                                      : b.type == Band::HighShelf ? FilterTypes::Type::HighShelf
                                      : b.type == Band::Notch ? FilterTypes::Type::Notch
@@ -201,8 +202,8 @@ public:
         }
     }
 
-    static void apply_all_svf(Vec& mag, double sr, const Band* bands, size_t count,
-            bool lowCutEnabled, double lowCutFreq,  bool highCutEnabled, double highCutFreq) {
+    static void apply_all_svf(Vec& mag, double sr, const Band* bands, size_t count, int solo_enabled,
+            int solo_band, bool lowCutEnabled, double lowCutFreq,  bool highCutEnabled, double highCutFreq) {
         const size_t n = mag.size();
         if (!n) return;
         const double nyquist = sr * 0.5;
@@ -215,6 +216,7 @@ public:
 
         for (size_t bi = 0; bi < count; ++bi) {
             const Band& b = bands[bi];
+            if (solo_enabled && solo_band != (int)bi) continue;
             if (!b.enabled) continue;
             double Q = mapQ(b.Q);
             active.push_back(
@@ -238,8 +240,8 @@ public:
         }
     }
 
-    static void apply_spectral_dynamics(Vec& mag, double sr, const Band* bands, size_t count,
-                    const Vec& sidechainDb, double thresholdDb, double tilt, double amount) {
+    static void apply_spectral_dynamics(Vec& mag, double sr, const Band* bands, size_t count, int solo_enabled,
+                        int solo_band, const Vec& sidechainDb, double thresholdDb, double tilt, double amount) {
         const size_t n = mag.size();
         if (!n || sidechainDb.size() != n) return;
 
@@ -255,7 +257,8 @@ public:
 
             for (size_t bi = 0; bi < count; ++bi) {
                 const Band& b = bands[bi];
-                if (!b.enabled) continue;
+                if (solo_enabled && solo_band != (int)bi) continue;
+                if (!b.enabled || b.mute) continue;
 
                 double m = 0.0;
                 switch (b.type) {
