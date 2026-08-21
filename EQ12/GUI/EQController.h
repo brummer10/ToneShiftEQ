@@ -1994,6 +1994,7 @@ Widget_t* add_my_vslider(Widget_t *parent, const char * label,
     wid->func.enter_callback = os_transparent_draw;
     wid->func.leave_callback = os_transparent_draw;
     wid->func.button_release_callback = slider_released;
+    wid->func.double_click_callback = reset_default;
     wid->func.mem_free_callback = slider_mem_free;
     return wid;
 }
@@ -2068,6 +2069,7 @@ Widget_t* add_my_mini_slider(Widget_t *parent, const char * label,
     wid->func.enter_callback = os_transparent_draw;
     wid->func.leave_callback = os_transparent_draw;
     wid->func.button_release_callback = mslider_released;
+    wid->func.double_click_callback = reset_default;
     wid->func.mem_free_callback = slider_mem_free;
     return wid;
 }

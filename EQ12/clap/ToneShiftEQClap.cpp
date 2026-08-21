@@ -238,7 +238,7 @@ static bool toneshifteq_state_load(const clap_plugin_t *plugin, const clap_istre
     toneshifteq_plugin_t *plug = (toneshifteq_plugin_t *)plugin->plugin_data;
     char _state[2048] = {0};
     int thisread = stream->read(stream, _state, sizeof(_state) - 1);
-    if (thisread < 0) return false;
+    if (thisread <= 0) return false;
     _state[thisread] = '\0';
     plug->state = _state;
     if (plug->isInited) plug->r->readState(plug->state);
@@ -531,6 +531,7 @@ static const clap_plugin_t *toneshifteq_create(const clap_host_t *host, PluginMo
     plug->width = WINDOW_WIDTH;
     plug->height = WINDOW_HEIGHT;
     plug->mode = mode;
+    plug->r->engine.param.setParam(84,(int)mode);
     plug->plugin.desc = (plug->mode == MODE_MASTER) ? 
         &toneshifteq_master_descriptor : &toneshifteq_live_descriptor;
     plug->plugin.plugin_data = plug;
@@ -572,9 +573,9 @@ static const clap_plugin_t *plugin_factory_create_toneshifteq
                         (const struct clap_plugin_factory *factory,
                         const clap_host_t *host, const char *plugin_id) {
 
-   if (!clap_version_is_compatible(host->clap_version)) {
-      return NULL;
-   }
+    if (!clap_version_is_compatible(host->clap_version)) {
+        return NULL;
+    }
 
     if (!strcmp(plugin_id, toneshifteq_master_descriptor.id))
         return toneshifteq_create(host, MODE_MASTER);

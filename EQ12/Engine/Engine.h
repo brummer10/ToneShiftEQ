@@ -144,7 +144,7 @@ void Engine::registerParameters() {
         param.registerParam(n + " enable", "EQ", 0, 1, 1, 1, (void*)&ip->bands[i].enabled, true, IS_INT);
         param.registerParam(n + " type", "EQ", 0, 3, defs[i].type, 1, (void*)&ip->bands[i].type, true, IS_INT);
         param.registerParam(n + " mute", "EQ", 0, 1, 0, 1, (void*)&ip->bands[i].mute, true, IS_INT);
-        param.registerParam(n + " freq", "EQ", defs[i].freqMin, defs[i].freqMax, defs[i].freqDef, 0.01, (void*)&ip->bands[i].freq, false, IS_DOUBLE);
+        param.registerParam(n + " freq", "EQ", 20.0, 20000.0, defs[i].freqDef, 0.01, (void*)&ip->bands[i].freq, false, IS_DOUBLE);
         param.registerParam(n + " gain", "EQ", -48.0, 24.0, 0.0, 0.01, (void*)&ip->bands[i].gain, false, IS_DOUBLE);
         param.registerParam(n + " Q", "EQ", defs[i].qMin, 10.0, defs[i].qDef, 0.01, (void*)&ip->bands[i].Q, false, IS_DOUBLE);
     }

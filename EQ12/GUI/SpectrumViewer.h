@@ -298,29 +298,29 @@ public:
             freq[i]->func.value_changed_callback = set_freq;
             freq[i]->func.button_release_callback = set;
             if (i == 0)
-                set_adjustment(freq[i]->adj, 40.0,    40.0,    20.0,    60.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 40.0,    40.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 1)
-                set_adjustment(freq[i]->adj, 70.0,    70.0,    40.0,   100.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 70.0,    70.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 2)
-                set_adjustment(freq[i]->adj, 120.0,  120.0,    70.0,   180.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 120.0,  120.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 3)
-                set_adjustment(freq[i]->adj, 210.0,  210.0,   120.0,   300.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 210.0,  210.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 4)
-                set_adjustment(freq[i]->adj, 370.0,  370.0,   200.0,   550.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 370.0,  370.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 5)
-                set_adjustment(freq[i]->adj, 650.0,  650.0,   350.0,   900.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 650.0,  650.0,    20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 6)
-                set_adjustment(freq[i]->adj, 1150.0, 1150.0,  650.0,  1600.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 1150.0, 1150.0,   20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 7)
-                set_adjustment(freq[i]->adj, 2000.0, 2000.0, 1100.0,  2800.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 2000.0, 2000.0,   20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 8)
-                set_adjustment(freq[i]->adj, 3500.0, 3500.0, 1800.0,  5000.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 3500.0, 3500.0,   20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 9)
-                set_adjustment(freq[i]->adj, 6100.0, 6100.0, 3500.0,  9000.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 6100.0, 6100.0,   20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 10)
-                set_adjustment(freq[i]->adj, 10700.0,10700.0,6000.0, 15000.0,    0.01, CL_LOGARITHMIC);
+                set_adjustment(freq[i]->adj, 10700.0,10700.0,  20.0,  20000.0,    0.01, CL_LOGARITHMIC);
             else if (i == 11)
-                set_adjustment(freq[i]->adj, 18000.0,18000.0,10000.0,20000.0,    0.01, CL_LOGARITHMIC);            
+                set_adjustment(freq[i]->adj, 18000.0,18000.0,  20.0,  20000.0,    0.01, CL_LOGARITHMIC);            
 
             fq[i] = add_eq_knob(frame[i], "Q", "", 141,0, 52, 78);
             set_widget_color(fq[i], (Color_state)0, (Color_mod)1, 0.12, 0.12, 0.14, 1);
@@ -408,7 +408,7 @@ public:
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
         #endif
-        #ifndef LV2PLUG
+
         Widget_t* ir_loader = add_my_lfile_button(laframe, 170, 20, 40, 40, "IR", " ", ".wav|.WAV");
         ir_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
         ir_loader->parent_struct = this;
@@ -417,7 +417,6 @@ public:
         save = add_xsave_file_button(laframe, 170, 60, 40, 40, "Save IR", " ", ".wav|.WAV");
         save->parent_struct = this;
         save->func.user_callback = save_response;
-        #endif
 
         hf_fade = add_my_fade_button(laframe, 750, 60, 40, 40);
         hf_fade->parent_struct = this;
