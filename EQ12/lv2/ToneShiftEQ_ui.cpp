@@ -384,6 +384,10 @@ int XToneShiftEQ_UI::idle(LV2UI_Handle handle) {
         self->notify_dsp(self);
         self->check = false;
     }
+    if (self->sw.redrawSpec.exchange(false, std::memory_order_acq_rel))
+            expose_widget(self->sw.spec);
+    if (self->sw.redrawFrame.exchange(false, std::memory_order_acq_rel))
+            self->sw.expose_frame();
 
     run_embedded(self->sw.getMain());
     if (self->check) {

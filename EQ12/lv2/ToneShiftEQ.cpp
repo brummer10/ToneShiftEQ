@@ -177,7 +177,7 @@ void Xtoneshifteq::run_dsp_(uint32_t n_samples) {
         }
     }
     // report latency
-    *(latency) = (int)*(par[84]) ? 0 : engine.conv->getLatency();
+    *(latency) = 0;
     // finish here when we have instance-access, otherwise send data via atom messages
     if (!atomTransfer.load(std::memory_order_acquire)) return;
     // get size of a empty message once

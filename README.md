@@ -5,7 +5,7 @@
 </p>
 
 **ToneShiftEQ** is a modern 12-band parametric equalizer featuring both
-a minimum-phase FFT convolution engine and a zero-latency biquad engine.
+a zero-latency minimum-phase FFT convolution engine and a zero-latency biquad engine.
 Each band can also operate as an independent dynamic equalizer with configurable Threshold and Ratio controls.
 It is designed for transparent tone shaping, corrective equalization, mixing and mastering.
 
@@ -30,7 +30,7 @@ It is designed for transparent tone shaping, corrective equalization, mixing and
 * Stereo processing
 * Low CPU consumption
 * Real-time safe processing architecture
-* 128 samples latency, host-compensated
+* zero-latency
 
 ---
 
@@ -39,7 +39,7 @@ It is designed for transparent tone shaping, corrective equalization, mixing and
 FFT Mode
 
 * Minimum-phase convolution
-* 128 samples latency
+* zero-latency
 * Supports HF Fade and IR export
 * Spectral Dynamics with smooth and amount control
 * Best suited for mixing and mastering
@@ -48,7 +48,7 @@ Biquad Mode
 
 * Cascaded parametric biquad filters
 * Dynamic Equaliser with threshold, ratio and direction control
-* Zero latency
+* zero-latency
 * Low CPU usage
 * Ideal for recording and live monitoring
 
@@ -119,7 +119,7 @@ existing impulse responses by approximating them with the internal EQ model.
 Under the hood it use [AudioFFT](https://github.com/HiFi-LoFi/AudioFFT) by HiFi-LoFi.
 
 The Biquad engine implements the same filter configuration as a cascade of
-second-order IIR filters for true zero-latency operation.
+second-order IIR filters.
 
 Dynamic processing is performed independently for each band, allowing
 frequency-selective compression/expanding using configurable Threshold and Ratio controls.
@@ -195,4 +195,4 @@ BSD-3-Clause
 
 ## Philosophy
 
-> If it sounds good, it is right.
+> If it sounds good, it is good.

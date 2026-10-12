@@ -38,6 +38,7 @@ public:
 
     Widget_t* top = nullptr;
     Widget_t* bp = nullptr;
+    Widget_t* spec = nullptr;
     Widget_t* frame[FilterTypes::NumFilters] = {nullptr};
     Widget_t* ftype[FilterTypes::NumFilters] = {nullptr};
     Widget_t* fenable[FilterTypes::NumFilters] = {nullptr};
@@ -75,6 +76,8 @@ public:
     Widget_t* dyn = nullptr;
     Widget_t* topframe = nullptr;
 
+    std::atomic<bool> redrawSpec {true};
+    std::atomic<bool> redrawFrame {true};
     std::atomic<bool> havePreset {false};
     std::vector<double> dstL;
     std::vector<double> dstR;
@@ -86,6 +89,18 @@ public:
 
     ~SpectrumViewer() {
         if(eq_layer) cairo_surface_destroy(eq_layer);
+    }
+
+    void setRedraw() {
+        redrawSpec.store(true, std::memory_order_release);
+    }
+
+    void setRedrawFrame() {
+        redrawFrame.store(true, std::memory_order_release);
+    }
+
+    void expose_frame() {
+        expose_widget(frame[active_panel]);
     }
 
     void setData(const std::vector<float>& ir) {
@@ -103,7 +118,10 @@ public:
             magin_.push_back(data[i]);
             mx = std::max<float>(mx, data[i]);
         }
-        if (mx > -90.f) expose_widget(spec);
+        if (mx > -90.f) {
+            setRedraw();
+            setRedrawFrame();
+        }
     }
 
     void setSpec(const float* data, int bin) {
@@ -113,7 +131,10 @@ public:
             mag_[0].push_back(data[i]);
             mx = std::max<float>(mx, data[i]);
         }
-        if (mx > -90.f) expose_widget(spec);
+        if (mx > -90.f) {
+            setRedraw();
+            setRedrawFrame();
+        }
     }
 
     void setFilter(const float* data, int bin) {
@@ -122,7 +143,7 @@ public:
             ir_.push_back(data[i]);
         }
         rebuild_eq_layer = true;
-        expose_widget(spec);
+        setRedraw();
     }
 
     void setPhase(const float* data, int bin) {
@@ -233,9 +254,9 @@ public:
 
         Widget_t* laframe = add_my_z_frame(spec,"", 0, 331, width-130, 100);
         laframe->scale.gravity = WESTEAST;
+        laframe->flags |= DONT_PROPAGATE;
         #if defined(_WIN32)
         {
-            laframe->flags |= DONT_PROPAGATE;
             LONG_PTR st = GetWindowLongPtr(laframe->widget, GWL_STYLE);
             SetWindowLongPtr(laframe->widget, GWL_STYLE, st | WS_CLIPCHILDREN);
         }
@@ -250,9 +271,9 @@ public:
         for (int i = 0; i<FilterTypes::NumFilters; i++) {
             frame[i] = add_my_panel(laframe,"", 275, 0, 270, 99);
             frame[i]->scale.gravity = NORTCENTER;
+            frame[i]->flags |= DONT_PROPAGATE;
             #if defined(_WIN32)
             {
-                frame[i]->flags |= DONT_PROPAGATE;
                 LONG_PTR st = GetWindowLongPtr(frame[i]->widget, GWL_STYLE);
                 SetWindowLongPtr(frame[i]->widget, GWL_STYLE, st | WS_CLIPCHILDREN);
             }
@@ -437,12 +458,10 @@ public:
         apo_save->parent_struct = this;
         apo_save->func.user_callback = apo_save_response;
 
-        #ifndef CLAPPLUG
         mode = add_my_mode_button(laframe, width-165, 0, 18, 18);
         mode->scale.gravity = ASPECT;
         mode->parent_struct = this;
         mode->func.value_changed_callback = set_mode;
-        #endif
 
         Widget_t* ir_loader = add_my_lfile_button(laframe, 170, 20, 40, 40, "IR", " ", ".wav|.WAV");
         ir_loader->flags |= USE_TRANSPARENCY | FAST_REDRAW;
@@ -557,7 +576,7 @@ public:
         db_max = db_max_ * std::pow(6.0 / db_max_, t);
         spec_height = 0;
         rebuild_eq_layer = true;
-        expose_widget(spec);
+        setRedraw();
     }
 
     void show() {
@@ -626,11 +645,9 @@ public:
             p++;
         }
        if (setRefresh) {
-            expose_widget(spec);
-            #if defined(_WIN32)
-            expose_widget(frame[active_panel]);
-            #endif
-       }
+            setRedraw();
+            setRedrawFrame();
+        }
     }
 
     void check_irmatch() {
@@ -638,7 +655,7 @@ public:
             setData(conn->getIR());
             setPhase(conn->getPhase());
             rebuild_eq_layer = true;
-            expose_widget(spec);
+            setRedraw();
             instanceChanged = false;
         }
     }
@@ -654,7 +671,6 @@ private:
     Xputty main;
     Widget_t* ref_label = nullptr;
     Widget_t* src_label = nullptr;
-    Widget_t* spec = nullptr;
     Widget_t* curFreq = nullptr;
     Widget_t* curGain = nullptr;
     Widget_t* ph = nullptr;
@@ -725,35 +741,6 @@ private:
         std::vector<double> freq;
         std::vector<std::complex<double>> zInv, zInv2, alpha;
     };
-
-    // --- Draw caches (GUI thread only) ---------------------------------
-
-    // Frequency LUTs: one slot per filter model (0 = tanh/gauss, 1 = biquad, 2 = SVF),
-    // so the dynamic overlay (always model 1) and the static curves don't evict each other.
-    BandCurveLUTs lutCache_[3];
-    int           lutCacheWidth_[3] = {-1, -1, -1};
-    double        lutCacheSR_[3]    = {-1.0, -1.0, -1.0};
-
-    // Visible x-range per band ([0] = static curves, [1] = dynamic overlay).
-    struct BandRangeCache {
-        bool   valid = false;
-        int    model = 0, type = 0, width = 0, steps = 0;
-        double freq = 0.0, Q = 0.0, gd = 0.0, sr = 0.0, eps = 0.0;
-        int    xLo = 0, xHi = 0;
-    };
-    BandRangeCache rangeCache_[2][FilterTypes::NumFilters];
-
-    // Spectrum pixel -> FFT bin mapping. Depends only on width, bin count and sample rate.
-    // A few slots, because ir_/phase_/magin_/mag_[] may have different bin counts.
-    static constexpr int SPEC_PX_STEP = 1;   // 2 = one line point per 2 px (cheaper)
-    struct SpecMap {
-        int   width = -1, bins = -1;
-        float sr = -1.0f;
-        std::vector<float> px;
-        std::vector<float> bin;
-    };
-    SpecMap specMaps_[4];
-    int     specMapNext_ = 0;
 
     typedef struct {
         double r, g, b, a;
@@ -853,7 +840,7 @@ private:
         adj_set_value(lowcut->adj, adj_get_std_value(lowcut->adj));
         adj_set_value(highcut->adj, adj_get_std_value(highcut->adj));
         rebuild_eq_layer = true;
-        expose_widget(spec);
+        setRedraw();
     }
 
     static void clear_to_default(void *w_, void *xbutton_, void* user_data) {
@@ -986,7 +973,7 @@ private:
         if (w->flags & HAS_POINTER && !adj_get_value(w->adj)){
             self->show_ph = self->show_ph ? false : true;
             self->rebuild_eq_layer = true;
-            expose_widget(self->spec);
+            self->setRedraw();
 
         }
     }
@@ -1038,12 +1025,14 @@ private:
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         adj_get_value(w->adj) ? widget_show(self->gthrv) : widget_hide(self->gthrv);
         self->sendValueChanged(111, adj_get_value(w->adj));
+        self->setRedraw();
     }
 
     static void set_global_threshold_value(void *w_, void* user_data) {
         Widget_t *w = (Widget_t*)w_;
         auto* self = static_cast<SpectrumViewer*>(w->parent_struct);
         self->sendValueChanged(112, adj_get_value(w->adj));
+        self->setRedraw();
     }
 
     static void set_hf_fade(void *w_, void* user_data) {
@@ -1200,7 +1189,7 @@ private:
                 widget_show_all(frame[selected_band]);
                 //os_raise_widget(frame[i]);
                 rebuild_eq_layer = true;
-                expose_widget(spec);
+                setRedraw();
             }
         }
     }
@@ -1575,7 +1564,7 @@ private:
                                                        -THR_TILT_MAX, THR_TILT_MAX);
                 }
                 self->sendValueChanged(114, self->threshold_tilt);
-                expose_widget(self->spec);
+                self->setRedraw();
             } else {
                 if(xbutton->button == Button4) {
                     self->zoom_step = std::max<int>(0, self->zoom_step - 1);
@@ -1840,13 +1829,13 @@ private:
                 band_match = true;
                 match_band = i;
                 rebuild_eq_layer = true;
-                os_expose_widget(spec);
+                setRedraw();
                 return ;
             } else if (band_match) {
                 band_match = false;
                 rebuild_eq_layer = true;
                 //mouse_leave_spec(spec, nullptr);
-                os_expose_widget(spec);
+                setRedraw();
             }
         }
         band_match = false;
@@ -1855,9 +1844,12 @@ private:
             float dy = my - y;
             if (dy * dy < 12*12) {
                 threshold_match = true;
+                setRedraw();
                 return;
+            } else if (threshold_match) {
+                threshold_match = false;
+                setRedraw();
             }
-            threshold_match = false;
         }
     }
 
@@ -1881,18 +1873,6 @@ private:
             }
         }
         return lut;
-    }
-
-    // Cached variant: rebuilt only when width, sample rate or model change.
-    const BandCurveLUTs& get_frequency_luts(int width, int steps, int model) {
-        const int idx = (model == 1 || model == 2) ? model : 0;
-        if (lutCacheWidth_[idx] != width || lutCacheSR_[idx] != sampleRate ||
-            lutCache_[idx].freq.size() != (size_t)steps) {
-            lutCache_[idx] = build_frequency_luts(width, steps, model);
-            lutCacheWidth_[idx] = width;
-            lutCacheSR_[idx] = sampleRate;
-        }
-        return lutCache_[idx];
     }
 
     template <typename DbFunc>
@@ -1993,7 +1973,7 @@ private:
         startX = xLo; stopX = xLo;
 
         cairo_new_path(cr);
-        for (int x = xLo; x <= xHi; ++x) {
+        for (int x = xLo; x <= xHi; x +=4) { // only draw every 4. pixel
             double f  = lut.freq[x];
             double db = m.dbAtLUT(x, f, lut, sampleRate);
             double y  = db_to_y(db, db_min, db_max, height);
@@ -2050,7 +2030,7 @@ private:
         const float y0 = db_to_y(0.0, db_min, db_max, height);
         const double epsilon_db = 0.5 * (db_max - db_min) / (double)height;
 
-        const BandCurveLUTs& lut = get_frequency_luts(width, STEPS, MODEL);
+        BandCurveLUTs lut = build_frequency_luts(width, STEPS, MODEL);
 
         for (int i = 0; i < FilterTypes::NumFilters; ++i) {
             if (!(int)conn->getParameterValue(i * 6 + 1)) continue;
@@ -2081,17 +2061,8 @@ private:
 
             BandFilterModel model = build_band_model(MODEL, type, bandFreq, Q, gd, sampleRate);
 
-            // x-range only depends on the band parameters -> cache it
-            BandRangeCache& rc = rangeCache_[dyn ? 1 : 0][i];
-            if (!(rc.valid && rc.model == MODEL && rc.type == type && rc.width == width &&
-                  rc.steps == STEPS && rc.freq == bandFreq && rc.Q == Q && rc.gd == gd &&
-                  rc.sr == sampleRate && rc.eps == epsilon_db)) {
-                compute_band_x_range(model, epsilon_db, sampleRate, width, STEPS, rc.xLo, rc.xHi);
-                rc.valid = true;
-                rc.model = MODEL; rc.type = type; rc.width = width; rc.steps = STEPS;
-                rc.freq = bandFreq; rc.Q = Q; rc.gd = gd; rc.sr = sampleRate; rc.eps = epsilon_db;
-            }
-            const int xLo = rc.xLo, xHi = rc.xHi;
+            int xLo, xHi;
+            compute_band_x_range(model, epsilon_db, sampleRate, width, STEPS, xLo, xHi);
 
             double startX, stopX;
             build_band_path(cr, model, lut, xLo, xHi, y0, height, startX, stopX);
@@ -2374,6 +2345,8 @@ private:
         spec_height = height;
         spec_width = width;
 
+        cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+        cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
         draw_band_curves(cr, true, width, height);
         if (conn->getParameterValue(111)) draw_threshold_line(cr, width, height);
         if (inVisible)
@@ -2402,27 +2375,6 @@ private:
         #endif
     }
 
-    // Pixel -> FFT bin mapping, cached per (width, bins, sample rate).
-    const SpecMap& get_spec_map(int width, int bins, float sample_rate) {
-        for (auto& m : specMaps_) {
-            if (m.width == width && m.bins == bins && m.sr == sample_rate) return m;
-        }
-        SpecMap& m = specMaps_[specMapNext_];
-        specMapNext_ = (specMapNext_ + 1) % 4;
-        m.width = width; m.bins = bins; m.sr = sample_rate;
-        m.px.clear(); m.bin.clear();
-        const int fft_size = bins * 2;
-        for (int px = 0; px < width; px += SPEC_PX_STEP) {
-            float freq = x_to_freq((float)px, f_min, f_max, (float)width);
-            float bin = freq * fft_size / sample_rate;
-            if (bin < 1.0f) continue;
-            if (bin > bins - 3) break;
-            m.px.push_back((float)px);
-            m.bin.push_back(bin);
-        }
-        return m;
-    }
-
     void drawSpectrum(cairo_t* cr, const Vec& mags, int width, int height, float dB_min, float dB_max,
                       double line_width, float sample_rate, float r, float g, float b, const char* label,
                       float label_y, bool dash = false, bool fill = false) {
@@ -2433,33 +2385,30 @@ private:
         //draw_text(cr, width - 60, label_y, label);
 
         cairo_set_line_width(cr, line_width);
-        static const double dashes[] = {2.0};
-        if (dash) {
-            cairo_set_dash(cr, dashes, 1, 0);
-            cairo_set_line_width(cr, 1.0);
-        } else {
-            cairo_set_dash(cr, dashes, 0, 0);
-        }
 
-        const int bins = (int)mags.size();
-        const SpecMap& sm = get_spec_map(width, bins, sample_rate);
-        const size_t n = sm.px.size();
-        if (n == 0) return;
+        int bins = mags.size();
+        int fft_size = bins * 2;
 
-        for (size_t k = 0; k < n; ++k) {
-            const float y = db_to_y(hermiteLookup(mags, sm.bin[k]), dB_min, dB_max, height);
-            if (k == 0) cairo_move_to(cr, sm.px[k], y);
-            else cairo_line_to(cr, sm.px[k], y);
-        }
+        bool started = false;
 
-        if (!fill) {
-            cairo_stroke(cr);
-            return;
+        for (int px = 0; px < width; px += 2) {
+            float freq = x_to_freq((float)px, f_min, f_max, (float)width);
+            float bin = freq * fft_size / sample_rate;
+            if (bin < 1.0f) continue;
+            if (bin > bins - 3) break;
+            float mag = hermiteLookup(mags, bin);
+            float y = db_to_y(mag, dB_min, dB_max, height);
+            if (!started) {
+                cairo_move_to(cr, px, y);
+                started = true;
+            } else {
+                cairo_line_to(cr, px, y);
+            }
         }
         cairo_stroke_preserve(cr);
-
+    
         // Spectrum fill
-        {
+        if (started && fill) {
             //cairo_set_source_rgba(cr,  0.17, 0.82, 0.64, 0.15);
             cairo_line_to(cr, width, height);
             cairo_line_to(cr, 3, height);

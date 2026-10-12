@@ -30,8 +30,6 @@
 #endif
 
 
-enum PluginMode { MODE_MASTER = 0, MODE_LIVE = 1 };
-
 // ---------------------------------------------------------------------------
 // helper
 // ---------------------------------------------------------------------------
@@ -66,9 +64,8 @@ static double plainToNormalised(const Parameter& p, double plain) {
 struct toneshifteq_processor : v3_audio_processor_cpp {
     std::atomic_int refcounter{1};
     ToneShiftEQ* const plugin;
-    const PluginMode mode;
 
-    toneshifteq_processor(ToneShiftEQ* p, PluginMode m) : plugin(p), mode(m) {
+    toneshifteq_processor(ToneShiftEQ* p) : plugin(p) {
         query_interface = query_interface_processor;
         ref             = ref_processor;
         unref           = unref_processor;
@@ -131,15 +128,12 @@ struct toneshifteq_processor : v3_audio_processor_cpp {
     }
 
     static uint32_t V3_API get_latency_samples(void* self) {
-        toneshifteq_processor* const p = *static_cast<toneshifteq_processor**>(self);
-
-        return p->mode == MODE_LIVE ? 0 : p->plugin->getEngine()->conv->getLatency();
+        return 0;
     }
 
     static v3_result V3_API setup_processing(void* self, v3_process_setup* setup) {
         toneshifteq_processor* const p = *static_cast<toneshifteq_processor**>(self);
         p->plugin->initEngine(static_cast<uint32_t>(setup->sample_rate), 25, 1);
-        p->plugin->param->setParam( descriptor.hiddenParameter, static_cast<double>(p->mode));
 
         return V3_OK;
     }
@@ -339,11 +333,9 @@ struct toneshifteq_view : v3_plugin_view_cpp {
 struct toneshifteq_controller : v3_edit_controller_cpp {
     std::atomic_int refcounter{1};
     ToneShiftEQ* const plugin;
-    const PluginMode mode;
     toneshifteq_view* viewPtr = nullptr;
 
-    explicit toneshifteq_controller(ToneShiftEQ* p, PluginMode m) : plugin(p), mode(m) {
-        p->engine.param.setParam(84,(int)mode);
+    explicit toneshifteq_controller(ToneShiftEQ* p) : plugin(p) {
         query_interface = query_interface_controller;
         ref             = ref_controller;
         unref           = unref_controller;
@@ -448,13 +440,6 @@ struct toneshifteq_controller : v3_edit_controller_cpp {
 
         uint32_t flags = V3_PARAM_CAN_AUTOMATE;
 
-        if (idx ==  descriptor.hiddenParameter) flags |= V3_PARAM_IS_HIDDEN;
-        if (idx ==  113) flags |= V3_PARAM_IS_HIDDEN;
-        if (c->mode == MODE_LIVE) {
-            if (idx == 79 || idx == 80 || idx == 81 || idx == 83) {
-                flags |= V3_PARAM_IS_HIDDEN;
-            }
-        }
         info->flags = flags;
 
         return V3_OK;
@@ -528,12 +513,11 @@ struct toneshifteq_controller : v3_edit_controller_cpp {
 
 struct toneshifteq_component : v3_component_cpp {
     std::atomic_int refcounter{1};
-    const PluginMode mode;
     ToneShiftEQ plugin;
     toneshifteq_processor* processorPtr = nullptr;
     toneshifteq_controller* controllerPtr = nullptr;
 
-    explicit toneshifteq_component(PluginMode m) : mode(m) {
+    explicit toneshifteq_component() {
         query_interface = query_interface_component;
         ref             = ref_component;
         unref           = unref_component;
@@ -570,7 +554,7 @@ struct toneshifteq_component : v3_component_cpp {
 
         if (v3_tuid_match(iid, v3_audio_processor_iid)) {
             if (c->processorPtr == nullptr)
-                c->processorPtr = new toneshifteq_processor(&c->plugin, c->mode);
+                c->processorPtr = new toneshifteq_processor(&c->plugin);
             else
                 ++c->processorPtr->refcounter;
             *iface = &c->processorPtr;
@@ -580,7 +564,7 @@ struct toneshifteq_component : v3_component_cpp {
 
         if (v3_tuid_match(iid, v3_edit_controller_iid)) {
             if (c->controllerPtr == nullptr)
-                c->controllerPtr = new toneshifteq_controller(&c->plugin, c->mode);
+                c->controllerPtr = new toneshifteq_controller(&c->plugin);
             else
                 ++c->controllerPtr->refcounter;
             *iface = &c->controllerPtr;
@@ -741,23 +725,23 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
     static int32_t V3_API num_classes(void*) { return 2; }
 
     static v3_result V3_API get_class_info(void*, int32_t idx, v3_class_info* info) {
-        if (idx < 0 || idx > 1) return V3_INVALID_ARG;
+        if (idx != 0) return V3_INVALID_ARG;
         std::memset(info, 0, sizeof(*info));
-        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
+        std::memcpy(info->class_id, descriptor.masterUID, sizeof(v3_tuid));
         info->cardinality = 0x7FFFFFFF;
         std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
-        std::snprintf(info->name, sizeof(info->name), "%s", idx == 0 ? descriptor.masterName : descriptor.liveName);
+        std::snprintf(info->name, sizeof(info->name), "%s", descriptor.masterName);
 
         return V3_OK;
     }
 
     static v3_result V3_API get_class_info_2(void*, int32_t idx, v3_class_info_2* info) {
-        if (idx < 0 || idx > 1) return V3_INVALID_ARG;
+        if (idx != 0 ) return V3_INVALID_ARG;
         std::memset(info, 0, sizeof(*info));
-        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
+        std::memcpy(info->class_id, descriptor.masterUID, sizeof(v3_tuid));
         info->cardinality = 0x7FFFFFFF;
         std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
-        std::snprintf(info->name, sizeof(info->name), "%s", idx == 0 ? descriptor.masterName : descriptor.liveName);
+        std::snprintf(info->name, sizeof(info->name), "%s", descriptor.masterName);
         info->class_flags = 0;
         std::snprintf(info->sub_categories, sizeof(info->sub_categories), "%s", descriptor.subCategories);
         std::snprintf(info->vendor, sizeof(info->vendor), "%s", descriptor.vendor);
@@ -768,12 +752,12 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
     }
 
     static v3_result V3_API get_class_info_utf16(void*, int32_t idx, v3_class_info_3* info) {
-        if (idx < 0 || idx > 1) return V3_INVALID_ARG;
+        if (idx != 0) return V3_INVALID_ARG;
         std::memset(info, 0, sizeof(*info));
-        std::memcpy(info->class_id, idx == 0 ? descriptor.masterUID :  descriptor.liveUID, sizeof(v3_tuid));
+        std::memcpy(info->class_id, descriptor.masterUID, sizeof(v3_tuid));
         info->cardinality = 0x7FFFFFFF;
         std::snprintf(info->category, sizeof(info->category), "%s", descriptor.category);
-        asciiToUtf16(info->name, idx == 0 ? descriptor.masterName : descriptor.liveName, 64);
+        asciiToUtf16(info->name, descriptor.masterName, 64);
         info->class_flags = 0;
         std::snprintf(info->sub_categories, sizeof(info->sub_categories), "%s", descriptor.subCategories);
         asciiToUtf16(info->vendor, descriptor.vendor, 64);
@@ -786,17 +770,14 @@ struct toneshifteq_factory : v3_plugin_factory_cpp {
     static v3_result V3_API set_host_context(void*, v3_funknown**) { return V3_OK; }
 
     static v3_result V3_API create_instance(void*, const v3_tuid class_id, const v3_tuid iid, void** instance) {
-        PluginMode mode;
-        if (v3_tuid_match(class_id, descriptor.masterUID)) mode = MODE_MASTER;
-        else if (v3_tuid_match(class_id,  descriptor.liveUID)) mode = MODE_LIVE;
-        else return V3_NO_INTERFACE;
+        if (!v3_tuid_match(class_id, descriptor.masterUID)) return V3_NO_INTERFACE;
 
         if (!v3_tuid_match(iid, v3_component_iid) && !v3_tuid_match(iid, v3_funknown_iid))
             return V3_NO_INTERFACE;
 
         toneshifteq_component** const box = new (std::nothrow) toneshifteq_component*;
         if (box == nullptr) return V3_NOMEM;
-        *box = new toneshifteq_component(mode);
+        *box = new toneshifteq_component();
         *instance = static_cast<void*>(box);
 
         return V3_OK;

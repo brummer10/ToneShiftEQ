@@ -166,6 +166,10 @@ public:
         sw.check_spec();
         os_run_embedded(sw.getMain());
         sw.check_irmatch();
+        if (sw.redrawSpec.exchange(false, std::memory_order_acq_rel))
+            expose_widget(sw.spec);
+        if (sw.redrawFrame.exchange(false, std::memory_order_acq_rel))
+            sw.expose_frame();
     }
 
     Xputty *getMain() {

@@ -32,11 +32,11 @@ pre-ringing and requires additional latency.
 ### FFT Convolution Engine
 
 The EQ applies the IR to the audio signal using a partitioned overlap-add
-(OLA) convolution engine implemented in C++ using FFTW3. The IR is split
-into 32 partitions of 128 samples each, processed in the frequency domain
+(OLA) convolution engine implemented in C++ using [AudioFFT](https://github.com/HiFi-LoFi/AudioFFT). 
+The IR is split into 32 partitions of 128 samples each, processed in the frequency domain
 using FFT/IFFT pairs of size 256.
 
-- **Latency**: 128 samples, reported to the host for automatic compensation
+- **Latency**: zero
 - **IR length**: 4096 samples (32 × 128)
 - **FFT size**: 256 points (2 × partition size, for linear convolution)
 
@@ -92,18 +92,18 @@ ToneShiftEQ12 provides 12 parametric bands:
 
 | Band | Center Freq  | Range            | Default Type |
 |------|-------------|------------------|--------------|
-| 0    | 40 Hz       | 20 – 60 Hz       | Low Shelf    |
-| 1    | 70 Hz       | 40 – 100 Hz      | Peak         |
-| 2    | 120 Hz      | 70 – 180 Hz      | Peak         |
-| 3    | 210 Hz      | 120 – 300 Hz     | Peak         |
-| 4    | 370 Hz      | 200 – 550 Hz     | Peak         |
-| 5    | 650 Hz      | 350 – 900 Hz     | Peak         |
-| 6    | 1150 Hz     | 650 – 1600 Hz    | Peak         |
-| 7    | 2000 Hz     | 1100 – 2800 Hz   | Peak         |
-| 8    | 3500 Hz     | 1800 – 5000 Hz   | Peak         |
-| 9    | 6100 Hz     | 3500 – 9000 Hz   | Peak         |
-| 10   | 10700 Hz    | 6000 – 15000 Hz  | Peak         |
-| 11   | 18000 Hz    | 10000 – 20000 Hz | High Shelf   |
+| 0    | 40 Hz       | 20 – 20000 Hz    | Low Shelf    |
+| 1    | 70 Hz       | 20 – 20000 Hz    | Peak         |
+| 2    | 120 Hz      | 20 – 20000 Hz    | Peak         |
+| 3    | 210 Hz      | 20 – 20000 Hz    | Peak         |
+| 4    | 370 Hz      | 20 – 20000 Hz    | Peak         |
+| 5    | 650 Hz      | 20 – 20000 Hz    | Peak         |
+| 6    | 1150 Hz     | 20 – 20000 Hz    | Peak         |
+| 7    | 2000 Hz     | 20 – 20000 Hz    | Peak         |
+| 8    | 3500 Hz     | 20 – 20000 Hz    | Peak         |
+| 9    | 6100 Hz     | 20 – 20000 Hz    | Peak         |
+| 10   | 10700 Hz    | 20 – 20000 Hz    | Peak         |
+| 11   | 18000 Hz    | 20 – 20000 Hz    | High Shelf   |
 
 Each band provides:
 - **Frequency** — logarithmic range as shown above
@@ -115,10 +115,10 @@ Each band provides:
 - **Ratio** — set the Ratio for the dynamic EQ
 
 Additional global controls:
+- **Volume In** — input gain
 - **Low Cut / High Cut** — configurable high-pass and low-pass filters
-- **Smooth** — spectrum smoothing (FFT only)
-- **Contrast** — contrast EQ response amount (FFT only)
-- **Tone Bias** — global tilt filter (FFT only)
+- **Smooth** — spectrum smoothing (FFT dynamic only)
+- **Amount** — EQ response amount (FFT dynamic only)
 - **HF Fade** — smooth high-frequency roll-off (FFT only)
 - **Volume Out** — output gain
 
@@ -216,7 +216,7 @@ not part of the Equalizer APO file format.
 - **Formats**: LV2, CLAP, VST3
 - **Audio**: Stereo in/out, any sample rate
 - **Latency**: 
-        FFT mode: 128 samples (host-compensated)
+        FFT mode: 0 samples
         Biquad mode: 0 samples
-- **Dependencies**: FFTW3, Cairo, X11(Linux only)
+- **Dependencies**: Cairo, X11(Linux only)
 - **License**: BSD-3-Clause / Open Source

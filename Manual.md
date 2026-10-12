@@ -12,11 +12,9 @@ allowing adjustments either through dedicated controls or directly inside the sp
 
 ToneShiftEQ provides two processing modes.
 
-The default FFT mode uses minimum-phase parametric convolution
-and introduces a fixed latency of 128 samples,
-which is automatically reported to the host for delay compensation.
-
-The Biquad mode uses cascaded biquad filters and operates with zero latency.
+The default FFT mode uses minimum-phase parametric convolution,
+the Biquad mode uses cascaded biquad filters,
+both operates with zero latency.
 
 ---
 
@@ -40,7 +38,7 @@ that can be adjusted directly inside the display.
 
 It provides:
 
-* Real-time audio spectrum visualization
+* Real-time audio spectrum visualization (in and out-put)
 * Display of active EQ curves
 * Interactive filter control points
 * Frequency and gain reference grid
@@ -238,7 +236,7 @@ Range:
 
 ## Mode switch
 
-* FFT - Minimum-phase convolution engine with 128 samples latency
+* FFT - Minimum-phase convolution engine with zero latency
 
 * Biquad - Cascaded parametric biquad filters with zero latency
 
@@ -248,7 +246,7 @@ Range:
 
 ## FFT Mode
 
-* 128-sample latency
+* zero-latency
 
 * Supports Smooth, Contrast, Tone Bias and IR export
 
@@ -256,7 +254,7 @@ Range:
 
 ## Biquad Mode
 
-* Zero latency
+* zero-latency
 
 * Traditional parametric EQ behaviour
 
@@ -272,7 +270,7 @@ This reduces unnecessary ultrasonic energy while preserving the audible frequenc
 
 ---
 
-## Smooth (FFT mode only)
+## Smooth (FFT dynamic mode only)
 
 The Smooth control determines how much fine spectral detail is preserved in the generated response.
 
@@ -306,74 +304,6 @@ Typical use cases:
   * General tonal balancing
   * Mastering applications
   * Natural sounding corrections
-
----
-
-## Contrast (FFT mode only)
-
-The Contrast control adjusts spectral contrast by
-enhancing or reducing local frequency differences relative to the surrounding spectrum.
-
-Positive values:
-
-* Increase spectral contrast
-* Make peaks and details more pronounced
-* Increase clarity and presence
-* Can create a more vivid or energetic sound
-
-Negative values:
-
-* Reduce spectral contrast
-* Suppress excessive peaks
-* Produce a smoother and more controlled sound
-* Can reduce harshness and spectral density
-
-Internally, ToneShiftEQ compares local spectral structures against a smoothed reference and dynamically adjusts their intensity.
-
-Typical use cases:
-
-Positive settings:
-
-* Add articulation to vocals
-* Increase perceived attack and detail
-* Enhance transient perception
-
-Negative settings:
-
-* Tame harsh material
-* Smooth resonances
-* Reduce excessive spectral complexity
-
----
-
-## Tone Bias (FFT mode only)
-
-Tone Bias changes how spectral processing is distributed across the frequency range.
-
-Negative values:
-
-* Weight processing toward lower frequencies
-* Produce a warmer or darker balance
-
-Positive values:
-
-* Places greater emphasis on higher frequencies.
-* Produce a brighter or more open balance
-
-Tone Bias does not directly act as a conventional EQ tilt filter.
-Instead, it changes how strongly spectral modifications are applied across the frequency spectrum.
-
-Typical use cases:
-
-Negative settings:
-
-* Reduce excessive brightness
-* Add warmth
-
-Positive settings:
-
-* Increase clarity
-* Add air and presence
 
 ---
 
@@ -442,10 +372,6 @@ Only filters supported by Equalizer APO are written to the configuration.
 ToneShiftEQ uses a minimum-phase convolution engine. This means the phase
 response behaves similarly to analog equalizers: phase and amplitude are
 coupled, which produces a natural and musical character without pre-ringing.
-
-Processing introduces a fixed latency of 128 samples, which is automatically
-reported to the host for compensation. In practice this latency is inaudible
-and transparent in any DAW that supports latency compensation.
 
 ---
 

@@ -21,15 +21,12 @@ struct PluginDescriptor {
     const char* subCategories;
 
     const char* masterName;
-    const char* liveName;
 
     const char* version;
     const char* sdkVersion;
 
     v3_tuid masterUID;
-    v3_tuid liveUID;
 
-    int hiddenParameter;
 };
 
 inline constexpr PluginDescriptor descriptor = {
@@ -41,14 +38,11 @@ inline constexpr PluginDescriptor descriptor = {
     .category      = "Audio Module Class",
     .subCategories = "Fx|EQ",
 
-    .masterName    = "ToneShift-EQ12M",
-    .liveName      = "ToneShift-EQ12L",
+    .masterName    = "ToneShift-EQ12",
 
-    .version       = "1.3.0",
+    .version       = "2.0.0",
     .sdkVersion    = "VST 3.7.9",
 
-    .masterUID      = V3_ID(0xf56bf8c5, 0xf60047ce, 0xa5a7dd43, 0x1717129a),
-    .liveUID        = V3_ID(0xc1de8249, 0x99ae4365, 0x85a775bc, 0x91ea8d7e),
+    .masterUID      = V3_ID(0x9b78b7fd, 0x3ca04b5e, 0x8fda77b6, 0xb0406177),
 
-    .hiddenParameter = 84,
 };
